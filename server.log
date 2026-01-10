@@ -1,0 +1,169 @@
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.025ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type='table' AND name="categories"
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.046ms] [34;1m[rows:2][0m SELECT sql FROM sqlite_master WHERE type IN ("table","index") AND tbl_name = "categories" AND sql IS NOT NULL order by type = "table" desc
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.014ms] [34;1m[rows:-][0m SELECT * FROM `categories` LIMIT 1
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.019ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "table" AND tbl_name = "categories" AND (sql LIKE "%CONSTRAINT ""fk_categories_subcategories"" %" OR sql LIKE "%CONSTRAINT fk_categories_subcategories %" OR sql LIKE "%CONSTRAINT `fk_categories_subcategories`%" OR sql LIKE "%CONSTRAINT [fk_categories_subcategories]%" OR sql LIKE "%CONSTRAINT 	fk_categories_subcategories	%")
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.017ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "index" AND tbl_name = "categories" AND name = "idx_categories_slug"
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.011ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type='table' AND name="products"
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.033ms] [34;1m[rows:2][0m SELECT sql FROM sqlite_master WHERE type IN ("table","index") AND tbl_name = "products" AND sql IS NOT NULL order by type = "table" desc
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.016ms] [34;1m[rows:-][0m SELECT * FROM `products` LIMIT 1
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.014ms] [34;1m[rows:1][0m PRAGMA foreign_keys
+
+2026/01/08 21:47:34 [32m
+[0m[33m[0.013ms] [34;1m[rows:-][0m SELECT sql FROM sqlite_master WHERE type = "table" AND tbl_name = "products" AND name = "products"
+
+2026/01/08 21:47:34 [32m
+[0m[33m[0.176ms] [34;1m[rows:0][0m CREATE TABLE `products__temp`  (`id` integer PRIMARY KEY AUTOINCREMENT,`category_id` integer,`name` text NOT NULL,`slug` text NOT NULL,`brand` text,`description` text,`base_price` decimal(12,2) NOT NULL,`is_active` numeric DEFAULT true,`created_at` datetime,`updated_at` datetime,CONSTRAINT `fk_categories_products` FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`))
+
+2026/01/08 21:47:34 [32m
+[0m[33m[0.044ms] [34;1m[rows:0][0m INSERT INTO `products__temp`(`id`,`category_id`,`name`,`slug`,`brand`,`description`,`base_price`,`is_active`,`created_at`,`updated_at`) SELECT `id`,`category_id`,`name`,`slug`,`brand`,`description`,`base_price`,`is_active`,`created_at`,`updated_at` FROM `products`
+
+2026/01/08 21:47:34 [32m
+[0m[33m[0.149ms] [34;1m[rows:0][0m DROP TABLE `products`
+
+2026/01/08 21:47:34 [32m
+[0m[33m[0.376ms] [34;1m[rows:0][0m ALTER TABLE `products__temp` RENAME TO `products`
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.241ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "table" AND tbl_name = "products" AND (sql LIKE "%CONSTRAINT ""fk_categories_products"" %" OR sql LIKE "%CONSTRAINT fk_categories_products %" OR sql LIKE "%CONSTRAINT `fk_categories_products`%" OR sql LIKE "%CONSTRAINT [fk_categories_products]%" OR sql LIKE "%CONSTRAINT 	fk_categories_products	%")
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.049ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "index" AND tbl_name = "products" AND name = "idx_products_slug"
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[10.087ms] [34;1m[rows:0][0m CREATE UNIQUE INDEX `idx_products_slug` ON `products`(`slug`)
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.113ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type='table' AND name="product_variants"
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.133ms] [34;1m[rows:2][0m SELECT sql FROM sqlite_master WHERE type IN ("table","index") AND tbl_name = "product_variants" AND sql IS NOT NULL order by type = "table" desc
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.043ms] [34;1m[rows:-][0m SELECT * FROM `product_variants` LIMIT 1
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.036ms] [34;1m[rows:1][0m PRAGMA foreign_keys
+
+2026/01/08 21:47:34 [32m
+[0m[33m[0.047ms] [34;1m[rows:-][0m SELECT sql FROM sqlite_master WHERE type = "table" AND tbl_name = "product_variants" AND name = "product_variants"
+
+2026/01/08 21:47:34 [32m
+[0m[33m[0.465ms] [34;1m[rows:0][0m CREATE TABLE `product_variants__temp`  (`id` integer PRIMARY KEY AUTOINCREMENT,`product_id` integer,`sku` text NOT NULL,`price` decimal(12,2) NOT NULL,`stock` integer DEFAULT 0,`attributes` JSON NOT NULL,`created_at` datetime,CONSTRAINT `fk_products_variants` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`))
+
+2026/01/08 21:47:34 [32m
+[0m[33m[0.123ms] [34;1m[rows:0][0m INSERT INTO `product_variants__temp`(`id`,`product_id`,`sku`,`price`,`stock`,`attributes`,`created_at`) SELECT `id`,`product_id`,`sku`,`price`,`stock`,`attributes`,`created_at` FROM `product_variants`
+
+2026/01/08 21:47:34 [32m
+[0m[33m[0.504ms] [34;1m[rows:0][0m DROP TABLE `product_variants`
+
+2026/01/08 21:47:34 [32m
+[0m[33m[0.890ms] [34;1m[rows:0][0m ALTER TABLE `product_variants__temp` RENAME TO `product_variants`
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.171ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "table" AND tbl_name = "product_variants" AND (sql LIKE "%CONSTRAINT ""fk_products_variants"" %" OR sql LIKE "%CONSTRAINT fk_products_variants %" OR sql LIKE "%CONSTRAINT `fk_products_variants`%" OR sql LIKE "%CONSTRAINT [fk_products_variants]%" OR sql LIKE "%CONSTRAINT 	fk_products_variants	%")
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.080ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "index" AND tbl_name = "product_variants" AND name = "idx_product_variants_sku"
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[9.893ms] [34;1m[rows:0][0m CREATE UNIQUE INDEX `idx_product_variants_sku` ON `product_variants`(`sku`)
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.082ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type='table' AND name="product_images"
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.188ms] [34;1m[rows:1][0m SELECT sql FROM sqlite_master WHERE type IN ("table","index") AND tbl_name = "product_images" AND sql IS NOT NULL order by type = "table" desc
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.097ms] [34;1m[rows:-][0m SELECT * FROM `product_images` LIMIT 1
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.091ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "table" AND tbl_name = "product_images" AND (sql LIKE "%CONSTRAINT ""fk_products_images"" %" OR sql LIKE "%CONSTRAINT fk_products_images %" OR sql LIKE "%CONSTRAINT `fk_products_images`%" OR sql LIKE "%CONSTRAINT [fk_products_images]%" OR sql LIKE "%CONSTRAINT 	fk_products_images	%")
+
+2026/01/08 21:47:34 [32m/home/luiferdev/Documents/Dev/bey_api/main-test.go:24
+[0m[33m[0.071ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "table" AND tbl_name = "product_images" AND (sql LIKE "%CONSTRAINT ""fk_product_variants_images"" %" OR sql LIKE "%CONSTRAINT fk_product_variants_images %" OR sql LIKE "%CONSTRAINT `fk_product_variants_images`%" OR sql LIKE "%CONSTRAINT [fk_product_variants_images]%" OR sql LIKE "%CONSTRAINT 	fk_product_variants_images	%")
+[GIN-debug] [WARNING] Creating an Engine instance with the Logger and Recovery middleware already attached.
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] POST   /api/v1/categories        --> bey/internal/modules/products.(*ProductHandler).CreateCategory-fm (4 handlers)
+[GIN-debug] GET    /api/v1/categories        --> bey/internal/modules/products.(*ProductHandler).GetCategories-fm (4 handlers)
+[GIN-debug] GET    /api/v1/categories/:id    --> bey/internal/modules/products.(*ProductHandler).GetCategory-fm (4 handlers)
+[GIN-debug] GET    /api/v1/categories/slug/:slug --> bey/internal/modules/products.(*ProductHandler).GetCategoryBySlug-fm (4 handlers)
+[GIN-debug] PUT    /api/v1/categories/:id    --> bey/internal/modules/products.(*ProductHandler).UpdateCategory-fm (4 handlers)
+[GIN-debug] DELETE /api/v1/categories/:id    --> bey/internal/modules/products.(*ProductHandler).DeleteCategory-fm (4 handlers)
+[GIN-debug] POST   /api/v1/products          --> bey/internal/modules/products.(*ProductHandler).CreateProduct-fm (4 handlers)
+[GIN-debug] GET    /api/v1/products          --> bey/internal/modules/products.(*ProductHandler).GetProducts-fm (4 handlers)
+[GIN-debug] GET    /api/v1/products/slug/:slug --> bey/internal/modules/products.(*ProductHandler).GetProductBySlug-fm (4 handlers)
+[GIN-debug] GET    /api/v1/products/:id      --> bey/internal/modules/products.(*ProductHandler).GetProduct-fm (4 handlers)
+[GIN-debug] PUT    /api/v1/products/:id      --> bey/internal/modules/products.(*ProductHandler).UpdateProduct-fm (4 handlers)
+[GIN-debug] DELETE /api/v1/products/:id      --> bey/internal/modules/products.(*ProductHandler).DeleteProduct-fm (4 handlers)
+[GIN-debug] POST   /api/v1/products/:id/variants --> bey/internal/modules/products.(*ProductHandler).CreateVariant-fm (4 handlers)
+[GIN-debug] GET    /api/v1/products/:id/variants --> bey/internal/modules/products.(*ProductHandler).GetVariantsByProduct-fm (4 handlers)
+[GIN-debug] POST   /api/v1/products/:id/images --> bey/internal/modules/products.(*ProductHandler).CreateImage-fm (4 handlers)
+[GIN-debug] GET    /api/v1/products/:id/images --> bey/internal/modules/products.(*ProductHandler).GetImagesByProduct-fm (4 handlers)
+[GIN-debug] PUT    /api/v1/products/:id/images/:image_id/main --> bey/internal/modules/products.(*ProductHandler).SetMainImage-fm (4 handlers)
+[GIN-debug] GET    /api/v1/variants/:id      --> bey/internal/modules/products.(*ProductHandler).GetVariant-fm (4 handlers)
+[GIN-debug] PUT    /api/v1/variants/:id      --> bey/internal/modules/products.(*ProductHandler).UpdateVariant-fm (4 handlers)
+[GIN-debug] DELETE /api/v1/variants/:id      --> bey/internal/modules/products.(*ProductHandler).DeleteVariant-fm (4 handlers)
+[GIN-debug] GET    /api/v1/images/:id        --> bey/internal/modules/products.(*ProductHandler).GetImage-fm (4 handlers)
+[GIN-debug] PUT    /api/v1/images/:id        --> bey/internal/modules/products.(*ProductHandler).UpdateImage-fm (4 handlers)
+[GIN-debug] DELETE /api/v1/images/:id        --> bey/internal/modules/products.(*ProductHandler).DeleteImage-fm (4 handlers)
+[GIN-debug] GET    /health                   --> main.main.func2 (4 handlers)
+2026/01/08 21:47:34 Server starting on 0.0.0.0:8080
+[GIN-debug] [WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.
+Please check https://github.com/gin-gonic/gin/blob/master/docs/doc.md#dont-trust-all-proxies for details.
+[GIN-debug] Listening and serving HTTP on 0.0.0.0:8080
+[GIN] 2026/01/08 - 21:53:13 | 200 |     136.103µs |             ::1 | GET      "/health"
+[GIN] 2026/01/08 - 22:11:18 | 404 |      89.503µs |             ::1 | GET      "/"
+[GIN] 2026/01/08 - 22:11:18 | 404 |      31.236µs |             ::1 | GET      "/favicon.ico"
+[GIN] 2026/01/08 - 22:11:38 | 200 |    1.896467ms |             ::1 | GET      "/health"
+[GIN] 2026/01/08 - 22:11:49 | 404 |      16.923µs |             ::1 | GET      "/api/v1"
+
+2026/01/08 22:13:34 [32m/home/luiferdev/Documents/Dev/bey_api/internal/modules/products/repository.go:117
+[0m[33m[19.895ms] [34;1m[rows:0][0m SELECT * FROM `products` LIMIT 10
+[GIN] 2026/01/08 - 22:13:34 | 200 |   20.672371ms |             ::1 | GET      "/api/v1/products"
+
+2026/01/08 22:50:47 [32m/home/luiferdev/Documents/Dev/bey_api/internal/modules/products/repository.go:117
+[0m[33m[1.078ms] [34;1m[rows:0][0m SELECT * FROM `products` LIMIT 10
+[GIN] 2026/01/08 - 22:50:47 | 200 |    1.756259ms |             ::1 | GET      "/api/v1/products"
+
+2026/01/08 22:50:49 [32m/home/luiferdev/Documents/Dev/bey_api/internal/modules/products/repository.go:117
+[0m[33m[0.307ms] [34;1m[rows:0][0m SELECT * FROM `products` LIMIT 10
+[GIN] 2026/01/08 - 22:50:49 | 200 |     481.872µs |             ::1 | GET      "/api/v1/products"
+
+2026/01/08 22:50:49 [32m/home/luiferdev/Documents/Dev/bey_api/internal/modules/products/repository.go:117
+[0m[33m[0.496ms] [34;1m[rows:0][0m SELECT * FROM `products` LIMIT 10
+[GIN] 2026/01/08 - 22:50:49 | 200 |     722.242µs |             ::1 | GET      "/api/v1/products"
+
+2026/01/08 22:50:50 [32m/home/luiferdev/Documents/Dev/bey_api/internal/modules/products/repository.go:117
+[0m[33m[0.137ms] [34;1m[rows:0][0m SELECT * FROM `products` LIMIT 10
+[GIN] 2026/01/08 - 22:50:50 | 200 |     231.873µs |             ::1 | GET      "/api/v1/products"
+
+2026/01/08 22:50:50 [32m/home/luiferdev/Documents/Dev/bey_api/internal/modules/products/repository.go:117
+[0m[33m[0.219ms] [34;1m[rows:0][0m SELECT * FROM `products` LIMIT 10
+[GIN] 2026/01/08 - 22:50:50 | 200 |     314.119µs |             ::1 | GET      "/api/v1/products"
+[GIN] 2026/01/08 - 22:50:59 | 200 |      18.602µs |             ::1 | GET      "/health"
+[GIN] 2026/01/08 - 22:51:12 | 200 |       22.01µs |             ::1 | GET      "/health"
+[GIN] 2026/01/08 - 22:51:13 | 200 |      15.681µs |             ::1 | GET      "/health"
+[GIN] 2026/01/08 - 22:51:18 | 200 |      19.209µs |             ::1 | GET      "/health"
