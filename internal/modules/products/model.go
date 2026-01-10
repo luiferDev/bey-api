@@ -18,7 +18,7 @@ type Category struct {
 	Subcategories []Category `gorm:"foreignKey:ParentID" json:"subcategories,omitempty"`
 	Products      []Product  `gorm:"foreignKey:CategoryID" json:"products,omitempty"`
 }
-
+// commit
 // Product - Información General
 type Product struct {
 	ID          uint             `gorm:"primaryKey" json:"id"`
