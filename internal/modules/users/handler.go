@@ -21,6 +21,14 @@ func NewUserHandler(db *gorm.DB) *UserHandler {
 	}
 }
 
+// @Summary Create a new user
+// @Description Creates a new user account
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Param user body CreateUserRequest true "User data"
+// @Success 201 {object} UserResponse
+// @Router /api/v1/users [post]
 func (h *UserHandler) Create(c *gin.Context) {
 	var req CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -57,6 +65,14 @@ func (h *UserHandler) Create(c *gin.Context) {
 	h.resp.Created(c, toUserResponse(user))
 }
 
+// @Summary Get user by ID
+// @Description Retrieves a user by their ID
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Param id path int true "User ID"
+// @Success 200 {object} UserResponse
+// @Router /api/v1/users/{id} [get]
 func (h *UserHandler) GetByID(c *gin.Context) {
 	id := c.GetUint("user_id")
 	user, err := h.repo.FindByID(id)
@@ -71,6 +87,15 @@ func (h *UserHandler) GetByID(c *gin.Context) {
 	h.resp.Success(c, toUserResponse(user))
 }
 
+// @Summary Update a user
+// @Description Updates an existing user
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Param id path int true "User ID"
+// @Param user body UpdateUserRequest true "User data"
+// @Success 200 {object} UserResponse
+// @Router /api/v1/users/{id} [put]
 func (h *UserHandler) Update(c *gin.Context) {
 	id := c.GetUint("user_id")
 	user, err := h.repo.FindByID(id)
@@ -107,6 +132,14 @@ func (h *UserHandler) Update(c *gin.Context) {
 	h.resp.Success(c, toUserResponse(user))
 }
 
+// @Summary Delete a user
+// @Description Deletes a user by ID
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Param id path int true "User ID"
+// @Success 200 {object} gin.H
+// @Router /api/v1/users/{id} [delete]
 func (h *UserHandler) Delete(c *gin.Context) {
 	id := c.GetUint("user_id")
 	if err := h.repo.Delete(id); err != nil {
@@ -116,6 +149,13 @@ func (h *UserHandler) Delete(c *gin.Context) {
 	h.resp.Success(c, gin.H{"message": "user deleted"})
 }
 
+// @Summary List all users
+// @Description Retrieves a list of all users
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Success 200 {array} UserResponse
+// @Router /api/v1/users [get]
 func (h *UserHandler) List(c *gin.Context) {
 	users, err := h.repo.FindAll(0, 100)
 	if err != nil {
