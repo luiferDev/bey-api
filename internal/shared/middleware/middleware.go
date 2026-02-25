@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
+
+	"bey/internal/concurrency"
 )
 
 func CORSMiddleware() gin.HandlerFunc {
@@ -21,4 +23,15 @@ func CORSMiddleware() gin.HandlerFunc {
 
 func LoggerMiddleware() gin.HandlerFunc {
 	return gin.Logger()
+}
+
+var rateLimiter *RateLimiter
+
+func InitRateLimiter(enabled bool, requestsPerSecond, burstCapacity int, endpointLimits map[string]int) {
+	rateLimiter = NewRateLimiter(concurrency.RateLimitConfig{
+		Enabled:           enabled,
+		RequestsPerSecond: requestsPerSecond,
+		BurstCapacity:     burstCapacity,
+		EndpointLimits:    endpointLimits,
+	})
 }
