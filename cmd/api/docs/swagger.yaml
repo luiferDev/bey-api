@@ -1,0 +1,1169 @@
+basePath: /
+definitions:
+  datatypes.JSONMap:
+    additionalProperties: true
+    type: object
+  gin.H:
+    additionalProperties: {}
+    type: object
+  internal_modules_inventory.InventoryResponse:
+    properties:
+      available:
+        type: integer
+      id:
+        type: integer
+      product_id:
+        type: integer
+      quantity:
+        type: integer
+      reserved:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  internal_modules_inventory.UpdateInventoryRequest:
+    properties:
+      quantity:
+        type: integer
+    type: object
+  internal_modules_orders.CreateOrderItemRequest:
+    properties:
+      product_id:
+        type: integer
+      quantity:
+        type: integer
+    required:
+    - product_id
+    - quantity
+    type: object
+  internal_modules_orders.CreateOrderRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/internal_modules_orders.CreateOrderItemRequest'
+        minItems: 1
+        type: array
+      notes:
+        type: string
+      shipping_address:
+        type: string
+      user_id:
+        type: integer
+    required:
+    - items
+    - shipping_address
+    - user_id
+    type: object
+  internal_modules_orders.OrderItemResponse:
+    properties:
+      id:
+        type: integer
+      product_id:
+        type: integer
+      quantity:
+        type: integer
+      unit_price:
+        type: number
+    type: object
+  internal_modules_orders.OrderResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/internal_modules_orders.OrderItemResponse'
+        type: array
+      notes:
+        type: string
+      shipping_address:
+        type: string
+      status:
+        type: string
+      total_price:
+        type: number
+      user_id:
+        type: integer
+    type: object
+  internal_modules_products.Category:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      parent_id:
+        type: integer
+      products:
+        items:
+          $ref: '#/definitions/internal_modules_products.Product'
+        type: array
+      slug:
+        type: string
+      subcategories:
+        description: Relaciones
+        items:
+          $ref: '#/definitions/internal_modules_products.Category'
+        type: array
+    type: object
+  internal_modules_products.CreateCategoryRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      parent_id:
+        type: integer
+      slug:
+        type: string
+    required:
+    - name
+    - slug
+    type: object
+  internal_modules_products.CreateProductImageRequest:
+    properties:
+      is_main:
+        type: boolean
+      product_id:
+        type: integer
+      sort_order:
+        type: integer
+      url_image:
+        type: string
+      variant_id:
+        type: integer
+    required:
+    - product_id
+    - url_image
+    type: object
+  internal_modules_products.CreateProductRequest:
+    properties:
+      base_price:
+        type: number
+      brand:
+        type: string
+      category_id:
+        type: integer
+      description:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      slug:
+        type: string
+    required:
+    - base_price
+    - category_id
+    - name
+    - slug
+    type: object
+  internal_modules_products.CreateProductVariantRequest:
+    properties:
+      attributes:
+        $ref: '#/definitions/datatypes.JSONMap'
+      price:
+        type: number
+      product_id:
+        type: integer
+      sku:
+        type: string
+      stock:
+        type: integer
+    required:
+    - attributes
+    - price
+    - product_id
+    - sku
+    type: object
+  internal_modules_products.Product:
+    properties:
+      base_price:
+        type: number
+      brand:
+        type: string
+      category:
+        allOf:
+        - $ref: '#/definitions/internal_modules_products.Category'
+        description: Relaciones
+      category_id:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      images:
+        items:
+          $ref: '#/definitions/internal_modules_products.ProductImage'
+        type: array
+      is_active:
+        type: boolean
+      name:
+        type: string
+      slug:
+        type: string
+      updated_at:
+        type: string
+      variants:
+        items:
+          $ref: '#/definitions/internal_modules_products.ProductVariant'
+        type: array
+    type: object
+  internal_modules_products.ProductImage:
+    properties:
+      id:
+        type: integer
+      is_main:
+        type: boolean
+      product_id:
+        type: integer
+      sort_order:
+        type: integer
+      url_image:
+        type: string
+      variant_id:
+        description: Puntero para permitir nulos
+        type: integer
+    type: object
+  internal_modules_products.ProductVariant:
+    properties:
+      attributes:
+        $ref: '#/definitions/datatypes.JSONMap'
+      created_at:
+        type: string
+      id:
+        type: integer
+      images:
+        description: Relaciones
+        items:
+          $ref: '#/definitions/internal_modules_products.ProductImage'
+        type: array
+      price:
+        type: number
+      product_id:
+        type: integer
+      sku:
+        type: string
+      stock:
+        type: integer
+    type: object
+  internal_modules_products.UpdateCategoryRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      parent_id:
+        type: integer
+      slug:
+        type: string
+    type: object
+  internal_modules_products.UpdateProductImageRequest:
+    properties:
+      is_main:
+        type: boolean
+      sort_order:
+        type: integer
+      url_image:
+        type: string
+    type: object
+  internal_modules_products.UpdateProductRequest:
+    properties:
+      base_price:
+        type: number
+      brand:
+        type: string
+      category_id:
+        type: integer
+      description:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      slug:
+        type: string
+    type: object
+  internal_modules_products.UpdateProductVariantRequest:
+    properties:
+      attributes:
+        $ref: '#/definitions/datatypes.JSONMap'
+      price:
+        type: number
+      sku:
+        type: string
+      stock:
+        type: integer
+    type: object
+  internal_modules_users.CreateUserRequest:
+    properties:
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - first_name
+    - last_name
+    - password
+    type: object
+  internal_modules_users.UpdateUserRequest:
+    properties:
+      active:
+        type: boolean
+      first_name:
+        type: string
+      last_name:
+        type: string
+    type: object
+  internal_modules_users.UserResponse:
+    properties:
+      active:
+        type: boolean
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: integer
+      last_name:
+        type: string
+      role:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@example.com
+    name: API Support
+    url: http://www.example.com/support
+  description: E-commerce REST API with products, categories, orders, users, and inventory
+    management
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Bey API
+  version: "1.0"
+paths:
+  /api/v1/categories:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of all categories
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_modules_products.Category'
+            type: array
+      summary: Get all categories
+      tags:
+      - Categories
+    post:
+      consumes:
+      - application/json
+      description: Creates a new product category
+      parameters:
+      - description: Category data
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_products.CreateCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_modules_products.Category'
+      summary: Create a new category
+      tags:
+      - Categories
+  /api/v1/categories/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a category by ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Delete a category
+      tags:
+      - Categories
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a category by its ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_products.Category'
+      summary: Get category by ID
+      tags:
+      - Categories
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing category
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Category data
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_products.UpdateCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_products.Category'
+      summary: Update a category
+      tags:
+      - Categories
+  /api/v1/categories/slug/{slug}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a category by its slug
+      parameters:
+      - description: Category slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_products.Category'
+      summary: Get category by slug
+      tags:
+      - Categories
+  /api/v1/images/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes an image by ID
+      parameters:
+      - description: Image ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Delete an image
+      tags:
+      - Images
+    get:
+      consumes:
+      - application/json
+      description: Retrieves an image by its ID
+      parameters:
+      - description: Image ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_products.ProductImage'
+      summary: Get image by ID
+      tags:
+      - Images
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing image
+      parameters:
+      - description: Image ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Image data
+        in: body
+        name: image
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_products.UpdateProductImageRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_products.ProductImage'
+      summary: Update an image
+      tags:
+      - Images
+  /api/v1/inventory/{product_id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves inventory for a specific product
+      parameters:
+      - description: Product ID
+        in: path
+        name: product_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_inventory.InventoryResponse'
+      summary: Get inventory by product ID
+      tags:
+      - Inventory
+    put:
+      consumes:
+      - application/json
+      description: Updates inventory quantity for a product
+      parameters:
+      - description: Product ID
+        in: path
+        name: product_id
+        required: true
+        type: integer
+      - description: Inventory data
+        in: body
+        name: inventory
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_inventory.UpdateInventoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_inventory.InventoryResponse'
+      summary: Update inventory
+      tags:
+      - Inventory
+  /api/v1/inventory/{product_id}/reserve:
+    post:
+      consumes:
+      - application/json
+      description: Reserves inventory quantity for a product
+      parameters:
+      - description: Product ID
+        in: path
+        name: product_id
+        required: true
+        type: integer
+      - description: Quantity to reserve
+        in: body
+        name: quantity
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Reserve inventory
+      tags:
+      - Inventory
+  /api/v1/orders:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of all orders
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_modules_orders.OrderResponse'
+            type: array
+      summary: List all orders
+      tags:
+      - Orders
+    post:
+      consumes:
+      - application/json
+      description: Creates a new order (async or sync based on configuration)
+      parameters:
+      - description: Order data
+        in: body
+        name: order
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_orders.CreateOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_modules_orders.OrderResponse'
+        "202":
+          description: Accepted
+      summary: Create a new order
+      tags:
+      - Orders
+  /api/v1/orders/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves an order by its ID
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_orders.OrderResponse'
+      summary: Get order by ID
+      tags:
+      - Orders
+  /api/v1/orders/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: Updates the status of an existing order
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Order status
+        in: body
+        name: status
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_orders.OrderResponse'
+      summary: Update order status
+      tags:
+      - Orders
+  /api/v1/orders/tasks/{task_id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves the status of an async order processing task
+      parameters:
+      - description: Task ID
+        in: path
+        name: task_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Get task status
+      tags:
+      - Orders
+  /api/v1/products:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of products with optional pagination and filtering
+      parameters:
+      - description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      - description: Limit for pagination
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by category ID
+        in: query
+        name: category_id
+        type: integer
+      - description: Filter by active status
+        in: query
+        name: active
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_modules_products.Product'
+            type: array
+      summary: Get all products
+      tags:
+      - Products
+    post:
+      consumes:
+      - application/json
+      description: Creates a new product
+      parameters:
+      - description: Product data
+        in: body
+        name: product
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_products.CreateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_modules_products.Product'
+      summary: Create a new product
+      tags:
+      - Products
+  /api/v1/products/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a product by ID
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Delete a product
+      tags:
+      - Products
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a product by its ID
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_products.Product'
+      summary: Get product by ID
+      tags:
+      - Products
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing product
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Product data
+        in: body
+        name: product
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_products.UpdateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_products.Product'
+      summary: Update a product
+      tags:
+      - Products
+  /api/v1/products/{id}/images:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all images for a specific product
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_modules_products.ProductImage'
+            type: array
+      summary: Get images by product
+      tags:
+      - Images
+    post:
+      consumes:
+      - application/json
+      description: Creates a new image for a product
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Image data
+        in: body
+        name: image
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_products.CreateProductImageRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_modules_products.ProductImage'
+      summary: Create a product image
+      tags:
+      - Images
+  /api/v1/products/{id}/images/{image_id}/main:
+    put:
+      consumes:
+      - application/json
+      description: Sets a product image as the main image
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Image ID
+        in: path
+        name: image_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Set main image
+      tags:
+      - Images
+  /api/v1/products/{id}/variants:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all variants for a specific product
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_modules_products.ProductVariant'
+            type: array
+      summary: Get variants by product
+      tags:
+      - Variants
+    post:
+      consumes:
+      - application/json
+      description: Creates a new variant for a product
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Variant data
+        in: body
+        name: variant
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_products.CreateProductVariantRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_modules_products.ProductVariant'
+      summary: Create a product variant
+      tags:
+      - Variants
+  /api/v1/products/slug/{slug}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a product by its slug
+      parameters:
+      - description: Product slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_products.Product'
+      summary: Get product by slug
+      tags:
+      - Products
+  /api/v1/users:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of all users
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_modules_users.UserResponse'
+            type: array
+      summary: List all users
+      tags:
+      - Users
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account
+      parameters:
+      - description: User data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_users.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_modules_users.UserResponse'
+      summary: Create a new user
+      tags:
+      - Users
+  /api/v1/users/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a user by ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Delete a user
+      tags:
+      - Users
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a user by their ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_users.UserResponse'
+      summary: Get user by ID
+      tags:
+      - Users
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing user
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: User data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_users.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_users.UserResponse'
+      summary: Update a user
+      tags:
+      - Users
+  /api/v1/variants/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a variant by ID
+      parameters:
+      - description: Variant ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Delete a variant
+      tags:
+      - Variants
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a variant by its ID
+      parameters:
+      - description: Variant ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_products.ProductVariant'
+      summary: Get variant by ID
+      tags:
+      - Variants
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing variant
+      parameters:
+      - description: Variant ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Variant data
+        in: body
+        name: variant
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_products.UpdateProductVariantRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_products.ProductVariant'
+      summary: Update a variant
+      tags:
+      - Variants
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
