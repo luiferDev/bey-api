@@ -1,8 +1,8 @@
 package products
 
 import (
-	"time"
 	"gorm.io/datatypes"
+	"time"
 )
 
 // Category DTOs
@@ -52,19 +52,19 @@ type UpdateProductRequest struct {
 }
 
 type ProductResponse struct {
-	ID          uint                    `json:"id"`
-	CategoryID  uint                    `json:"category_id"`
-	Name        string                  `json:"name"`
-	Slug        string                  `json:"slug"`
-	Brand       string                  `json:"brand"`
-	Description string                  `json:"description"`
-	BasePrice   float64                 `json:"base_price"`
-	IsActive    bool                    `json:"is_active"`
-	CreatedAt   time.Time               `json:"created_at"`
-	UpdatedAt   time.Time               `json:"updated_at"`
-	Category    *CategoryResponse       `json:"category,omitempty"`
+	ID          uint                     `json:"id"`
+	CategoryID  uint                     `json:"category_id"`
+	Name        string                   `json:"name"`
+	Slug        string                   `json:"slug"`
+	Brand       string                   `json:"brand"`
+	Description string                   `json:"description"`
+	BasePrice   float64                  `json:"base_price"`
+	IsActive    bool                     `json:"is_active"`
+	CreatedAt   time.Time                `json:"created_at"`
+	UpdatedAt   time.Time                `json:"updated_at"`
+	Category    *CategoryResponse        `json:"category,omitempty"`
 	Variants    []ProductVariantResponse `json:"variants,omitempty"`
-	Images      []ProductImageResponse  `json:"images,omitempty"`
+	Images      []ProductImageResponse   `json:"images,omitempty"`
 }
 
 // ProductVariant DTOs
@@ -110,9 +110,9 @@ type UpdateProductImageRequest struct {
 }
 
 type ProductImageResponse struct {
-	ID        uint  `json:"id"`
-	ProductID uint  `json:"product_id"`
-	VariantID *uint `json:"variant_id"`
+	ID        uint   `json:"id"`
+	ProductID uint   `json:"product_id"`
+	VariantID *uint  `json:"variant_id"`
 	URLImage  string `json:"url_image"`
 	IsMain    bool   `json:"is_main"`
 	SortOrder int    `json:"sort_order"`

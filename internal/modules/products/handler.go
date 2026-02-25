@@ -8,10 +8,10 @@ import (
 )
 
 type ProductHandler struct {
-	categoryRepo      *CategoryRepository
-	productRepo       *ProductRepository
-	variantRepo       *ProductVariantRepository
-	imageRepo         *ProductImageRepository
+	categoryRepo *CategoryRepository
+	productRepo  *ProductRepository
+	variantRepo  *ProductVariantRepository
+	imageRepo    *ProductImageRepository
 }
 
 func NewProductHandler(
@@ -28,7 +28,14 @@ func NewProductHandler(
 	}
 }
 
-// Category Handlers
+// @Summary Create a new category
+// @Description Creates a new product category
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param category body CreateCategoryRequest true "Category data"
+// @Success 201 {object} Category
+// @Router /api/v1/categories [post]
 func (h *ProductHandler) CreateCategory(c *gin.Context) {
 	var req CreateCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -51,6 +58,14 @@ func (h *ProductHandler) CreateCategory(c *gin.Context) {
 	c.JSON(http.StatusCreated, category)
 }
 
+// @Summary Get category by ID
+// @Description Retrieves a category by its ID
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param id path int true "Category ID"
+// @Success 200 {object} Category
+// @Router /api/v1/categories/{id} [get]
 func (h *ProductHandler) GetCategory(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -71,9 +86,17 @@ func (h *ProductHandler) GetCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, category)
 }
 
+// @Summary Get category by slug
+// @Description Retrieves a category by its slug
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param slug path string true "Category slug"
+// @Success 200 {object} Category
+// @Router /api/v1/categories/slug/{slug} [get]
 func (h *ProductHandler) GetCategoryBySlug(c *gin.Context) {
 	slug := c.Param("slug")
-	
+
 	category, err := h.categoryRepo.FindBySlug(slug)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get category"})
@@ -87,6 +110,15 @@ func (h *ProductHandler) GetCategoryBySlug(c *gin.Context) {
 	c.JSON(http.StatusOK, category)
 }
 
+// @Summary Update a category
+// @Description Updates an existing category
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param id path int true "Category ID"
+// @Param category body UpdateCategoryRequest true "Category data"
+// @Success 200 {object} Category
+// @Router /api/v1/categories/{id} [put]
 func (h *ProductHandler) UpdateCategory(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -131,6 +163,14 @@ func (h *ProductHandler) UpdateCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, category)
 }
 
+// @Summary Delete a category
+// @Description Deletes a category by ID
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param id path int true "Category ID"
+// @Success 200
+// @Router /api/v1/categories/{id} [delete]
 func (h *ProductHandler) DeleteCategory(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -146,6 +186,13 @@ func (h *ProductHandler) DeleteCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Category deleted successfully"})
 }
 
+// @Summary Get all categories
+// @Description Retrieves a list of all categories
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Success 200 {array} Category
+// @Router /api/v1/categories [get]
 func (h *ProductHandler) GetCategories(c *gin.Context) {
 	categories, err := h.categoryRepo.FindAll()
 	if err != nil {
@@ -157,6 +204,14 @@ func (h *ProductHandler) GetCategories(c *gin.Context) {
 }
 
 // Product Handlers
+// @Summary Create a new product
+// @Description Creates a new product
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param product body CreateProductRequest true "Product data"
+// @Success 201 {object} Product
+// @Router /api/v1/products [post]
 func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	var req CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -187,6 +242,14 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	c.JSON(http.StatusCreated, product)
 }
 
+// @Summary Get product by ID
+// @Description Retrieves a product by its ID
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param id path int true "Product ID"
+// @Success 200 {object} Product
+// @Router /api/v1/products/{id} [get]
 func (h *ProductHandler) GetProduct(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -207,9 +270,17 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
+// @Summary Get product by slug
+// @Description Retrieves a product by its slug
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param slug path string true "Product slug"
+// @Success 200 {object} Product
+// @Router /api/v1/products/slug/{slug} [get]
 func (h *ProductHandler) GetProductBySlug(c *gin.Context) {
 	slug := c.Param("slug")
-	
+
 	product, err := h.productRepo.FindBySlug(slug)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get product"})
@@ -223,6 +294,15 @@ func (h *ProductHandler) GetProductBySlug(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
+// @Summary Update a product
+// @Description Updates an existing product
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param id path int true "Product ID"
+// @Param product body UpdateProductRequest true "Product data"
+// @Success 200 {object} Product
+// @Router /api/v1/products/{id} [put]
 func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -276,6 +356,14 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
+// @Summary Delete a product
+// @Description Deletes a product by ID
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param id path int true "Product ID"
+// @Success 200
+// @Router /api/v1/products/{id} [delete]
 func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -291,9 +379,30 @@ func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Product deleted successfully"})
 }
 
+// @Summary Get all products
+// @Description Retrieves a list of products with optional pagination and filtering
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param offset query int false "Offset for pagination"
+// @Param limit query int false "Limit for pagination"
+// @Param category_id query int false "Filter by category ID"
+// @Param active query bool false "Filter by active status"
+// @Success 200 {array} Product
+// @Router /api/v1/products [get]
 func (h *ProductHandler) GetProducts(c *gin.Context) {
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	if offset < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid offset: must be >= 0"})
+		return
+	}
+	if limit <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit: must be > 0"})
+		return
+	}
+
 	categoryID := c.Query("category_id")
 	active := c.Query("active")
 
@@ -301,15 +410,15 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 	var err error
 
 	if categoryID != "" {
-		catID, err := strconv.ParseUint(categoryID, 10, 32)
-		if err != nil {
+		catID, parseErr := strconv.ParseUint(categoryID, 10, 32)
+		if parseErr != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category ID"})
 			return
 		}
 		products, err = h.productRepo.FindByCategoryID(uint(catID), offset, limit)
 	} else if active != "" {
-		isActive, err := strconv.ParseBool(active)
-		if err != nil {
+		isActive, parseErr := strconv.ParseBool(active)
+		if parseErr != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid active value"})
 			return
 		}
@@ -327,6 +436,15 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 }
 
 // ProductVariant Handlers
+// @Summary Create a product variant
+// @Description Creates a new variant for a product
+// @Tags Variants
+// @Accept json
+// @Produce json
+// @Param id path int true "Product ID"
+// @Param variant body CreateProductVariantRequest true "Variant data"
+// @Success 201 {object} ProductVariant
+// @Router /api/v1/products/{id}/variants [post]
 func (h *ProductHandler) CreateVariant(c *gin.Context) {
 	var req CreateProductVariantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -350,6 +468,14 @@ func (h *ProductHandler) CreateVariant(c *gin.Context) {
 	c.JSON(http.StatusCreated, variant)
 }
 
+// @Summary Get variant by ID
+// @Description Retrieves a variant by its ID
+// @Tags Variants
+// @Accept json
+// @Produce json
+// @Param id path int true "Variant ID"
+// @Success 200 {object} ProductVariant
+// @Router /api/v1/variants/{id} [get]
 func (h *ProductHandler) GetVariant(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -370,6 +496,15 @@ func (h *ProductHandler) GetVariant(c *gin.Context) {
 	c.JSON(http.StatusOK, variant)
 }
 
+// @Summary Update a variant
+// @Description Updates an existing variant
+// @Tags Variants
+// @Accept json
+// @Produce json
+// @Param id path int true "Variant ID"
+// @Param variant body UpdateProductVariantRequest true "Variant data"
+// @Success 200 {object} ProductVariant
+// @Router /api/v1/variants/{id} [put]
 func (h *ProductHandler) UpdateVariant(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -414,6 +549,14 @@ func (h *ProductHandler) UpdateVariant(c *gin.Context) {
 	c.JSON(http.StatusOK, variant)
 }
 
+// @Summary Delete a variant
+// @Description Deletes a variant by ID
+// @Tags Variants
+// @Accept json
+// @Produce json
+// @Param id path int true "Variant ID"
+// @Success 200
+// @Router /api/v1/variants/{id} [delete]
 func (h *ProductHandler) DeleteVariant(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -429,6 +572,14 @@ func (h *ProductHandler) DeleteVariant(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Variant deleted successfully"})
 }
 
+// @Summary Get variants by product
+// @Description Retrieves all variants for a specific product
+// @Tags Variants
+// @Accept json
+// @Produce json
+// @Param id path int true "Product ID"
+// @Success 200 {array} ProductVariant
+// @Router /api/v1/products/{id}/variants [get]
 func (h *ProductHandler) GetVariantsByProduct(c *gin.Context) {
 	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -446,6 +597,15 @@ func (h *ProductHandler) GetVariantsByProduct(c *gin.Context) {
 }
 
 // ProductImage Handlers
+// @Summary Create a product image
+// @Description Creates a new image for a product
+// @Tags Images
+// @Accept json
+// @Produce json
+// @Param id path int true "Product ID"
+// @Param image body CreateProductImageRequest true "Image data"
+// @Success 201 {object} ProductImage
+// @Router /api/v1/products/{id}/images [post]
 func (h *ProductHandler) CreateImage(c *gin.Context) {
 	var req CreateProductImageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -474,6 +634,14 @@ func (h *ProductHandler) CreateImage(c *gin.Context) {
 	c.JSON(http.StatusCreated, image)
 }
 
+// @Summary Get image by ID
+// @Description Retrieves an image by its ID
+// @Tags Images
+// @Accept json
+// @Produce json
+// @Param id path int true "Image ID"
+// @Success 200 {object} ProductImage
+// @Router /api/v1/images/{id} [get]
 func (h *ProductHandler) GetImage(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -494,6 +662,15 @@ func (h *ProductHandler) GetImage(c *gin.Context) {
 	c.JSON(http.StatusOK, image)
 }
 
+// @Summary Update an image
+// @Description Updates an existing image
+// @Tags Images
+// @Accept json
+// @Produce json
+// @Param id path int true "Image ID"
+// @Param image body UpdateProductImageRequest true "Image data"
+// @Success 200 {object} ProductImage
+// @Router /api/v1/images/{id} [put]
 func (h *ProductHandler) UpdateImage(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -535,6 +712,14 @@ func (h *ProductHandler) UpdateImage(c *gin.Context) {
 	c.JSON(http.StatusOK, image)
 }
 
+// @Summary Delete an image
+// @Description Deletes an image by ID
+// @Tags Images
+// @Accept json
+// @Produce json
+// @Param id path int true "Image ID"
+// @Success 200
+// @Router /api/v1/images/{id} [delete]
 func (h *ProductHandler) DeleteImage(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -550,6 +735,14 @@ func (h *ProductHandler) DeleteImage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Image deleted successfully"})
 }
 
+// @Summary Get images by product
+// @Description Retrieves all images for a specific product
+// @Tags Images
+// @Accept json
+// @Produce json
+// @Param id path int true "Product ID"
+// @Success 200 {array} ProductImage
+// @Router /api/v1/products/{id}/images [get]
 func (h *ProductHandler) GetImagesByProduct(c *gin.Context) {
 	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -566,6 +759,15 @@ func (h *ProductHandler) GetImagesByProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, images)
 }
 
+// @Summary Set main image
+// @Description Sets a product image as the main image
+// @Tags Images
+// @Accept json
+// @Produce json
+// @Param id path int true "Product ID"
+// @Param image_id path int true "Image ID"
+// @Success 200
+// @Router /api/v1/products/{id}/images/{image_id}/main [put]
 func (h *ProductHandler) SetMainImage(c *gin.Context) {
 	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {

@@ -2,6 +2,9 @@ package products
 
 import (
 	"errors"
+	"time"
+
+	"bey/internal/concurrency"
 )
 
 type ProductService struct {
@@ -9,6 +12,7 @@ type ProductService struct {
 	productRepo  *ProductRepository
 	variantRepo  *ProductVariantRepository
 	imageRepo    *ProductImageRepository
+	taskQueue    concurrency.TaskQueue
 }
 
 func NewProductService(
@@ -22,6 +26,22 @@ func NewProductService(
 		productRepo:  productRepo,
 		variantRepo:  variantRepo,
 		imageRepo:    imageRepo,
+	}
+}
+
+func NewProductServiceWithTaskQueue(
+	categoryRepo *CategoryRepository,
+	productRepo *ProductRepository,
+	variantRepo *ProductVariantRepository,
+	imageRepo *ProductImageRepository,
+	taskQueue concurrency.TaskQueue,
+) *ProductService {
+	return &ProductService{
+		categoryRepo: categoryRepo,
+		productRepo:  productRepo,
+		variantRepo:  variantRepo,
+		imageRepo:    imageRepo,
+		taskQueue:    taskQueue,
 	}
 }
 
@@ -239,13 +259,234 @@ func (s *ProductService) GetProductStats(productID uint) (map[string]interface{}
 	}
 
 	stats := map[string]interface{}{
-		"product_id":     productID,
-		"variant_count":  variantCount,
-		"total_stock":    totalStock,
-		"image_count":    len(images),
-		"is_active":      product.IsActive,
-		"has_stock":      totalStock > 0,
+		"product_id":    productID,
+		"variant_count": variantCount,
+		"total_stock":   totalStock,
+		"image_count":   len(images),
+		"is_active":     product.IsActive,
+		"has_stock":     totalStock > 0,
 	}
 
 	return stats, nil
+}
+
+type BulkUpdateProductsRequest struct {
+	ProductIDs []uint                 `json:"product_ids" binding:"required"`
+	Updates    []UpdateProductRequest `json:"updates" binding:"required"`
+}
+
+type BulkCreateProductsRequest struct {
+	Products []CreateProductRequest `json:"products" binding:"required"`
+}
+
+type BulkDeleteProductsRequest struct {
+	ProductIDs []uint `json:"product_ids" binding:"required"`
+}
+
+type BulkTaskResult struct {
+	TotalProcessed int      `json:"total_processed"`
+	Successful     int      `json:"successful"`
+	Failed         int      `json:"failed"`
+	Errors         []string `json:"errors,omitempty"`
+}
+
+func (s *ProductService) SubmitBulkUpdateTask(req BulkUpdateProductsRequest) (string, error) {
+	if s.taskQueue == nil {
+		return "", errors.New("task queue not configured")
+	}
+
+	task := &concurrency.Task{
+		Type:    concurrency.TaskTypeBulkUpdate,
+		Status:  concurrency.TaskStatusPending,
+		Payload: req,
+	}
+
+	taskID, err := s.taskQueue.Submit(task)
+	if err != nil {
+		return "", err
+	}
+
+	go s.processBulkUpdateTask(task)
+
+	return taskID, nil
+}
+
+func (s *ProductService) processBulkUpdateTask(task *concurrency.Task) {
+	task.Status = concurrency.TaskStatusRunning
+	task.UpdatedAt = time.Now()
+
+	req, ok := task.Payload.(BulkUpdateProductsRequest)
+	if !ok {
+		task.Status = concurrency.TaskStatusFailed
+		task.Error = "invalid payload type"
+		task.UpdatedAt = time.Now()
+		return
+	}
+
+	result := BulkTaskResult{
+		TotalProcessed: len(req.ProductIDs),
+	}
+
+	for i, productID := range req.ProductIDs {
+		if i < len(req.Updates) {
+			update := req.Updates[i]
+			err := s.applyProductUpdate(productID, update)
+			if err != nil {
+				result.Failed++
+				result.Errors = append(result.Errors, err.Error())
+			} else {
+				result.Successful++
+			}
+		}
+	}
+
+	task.Result = result
+	task.Status = concurrency.TaskStatusCompleted
+	task.UpdatedAt = time.Now()
+}
+
+func (s *ProductService) applyProductUpdate(productID uint, update UpdateProductRequest) error {
+	product, err := s.productRepo.FindByID(productID)
+	if err != nil {
+		return err
+	}
+	if product == nil {
+		return errors.New("product not found")
+	}
+
+	if update.CategoryID != nil {
+		product.CategoryID = *update.CategoryID
+	}
+	if update.Name != nil {
+		product.Name = *update.Name
+	}
+	if update.Slug != nil {
+		product.Slug = *update.Slug
+	}
+	if update.Brand != nil {
+		product.Brand = *update.Brand
+	}
+	if update.Description != nil {
+		product.Description = *update.Description
+	}
+	if update.BasePrice != nil {
+		product.BasePrice = *update.BasePrice
+	}
+	if update.IsActive != nil {
+		product.IsActive = *update.IsActive
+	}
+
+	return s.productRepo.Update(product)
+}
+
+func (s *ProductService) SubmitBulkCreateTask(req BulkCreateProductsRequest) (string, error) {
+	if s.taskQueue == nil {
+		return "", errors.New("task queue not configured")
+	}
+
+	task := &concurrency.Task{
+		Type:    concurrency.TaskTypeBulkCreate,
+		Status:  concurrency.TaskStatusPending,
+		Payload: req,
+	}
+
+	taskID, err := s.taskQueue.Submit(task)
+	if err != nil {
+		return "", err
+	}
+
+	go s.processBulkCreateTask(task)
+
+	return taskID, nil
+}
+
+func (s *ProductService) processBulkCreateTask(task *concurrency.Task) {
+	task.Status = concurrency.TaskStatusRunning
+	task.UpdatedAt = time.Now()
+
+	req, ok := task.Payload.(BulkCreateProductsRequest)
+	if !ok {
+		task.Status = concurrency.TaskStatusFailed
+		task.Error = "invalid payload type"
+		task.UpdatedAt = time.Now()
+		return
+	}
+
+	result := BulkTaskResult{
+		TotalProcessed: len(req.Products),
+	}
+
+	for _, productReq := range req.Products {
+		_, err := s.CreateProductWithVariants(productReq, nil, nil)
+		if err != nil {
+			result.Failed++
+			result.Errors = append(result.Errors, err.Error())
+		} else {
+			result.Successful++
+		}
+	}
+
+	task.Result = result
+	task.Status = concurrency.TaskStatusCompleted
+	task.UpdatedAt = time.Now()
+}
+
+func (s *ProductService) SubmitBulkDeleteTask(req BulkDeleteProductsRequest) (string, error) {
+	if s.taskQueue == nil {
+		return "", errors.New("task queue not configured")
+	}
+
+	task := &concurrency.Task{
+		Type:    concurrency.TaskTypeBulkDelete,
+		Status:  concurrency.TaskStatusPending,
+		Payload: req,
+	}
+
+	taskID, err := s.taskQueue.Submit(task)
+	if err != nil {
+		return "", err
+	}
+
+	go s.processBulkDeleteTask(task)
+
+	return taskID, nil
+}
+
+func (s *ProductService) processBulkDeleteTask(task *concurrency.Task) {
+	task.Status = concurrency.TaskStatusRunning
+	task.UpdatedAt = time.Now()
+
+	req, ok := task.Payload.(BulkDeleteProductsRequest)
+	if !ok {
+		task.Status = concurrency.TaskStatusFailed
+		task.Error = "invalid payload type"
+		task.UpdatedAt = time.Now()
+		return
+	}
+
+	result := BulkTaskResult{
+		TotalProcessed: len(req.ProductIDs),
+	}
+
+	for _, productID := range req.ProductIDs {
+		err := s.productRepo.Delete(productID)
+		if err != nil {
+			result.Failed++
+			result.Errors = append(result.Errors, err.Error())
+		} else {
+			result.Successful++
+		}
+	}
+
+	task.Result = result
+	task.Status = concurrency.TaskStatusCompleted
+	task.UpdatedAt = time.Now()
+}
+
+func (s *ProductService) GetTaskStatus(taskID string) (*concurrency.Task, error) {
+	if s.taskQueue == nil {
+		return nil, errors.New("task queue not configured")
+	}
+
+	return s.taskQueue.GetStatus(taskID)
 }

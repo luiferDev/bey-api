@@ -2,7 +2,9 @@ package products
 
 import (
 	"errors"
+	"log"
 
+	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 )
 
@@ -25,6 +27,7 @@ func (r *CategoryRepository) FindByID(id uint) (*Category, error) {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
+		log.Printf("ERROR: Failed to find category by id %d: %v", id, err)
 		return nil, err
 	}
 	return &category, nil
@@ -36,22 +39,32 @@ func (r *CategoryRepository) FindBySlug(slug string) (*Category, error) {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
+		log.Printf("ERROR: Failed to find category by slug %s: %v", slug, err)
 		return nil, err
 	}
 	return &category, nil
 }
 
 func (r *CategoryRepository) Update(category *Category) error {
-	return r.db.Save(category).Error
+	if err := r.db.Save(category).Error; err != nil {
+		log.Printf("ERROR: Failed to update category %d: %v", category.ID, err)
+		return err
+	}
+	return nil
 }
 
 func (r *CategoryRepository) Delete(id uint) error {
-	return r.db.Delete(&Category{}, id).Error
+	if err := r.db.Delete(&Category{}, id).Error; err != nil {
+		log.Printf("ERROR: Failed to delete category %d: %v", id, err)
+		return err
+	}
+	return nil
 }
 
 func (r *CategoryRepository) FindAll() ([]Category, error) {
 	var categories []Category
 	if err := r.db.Where("parent_id IS NULL").Preload("Subcategories").Find(&categories).Error; err != nil {
+		log.Printf("ERROR: Failed to find all categories: %v", err)
 		return nil, err
 	}
 	return categories, nil
@@ -67,15 +80,29 @@ func (r *CategoryRepository) FindByParentID(parentID uint) ([]Category, error) {
 
 // ProductRepository
 type ProductRepository struct {
-	db *gorm.DB
+	db          *gorm.DB
+	variantRepo *ProductVariantRepository
+	imageRepo   *ProductImageRepository
 }
 
 func NewProductRepository(db *gorm.DB) *ProductRepository {
 	return &ProductRepository{db: db}
 }
 
+func NewProductRepositoryWithRelations(db *gorm.DB, variantRepo *ProductVariantRepository, imageRepo *ProductImageRepository) *ProductRepository {
+	return &ProductRepository{
+		db:          db,
+		variantRepo: variantRepo,
+		imageRepo:   imageRepo,
+	}
+}
+
 func (r *ProductRepository) Create(product *Product) error {
-	return r.db.Create(product).Error
+	if err := r.db.Create(product).Error; err != nil {
+		log.Printf("ERROR: Failed to create product %s: %v", product.Name, err)
+		return err
+	}
+	return nil
 }
 
 func (r *ProductRepository) FindByID(id uint) (*Product, error) {
@@ -84,6 +111,7 @@ func (r *ProductRepository) FindByID(id uint) (*Product, error) {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
+		log.Printf("ERROR: Failed to find product by id %d: %v", id, err)
 		return nil, err
 	}
 	return &product, nil
@@ -95,17 +123,26 @@ func (r *ProductRepository) FindBySlug(slug string) (*Product, error) {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
+		log.Printf("ERROR: Failed to find product by slug %s: %v", slug, err)
 		return nil, err
 	}
 	return &product, nil
 }
 
 func (r *ProductRepository) Update(product *Product) error {
-	return r.db.Save(product).Error
+	if err := r.db.Save(product).Error; err != nil {
+		log.Printf("ERROR: Failed to update product %d: %v", product.ID, err)
+		return err
+	}
+	return nil
 }
 
 func (r *ProductRepository) Delete(id uint) error {
-	return r.db.Delete(&Product{}, id).Error
+	if err := r.db.Delete(&Product{}, id).Error; err != nil {
+		log.Printf("ERROR: Failed to delete product %d: %v", id, err)
+		return err
+	}
+	return nil
 }
 
 func (r *ProductRepository) FindAll(offset, limit int) ([]Product, error) {
@@ -115,6 +152,7 @@ func (r *ProductRepository) FindAll(offset, limit int) ([]Product, error) {
 		query = query.Offset(offset).Limit(limit)
 	}
 	if err := query.Find(&products).Error; err != nil {
+		log.Printf("ERROR: Failed to find all products: %v", err)
 		return nil, err
 	}
 	return products, nil
@@ -127,6 +165,7 @@ func (r *ProductRepository) FindByCategoryID(categoryID uint, offset, limit int)
 		query = query.Offset(offset).Limit(limit)
 	}
 	if err := query.Find(&products).Error; err != nil {
+		log.Printf("ERROR: Failed to find products by category %d: %v", categoryID, err)
 		return nil, err
 	}
 	return products, nil
@@ -139,9 +178,57 @@ func (r *ProductRepository) FindByActive(isActive bool, offset, limit int) ([]Pr
 		query = query.Offset(offset).Limit(limit)
 	}
 	if err := query.Find(&products).Error; err != nil {
+		log.Printf("ERROR: Failed to find active products: %v", err)
 		return nil, err
 	}
 	return products, nil
+}
+
+type ProductWithRelations struct {
+	Product  *Product
+	Variants []ProductVariant
+	Images   []ProductImage
+}
+
+func (r *ProductRepository) FindByIDWithRelationsParallel(id uint) (*ProductWithRelations, error) {
+	if r.variantRepo == nil || r.imageRepo == nil {
+		return nil, errors.New("variant and image repositories are required for parallel fetch")
+	}
+
+	result := &ProductWithRelations{}
+
+	var eg errgroup.Group
+
+	eg.Go(func() error {
+		product, err := r.FindByID(id)
+		result.Product = product
+		return err
+	})
+
+	eg.Go(func() error {
+		variants, err := r.variantRepo.FindByProductID(id)
+		result.Variants = variants
+		return err
+	})
+
+	eg.Go(func() error {
+		images, err := r.imageRepo.FindByProductID(id)
+		result.Images = images
+		return err
+	})
+
+	if err := eg.Wait(); err != nil {
+		if result.Product == nil {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if result.Product == nil {
+		return nil, nil
+	}
+
+	return result, nil
 }
 
 // ProductVariantRepository
@@ -248,19 +335,17 @@ func (r *ProductImageRepository) FindByVariantID(variantID uint) ([]ProductImage
 }
 
 func (r *ProductImageRepository) SetMainImage(productID uint, imageID uint) error {
-	tx := r.db.Begin()
-	
-	// Desmarcar todas las imágenes como principales
-	if err := tx.Model(&ProductImage{}).Where("product_id = ?", productID).Update("is_main", false).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	
-	// Marcar la imagen específica como principal
-	if err := tx.Model(&ProductImage{}).Where("id = ? AND product_id = ?", imageID, productID).Update("is_main", true).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	
-	return tx.Commit().Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Desmarcar todas las imágenes como principales
+		if err := tx.Model(&ProductImage{}).Where("product_id = ?", productID).Update("is_main", false).Error; err != nil {
+			return err
+		}
+
+		// Marcar la imagen específica como principal
+		if err := tx.Model(&ProductImage{}).Where("id = ? AND product_id = ?", imageID, productID).Update("is_main", true).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }

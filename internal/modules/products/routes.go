@@ -6,6 +6,10 @@ import (
 )
 
 func SetupRoutes(router *gin.RouterGroup, db *gorm.DB) {
+	SetupRoutesWithService(router, db, nil)
+}
+
+func SetupRoutesWithService(router *gin.RouterGroup, db *gorm.DB, productService *ProductService) {
 	// Inicializar repositorios
 	categoryRepo := NewCategoryRepository(db)
 	productRepo := NewProductRepository(db)
