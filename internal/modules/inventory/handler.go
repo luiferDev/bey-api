@@ -19,6 +19,14 @@ func NewInventoryHandler(db *gorm.DB) *InventoryHandler {
 	}
 }
 
+// @Summary Get inventory by product ID
+// @Description Retrieves inventory for a specific product
+// @Tags Inventory
+// @Accept json
+// @Produce json
+// @Param product_id path int true "Product ID"
+// @Success 200 {object} InventoryResponse
+// @Router /api/v1/inventory/{product_id} [get]
 func (h *InventoryHandler) GetByProductID(c *gin.Context) {
 	productID := c.GetUint("product_id")
 	inventory, err := h.repo.FindByProductID(productID)
@@ -33,6 +41,15 @@ func (h *InventoryHandler) GetByProductID(c *gin.Context) {
 	h.resp.Success(c, toInventoryResponse(inventory))
 }
 
+// @Summary Update inventory
+// @Description Updates inventory quantity for a product
+// @Tags Inventory
+// @Accept json
+// @Produce json
+// @Param product_id path int true "Product ID"
+// @Param inventory body UpdateInventoryRequest true "Inventory data"
+// @Success 200 {object} InventoryResponse
+// @Router /api/v1/inventory/{product_id} [put]
 func (h *InventoryHandler) Update(c *gin.Context) {
 	productID := c.GetUint("product_id")
 	inventory, err := h.repo.FindByProductID(productID)
@@ -63,6 +80,15 @@ func (h *InventoryHandler) Update(c *gin.Context) {
 	h.resp.Success(c, toInventoryResponse(inventory))
 }
 
+// @Summary Reserve inventory
+// @Description Reserves inventory quantity for a product
+// @Tags Inventory
+// @Accept json
+// @Produce json
+// @Param product_id path int true "Product ID"
+// @Param quantity body object true "Quantity to reserve"
+// @Success 200
+// @Router /api/v1/inventory/{product_id}/reserve [post]
 func (h *InventoryHandler) Reserve(c *gin.Context) {
 	productID := c.GetUint("product_id")
 	inventory, err := h.repo.FindByProductID(productID)
