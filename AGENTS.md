@@ -1,154 +1,82 @@
 # AGENTS.md - Bey API Development Guide
 
 ## Project Overview
+Bey API is a Go REST API built with Gin + GORM. Provides e-commerce: products, categories, users, orders, inventory.
 
-Bey API is a Go REST API built with Gin web framework and GORM ORM. It provides e-commerce functionality including products, categories, users, orders, and inventory management.
-
-## Tech Stack
-- **Language**: Go 1.25+
-- **Web Framework**: Gin
-- **ORM**: GORM
-- **Databases**: PostgreSQL (production), SQLite (development)
-- **Configuration**: YAML-based
+**Tech Stack**: Go 1.25+, Gin, GORM, PostgreSQL/SQLite, YAML config
 
 ## Project Structure
 ```
 bey_api/
-├── cmd/api/main.go          # Application entry point
+├── cmd/api/main.go           # Entry point
 ├── internal/
-│   ├── config/              # Configuration loading
-│   ├── database/            # Database connection (postgres.go)
-│   ├── concurrency/        # Worker pool, task queue, task types
-│   ├── modules/             # Feature modules
-│   │   ├── products/        # Products, categories, variants, images
-│   │   ├── users/           # User management
-│   │   ├── orders/          # Order processing
-│   │   └── inventory/       # Inventory tracking
-│   └── shared/
-│       ├── middleware/      # CORS, logging, rate limiting middleware
-│       └── response/        # Response formatting helpers
-├── config.yaml              # Application configuration
-└── test_api.sh             # Manual API test script
+│   ├── config/               # YAML config loading
+│   ├── database/             # DB connection
+│   ├── concurrency/          # Worker pool, task queue
+│   ├── modules/              # Feature modules (products, users, orders, inventory)
+│   └── shared/               # Middleware, response helpers
+├── config.yaml
+└── openspec/                 # SDD specifications
 ```
 
-## Build & Run Commands
+## Essential Commands
 
-### Development
+### Build & Run
 ```bash
-# Run the application
-go run ./cmd/api/
-
-# Build binary
-go build -o main ./cmd/api/
-
-# Run with custom config
-go run ./cmd/api/ --config=/path/to/config.yaml
+go run ./cmd/api/                    # Run dev server
+go build -o main ./cmd/api/          # Build binary
 ```
 
-### Testing
+### Testing (SINGLE TEST - most important)
 ```bash
-# Run all tests
-go test ./...
-
-# Run tests with verbose output
-go test -v ./...
-
-# Run tests for specific package
-go test -v ./internal/modules/products/...
-
-# Run specific test function
-go test -v -run TestFunctionName ./internal/modules/products/...
-
-# Run tests with coverage
-go test -cover ./...
+go test -v -run TestFunctionName ./internal/modules/products/...  # Run one test
+go test -v ./internal/modules/products/...                          # Package tests
+go test -v ./...                                                   # All tests
+go test -cover ./...                                              # With coverage
 ```
 
-### Manual API Testing
+### Linting & Quality
 ```bash
-# Ensure server is running on localhost:8080, then:
-./test_api.sh
+go fmt ./...           # Format code
+go vet ./...           # Vet
+golangci-lint run      # Lint (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
 ```
 
-### Linting & Code Quality
+### Swagger
 ```bash
-# Install golangci-lint (if not present)
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
-# Run linter
-golangci-lint run
-
-# Format code
-go fmt ./...
-
-# Vet code
-go vet ./...
-```
-
-### Concurrency & Profiling
-```bash
-# Run with pprof enabled (starts on main port + 1, e.g., 8081 if API is on 8080)
-go run ./cmd/api/
-
-# Analyze goroutine heap dump
-go tool pprof http://localhost:8081/debug/pprof/heap
-
-# View current goroutines
-go tool pprof http://localhost:8081/debug/pprof/goroutine
-
-# Get goroutine profile (30 seconds)
-curl -o profile.pb http://localhost:8081/debug/pprof/profile?seconds=30
-
-# View blocking profile
-go tool pprof http://localhost:8081/debug/pprof/block
-
-# View mutex profile
-go tool pprof http://localhost:8081/debug/pprof/mutex
+swag init -g cmd/api/main.go -o cmd/api/docs --parseDependency --parseInternal  # Generate docs
+# Access: http://localhost:8080/swagger/index.html
 ```
 
 ## Code Style Guidelines
 
-### Package Organization
-- Handlers, repositories, models, and DTOs live in the same package per module
-- Use meaningful package names (e.g., `products`, `users`, `orders`)
-- Shared utilities go in `internal/shared/`
+### Naming
+- Files: `snake_case` (handler.go, model.go)
+- Types: `PascalCase` (ProductHandler, ProductRepository)
+- Variables: `camelCase` (productRepo, categoryID)
+- Interfaces: `er` suffix (Repository, Handler)
 
-### Naming Conventions
-- **Files**: snake_case (e.g., `handler.go`, `repository.go`, `model.go`)
-- **Types/Structs**: PascalCase (e.g., `ProductHandler`, `ProductRepository`)
-- **Functions/Methods**: PascalCase (e.g., `CreateProduct`, `FindByID`)
-- **Variables**: camelCase (e.g., `productRepo`, `categoryID`)
-- **Constants**: PascalCase or SCREAMING_SNAKE_CASE for config values
-- **Interfaces**: PascalCase with `er` suffix when appropriate (e.g., `Repository`)
-
-### Import Organization
-Standard Go import grouping:
+### Imports (3 groups, blank line between)
 ```go
 import (
-    // Standard library
+    // Stdlib
     "fmt"
     "net/http"
-    "strconv"
-    "time"
-
-    // Third-party packages
+    
+    // Third-party
     "github.com/gin-gonic/gin"
     "gorm.io/gorm"
-
-    // Internal packages
+    
+    // Internal
     "bey/internal/config"
-    "bey/internal/modules/products"
 )
 ```
 
 ### Error Handling
-- Return errors from repository and service layers
-- Handle errors in handlers with appropriate HTTP status codes
-- Use `errors.Is()` for error comparison (especially GORM errors)
-- Return `nil, nil` for "not found" cases (avoid wrapping in sentinel errors)
-- Log errors appropriately (use `log.Printf` or structured logging)
-
+- Return errors from repo/service layers
+- Use `errors.Is()` for GORM errors
+- Return `nil, nil` for "not found" (not sentinel errors)
 ```go
-// Repository example
 func (r *ProductRepository) FindByID(id uint) (*Product, error) {
     var product Product
     if err := r.db.First(&product, id).Error; err != nil {
@@ -159,121 +87,60 @@ func (r *ProductRepository) FindByID(id uint) (*Product, error) {
     }
     return &product, nil
 }
-
-// Handler example
-func (h *ProductHandler) GetProduct(c *gin.Context) {
-    id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-    if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
-        return
-    }
-
-    product, err := h.productRepo.FindByID(uint(id))
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get product"})
-        return
-    }
-    if product == nil {
-        c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
-        return
-    }
-
-    c.JSON(http.StatusOK, product)
-}
 ```
 
-### GORM Model Conventions
-- Use `gorm:"primaryKey"` for primary keys
-- Use `gorm:"size:X"` for string size limits
-- Use `gorm:"uniqueIndex"` or `gorm:"index"` for indexes
-- Use `gorm:"default:VALUE"` for defaults
-- Use `gorm:"foreignKey:Name"` for relationships
-- Use `gorm:"type:DECIMAL(12,2)"` for precise decimals
-
+### GORM Models
 ```go
 type Product struct {
-    ID          uint           `gorm:"primaryKey" json:"id"`
-    CategoryID  uint           `json:"category_id"`
-    Name        string         `gorm:"size:255;not null" json:"name"`
-    Slug        string         `gorm:"size:255;uniqueIndex;not null" json:"slug"`
-    BasePrice   float64        `gorm:"type:decimal(12,2);not null" json:"base_price"`
-    IsActive    bool           `gorm:"default:true" json:"is_active"`
-    Category    Category       `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
+    ID        uint      `gorm:"primaryKey" json:"id"`
+    Name      string    `gorm:"size:255;not null" json:"name"`
+    Slug      string    `gorm:"size:255;uniqueIndex;not null" json:"slug"`
+    BasePrice float64   `gorm:"type:decimal(12,2);not null" json:"base_price"`
+    Category  Category  `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 }
 ```
 
-### DTO Conventions
-- Request DTOs: `CreateXxxRequest`, `UpdateXxxRequest`
-- Response DTOs: `XxxResponse`
-- Use pointer types (`*string`, `*int`) for optional fields in requests
-- Use struct tags: `json:"field_name"`, `binding:"required"`
-- Validation: Use Gin's binding tags (e.g., `binding:"required"`, `binding:"gt=0"`)
-
+### DTOs
+- Request: `CreateXxxRequest`, `UpdateXxxRequest`
+- Response: `XxxResponse`
+- Optional fields: pointer types (`*string`, `*int`)
 ```go
 type CreateProductRequest struct {
     CategoryID  uint    `json:"category_id" binding:"required"`
     Name        string  `json:"name" binding:"required"`
     BasePrice   float64 `json:"base_price" binding:"required,gt=0"`
-    IsActive    *bool   `json:"is_active"`
 }
 ```
 
-### Handler Patterns
-- One handler struct per feature module
-- Pass dependencies via constructor
-- Use pointer receiver methods
-- Return early on errors
-- Use consistent response patterns via `response.Success()` or direct `c.JSON()`
-
+### Handlers
+- One struct per module, dependencies via constructor
+- Return early on errors, use `response.Success()` or `c.JSON()`
 ```go
 type ProductHandler struct {
     productRepo *ProductRepository
 }
 
 func NewProductHandler(productRepo *ProductRepository) *ProductHandler {
-    return &ProductHandler{
-        productRepo: productRepo,
-    }
+    return &ProductHandler{productRepo: productRepo}
 }
 ```
 
-### Route Registration
-- Group routes under `/api/v1` prefix
-- Use meaningful HTTP methods (GET, POST, PUT, DELETE)
-- Follow REST conventions: `/resources`, `/resources/:id`, `/resources/:id/subresource`
+### Routes
+- Group under `/api/v1`
+- REST conventions: `/resources`, `/resources/:id`
 
 ### Configuration
-- Configuration via YAML file (`config.yaml`)
-- Use `.env.example` to document required environment variables
-- Load config in `main.go` before database initialization
+- YAML in `config.yaml`
+- Load in `main.go` before DB init
+
+## Adding a New Module
+1. `model.go` - GORM models
+2. `repository.go` - Data access
+3. `handler.go` - HTTP handlers  
+4. `dto.go` - Request/Response DTOs
+5. `routes.go` - Route definitions
+6. Register in `main.go`
 
 ## Database
-
-### Migrations
-- Use GORM's `AutoMigrate()` in `main.go`
-- Models are defined in `internal/modules/*/model.go`
-
-### Connections
-- Database connection managed in `internal/database/postgres.go`
-- Supports PostgreSQL (production) and SQLite (development)
-
-## Common Tasks
-
-### Adding a New Module
-1. Create `internal/modules/<module>/model.go` - GORM models
-2. Create `internal/modules/<module>/repository.go` - Data access layer
-3. Create `internal/modules/<module>/handler.go` - HTTP handlers
-4. Create `internal/modules/<module>/dto.go` - Request/Response DTOs
-5. Create `internal/modules/<module>/routes.go` - Route definitions
-6. Register routes in `main.go`
-
-### Adding a New Endpoint
-1. Add DTO in `dto.go` if needed
-2. Add repository method in `repository.go`
-3. Add handler method in `handler.go`
-4. Register route in `routes.go`
-
-### Database Changes
-1. Modify model in `model.go`
-2. Run AutoMigrate or create manual migration
-3. Test with SQLite for development
+- Use GORM `AutoMigrate()` in main.go
+- Models in `internal/modules/*/model.go`
