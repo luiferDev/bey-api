@@ -42,3 +42,7 @@ dist/
 cmd/api/docs/docs.go
 cmd/api/docs/swagger.yaml
 cmd/api/docs/swagger.json
+
+# Test databases
+*.db
+*.db-*
