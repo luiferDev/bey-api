@@ -14,10 +14,10 @@ type Postgres struct {
 	DB *gorm.DB
 }
 
-func New(cfg config.DatabaseConfig) (*Postgres, error) {
+func New(cfg *config.Config) (*Postgres, error) {
 	dsn := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.Name,
+		cfg.GetDBHost(), cfg.GetDBPort(), cfg.GetDBUser(), cfg.GetDBPassword(), cfg.GetDBName(),
 	)
 
 	gormConfig := &gorm.Config{
@@ -34,9 +34,9 @@ func New(cfg config.DatabaseConfig) (*Postgres, error) {
 		return nil, fmt.Errorf("failed to get database instance: %w", err)
 	}
 
-	sqlDB.SetMaxOpenConns(cfg.MaxOpenConns)
-	sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
-	sqlDB.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	sqlDB.SetMaxOpenConns(cfg.Database.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.Database.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(cfg.Database.ConnMaxLifetime)
 
 	return &Postgres{DB: db}, nil
 }

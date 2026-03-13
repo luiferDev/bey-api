@@ -1,6 +1,8 @@
 package products
 
 import (
+	"bey/internal/modules/inventory"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -15,9 +17,10 @@ func SetupRoutesWithService(router *gin.RouterGroup, db *gorm.DB, productService
 	productRepo := NewProductRepository(db)
 	variantRepo := NewProductVariantRepository(db)
 	imageRepo := NewProductImageRepository(db)
+	inventoryRepo := inventory.NewInventoryRepository(db)
 
-	// Inicializar handler
-	handler := NewProductHandler(categoryRepo, productRepo, variantRepo, imageRepo)
+	// Inicializar handler con inventory
+	handler := NewProductHandlerWithInventory(categoryRepo, productRepo, variantRepo, imageRepo, inventoryRepo)
 
 	// Rutas de categorías
 	categories := router.Group("/categories")

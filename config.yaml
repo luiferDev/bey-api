@@ -25,3 +25,10 @@ concurrency:
     requests_per_second: 100
     burst_capacity: 200
     endpoint_limits: {}
+
+security:
+  allowed_origins:
+    - "http://localhost:3000"
+    - "http://localhost:8080"
+  jwt_secret: "your-secret-key-change-in-production"
+  jwt_expiry_hours: 2

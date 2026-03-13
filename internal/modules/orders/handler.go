@@ -2,15 +2,25 @@ package orders
 
 import (
 	"bey/internal/shared/response"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
+type VariantStockHandler interface {
+	ConfirmSale(id uint, quantity int) error
+	ReleaseStock(id uint, quantity int) error
+}
+
 type OrderHandler struct {
 	repo         *OrderRepository
 	orderService *OrderService
-	resp         *response.ResponseHandler
+	productRepo  interface {
+		GetPriceByID(id uint) (float64, error)
+	}
+	variantRepo VariantStockHandler
+	resp        *response.ResponseHandler
 }
 
 func NewOrderHandler(db *gorm.DB) *OrderHandler {
@@ -20,10 +30,14 @@ func NewOrderHandler(db *gorm.DB) *OrderHandler {
 	}
 }
 
-func NewOrderHandlerWithService(db *gorm.DB, orderService *OrderService) *OrderHandler {
+func NewOrderHandlerWithAllDeps(db *gorm.DB, orderService *OrderService, productRepo interface {
+	GetPriceByID(id uint) (float64, error)
+}, variantRepo VariantStockHandler) *OrderHandler {
 	return &OrderHandler{
 		repo:         NewOrderRepository(db),
 		orderService: orderService,
+		productRepo:  productRepo,
+		variantRepo:  variantRepo,
 		resp:         response.NewResponseHandler(),
 	}
 }
@@ -61,12 +75,26 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	var totalPrice float64
 	items := make([]OrderItem, len(req.Items))
 	for i, item := range req.Items {
+		unitPrice := float64(0)
+		if h.productRepo != nil {
+			price, err := h.productRepo.GetPriceByID(item.ProductID)
+			if err != nil {
+				h.resp.InternalError(c, "failed to get product price")
+				return
+			}
+			if price == 0 {
+				h.resp.ValidationError(c, "product not found")
+				return
+			}
+			unitPrice = price
+		}
+
 		items[i] = OrderItem{
 			ProductID: item.ProductID,
 			Quantity:  item.Quantity,
-			UnitPrice: 0,
+			UnitPrice: unitPrice,
 		}
-		totalPrice += float64(item.Quantity) * items[i].UnitPrice
+		totalPrice += float64(item.Quantity) * unitPrice
 	}
 
 	order := &Order{
@@ -95,8 +123,13 @@ func (h *OrderHandler) Create(c *gin.Context) {
 // @Success 200 {object} OrderResponse
 // @Router /api/v1/orders/{id} [get]
 func (h *OrderHandler) GetByID(c *gin.Context) {
-	id := c.GetUint("order_id")
-	order, err := h.repo.FindByID(id)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		h.resp.ValidationError(c, "invalid order_id")
+		return
+	}
+
+	order, err := h.repo.FindByID(uint(id))
 	if err != nil {
 		h.resp.InternalError(c, "failed to get order")
 		return
@@ -118,8 +151,13 @@ func (h *OrderHandler) GetByID(c *gin.Context) {
 // @Success 200 {object} OrderResponse
 // @Router /api/v1/orders/{id}/status [put]
 func (h *OrderHandler) UpdateStatus(c *gin.Context) {
-	id := c.GetUint("order_id")
-	order, err := h.repo.FindByID(id)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		h.resp.ValidationError(c, "invalid order_id")
+		return
+	}
+
+	order, err := h.repo.FindByID(uint(id))
 	if err != nil {
 		h.resp.InternalError(c, "failed to get order")
 		return
@@ -208,12 +246,121 @@ func (h *OrderHandler) GetTaskStatus(c *gin.Context) {
 	})
 }
 
+// @Summary Confirm order sale
+// @Description Confirms a sale after payment (finalizes the reservation)
+// @Tags Orders
+// @Accept json
+// @Produce json
+// @Param id path int true "Order ID"
+// @Success 200 {object} OrderResponse
+// @Router /api/v1/orders/{id}/confirm [post]
+func (h *OrderHandler) Confirm(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		h.resp.ValidationError(c, "invalid order_id")
+		return
+	}
+
+	order, err := h.repo.FindByID(uint(id))
+	if err != nil {
+		h.resp.InternalError(c, "failed to get order")
+		return
+	}
+	if order == nil {
+		h.resp.NotFound(c, "order not found")
+		return
+	}
+
+	// Only confirm pending or confirmed orders
+	if order.Status != "pending" && order.Status != "confirmed" {
+		h.resp.Error(c, 400, "order cannot be confirmed in current status")
+		return
+	}
+
+	// Confirm stock for each item
+	if h.variantRepo != nil {
+		for _, item := range order.Items {
+			if item.VariantID != nil {
+				// Confirm variant sale (just reduces reserved)
+				if err := h.variantRepo.ConfirmSale(*item.VariantID, item.Quantity); err != nil {
+					h.resp.InternalError(c, "failed to confirm variant stock")
+					return
+				}
+			}
+			// TODO: Also confirm inventory if no variant
+		}
+	}
+
+	order.Status = "confirmed"
+	if err := h.repo.Update(order); err != nil {
+		h.resp.InternalError(c, "failed to update order")
+		return
+	}
+
+	h.resp.Success(c, toOrderResponse(order))
+}
+
+// @Summary Cancel order
+// @Description Cancels an order and releases reserved inventory
+// @Tags Orders
+// @Accept json
+// @Produce json
+// @Param id path int true "Order ID"
+// @Success 200 {object} OrderResponse
+// @Router /api/v1/orders/{id}/cancel [post]
+func (h *OrderHandler) Cancel(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		h.resp.ValidationError(c, "invalid order_id")
+		return
+	}
+
+	order, err := h.repo.FindByID(uint(id))
+	if err != nil {
+		h.resp.InternalError(c, "failed to get order")
+		return
+	}
+	if order == nil {
+		h.resp.NotFound(c, "order not found")
+		return
+	}
+
+	// Only cancel pending orders
+	if order.Status != "pending" {
+		h.resp.Error(c, 400, "order cannot be cancelled in current status")
+		return
+	}
+
+	// Release stock for each item
+	if h.variantRepo != nil {
+		for _, item := range order.Items {
+			if item.VariantID != nil {
+				// Release variant stock (returns to stock, reduces reserved)
+				if err := h.variantRepo.ReleaseStock(*item.VariantID, item.Quantity); err != nil {
+					h.resp.InternalError(c, "failed to release variant stock")
+					return
+				}
+			}
+			// TODO: Also release inventory if no variant
+		}
+	}
+
+	order.Status = "cancelled"
+	if err := h.repo.Update(order); err != nil {
+		h.resp.InternalError(c, "failed to update order")
+		return
+	}
+
+	h.resp.Success(c, toOrderResponse(order))
+}
+
 func toOrderResponse(order *Order) OrderResponse {
 	items := make([]OrderItemResponse, len(order.Items))
 	for i := range order.Items {
 		items[i] = OrderItemResponse{
 			ID:        order.Items[i].ID,
 			ProductID: order.Items[i].ProductID,
+			VariantID: order.Items[i].VariantID,
 			Quantity:  order.Items[i].Quantity,
 			UnitPrice: order.Items[i].UnitPrice,
 		}

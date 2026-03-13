@@ -54,3 +54,10 @@ func (r *InventoryRepository) Reserve(productID uint, quantity int) error {
 		"reserved": gorm.Expr("reserved + ?", quantity),
 	}).Error
 }
+
+func (r *InventoryRepository) Release(productID uint, quantity int) error {
+	return r.db.Model(&Inventory{}).Where("product_id = ? AND reserved >= ?", productID, quantity).Updates(map[string]interface{}{
+		"quantity": gorm.Expr("quantity + ?", quantity),
+		"reserved": gorm.Expr("reserved - ?", quantity),
+	}).Error
+}

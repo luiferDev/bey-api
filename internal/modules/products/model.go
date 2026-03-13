@@ -48,6 +48,7 @@ type ProductVariant struct {
 	SKU        string            `gorm:"size:100;uniqueIndex;not null" json:"sku"`
 	Price      float64           `gorm:"type:decimal(12,2);not null" json:"price"`
 	Stock      int               `gorm:"default:0" json:"stock"`
+	Reserved   int               `gorm:"default:0" json:"reserved"` // Reservado en compras/checkout
 	Attributes datatypes.JSONMap `gorm:"type:jsonb;not null" json:"attributes"`
 	CreatedAt  time.Time         `json:"created_at"`
 	// Relaciones

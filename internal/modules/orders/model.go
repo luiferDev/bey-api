@@ -23,6 +23,7 @@ type OrderItem struct {
 	ID        uint      `gorm:"primarykey" json:"id"`
 	OrderID   uint      `gorm:"index" json:"order_id"`
 	ProductID uint      `gorm:"index" json:"product_id"`
+	VariantID *uint     `gorm:"index" json:"variant_id"` // Nullable - si es null, es el producto base
 	Quantity  int       `json:"quantity"`
 	UnitPrice float64   `gorm:"precision:10;scale:2" json:"unit_price"`
 	CreatedAt time.Time `json:"created_at"`
@@ -36,8 +37,9 @@ type CreateOrderRequest struct {
 }
 
 type CreateOrderItemRequest struct {
-	ProductID uint `json:"product_id" binding:"required"`
-	Quantity  int  `json:"quantity" binding:"required,gt=0"`
+	ProductID uint  `json:"product_id" binding:"required"`
+	VariantID *uint `json:"variant_id"` // Opcional - si se especifica, usa la variante
+	Quantity  int   `json:"quantity" binding:"required,gt=0"`
 }
 
 type OrderResponse struct {
@@ -54,6 +56,7 @@ type OrderResponse struct {
 type OrderItemResponse struct {
 	ID        uint    `json:"id"`
 	ProductID uint    `json:"product_id"`
+	VariantID *uint   `json:"variant_id"`
 	Quantity  int     `json:"quantity"`
 	UnitPrice float64 `json:"unit_price"`
 }

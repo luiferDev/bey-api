@@ -1,17 +1,21 @@
 package products
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+
+	"bey/internal/modules/inventory"
+	"bey/internal/shared/response"
 )
 
 type ProductHandler struct {
-	categoryRepo *CategoryRepository
-	productRepo  *ProductRepository
-	variantRepo  *ProductVariantRepository
-	imageRepo    *ProductImageRepository
+	categoryRepo  *CategoryRepository
+	productRepo   *ProductRepository
+	variantRepo   *ProductVariantRepository
+	imageRepo     *ProductImageRepository
+	inventoryRepo *inventory.InventoryRepository
+	response      *response.ResponseHandler
 }
 
 func NewProductHandler(
@@ -25,6 +29,24 @@ func NewProductHandler(
 		productRepo:  productRepo,
 		variantRepo:  variantRepo,
 		imageRepo:    imageRepo,
+		response:     response.NewResponseHandler(),
+	}
+}
+
+func NewProductHandlerWithInventory(
+	categoryRepo *CategoryRepository,
+	productRepo *ProductRepository,
+	variantRepo *ProductVariantRepository,
+	imageRepo *ProductImageRepository,
+	inventoryRepo *inventory.InventoryRepository,
+) *ProductHandler {
+	return &ProductHandler{
+		categoryRepo:  categoryRepo,
+		productRepo:   productRepo,
+		variantRepo:   variantRepo,
+		imageRepo:     imageRepo,
+		inventoryRepo: inventoryRepo,
+		response:      response.NewResponseHandler(),
 	}
 }
 
@@ -39,7 +61,7 @@ func NewProductHandler(
 func (h *ProductHandler) CreateCategory(c *gin.Context) {
 	var req CreateCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.response.ValidationError(c, err.Error())
 		return
 	}
 
@@ -51,11 +73,11 @@ func (h *ProductHandler) CreateCategory(c *gin.Context) {
 	}
 
 	if err := h.categoryRepo.Create(category); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create category"})
+		h.response.InternalError(c, "Failed to create category")
 		return
 	}
 
-	c.JSON(http.StatusCreated, category)
+	h.response.Created(c, category)
 }
 
 // @Summary Get category by ID
@@ -69,21 +91,21 @@ func (h *ProductHandler) CreateCategory(c *gin.Context) {
 func (h *ProductHandler) GetCategory(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category ID"})
+		h.response.ValidationError(c, "Invalid category ID")
 		return
 	}
 
 	category, err := h.categoryRepo.FindByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get category"})
+		h.response.InternalError(c, "Failed to get category")
 		return
 	}
 	if category == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
+		h.response.NotFound(c, "Category not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, category)
+	h.response.Success(c, category)
 }
 
 // @Summary Get category by slug
@@ -99,15 +121,15 @@ func (h *ProductHandler) GetCategoryBySlug(c *gin.Context) {
 
 	category, err := h.categoryRepo.FindBySlug(slug)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get category"})
+		h.response.InternalError(c, "Failed to get category")
 		return
 	}
 	if category == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
+		h.response.NotFound(c, "Category not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, category)
+	h.response.Success(c, category)
 }
 
 // @Summary Update a category
@@ -122,23 +144,23 @@ func (h *ProductHandler) GetCategoryBySlug(c *gin.Context) {
 func (h *ProductHandler) UpdateCategory(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category ID"})
+		h.response.ValidationError(c, "Invalid category ID")
 		return
 	}
 
 	category, err := h.categoryRepo.FindByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get category"})
+		h.response.InternalError(c, "Failed to get category")
 		return
 	}
 	if category == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
+		h.response.NotFound(c, "Category not found")
 		return
 	}
 
 	var req UpdateCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.response.ValidationError(c, err.Error())
 		return
 	}
 
@@ -156,11 +178,11 @@ func (h *ProductHandler) UpdateCategory(c *gin.Context) {
 	}
 
 	if err := h.categoryRepo.Update(category); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update category"})
+		h.response.InternalError(c, "Failed to update category")
 		return
 	}
 
-	c.JSON(http.StatusOK, category)
+	h.response.Success(c, category)
 }
 
 // @Summary Delete a category
@@ -174,16 +196,16 @@ func (h *ProductHandler) UpdateCategory(c *gin.Context) {
 func (h *ProductHandler) DeleteCategory(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category ID"})
+		h.response.ValidationError(c, "Invalid category ID")
 		return
 	}
 
 	if err := h.categoryRepo.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete category"})
+		h.response.InternalError(c, "Failed to delete category")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Category deleted successfully"})
+	h.response.Success(c, gin.H{"message": "Category deleted successfully"})
 }
 
 // @Summary Get all categories
@@ -196,11 +218,11 @@ func (h *ProductHandler) DeleteCategory(c *gin.Context) {
 func (h *ProductHandler) GetCategories(c *gin.Context) {
 	categories, err := h.categoryRepo.FindAll()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get categories"})
+		h.response.InternalError(c, "Failed to get categories")
 		return
 	}
 
-	c.JSON(http.StatusOK, categories)
+	h.response.Success(c, categories)
 }
 
 // Product Handlers
@@ -215,7 +237,7 @@ func (h *ProductHandler) GetCategories(c *gin.Context) {
 func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	var req CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.response.ValidationError(c, err.Error())
 		return
 	}
 
@@ -235,11 +257,11 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	}
 
 	if err := h.productRepo.Create(product); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create product"})
+		h.response.InternalError(c, "Failed to create product")
 		return
 	}
 
-	c.JSON(http.StatusCreated, product)
+	h.response.Created(c, product)
 }
 
 // @Summary Get product by ID
@@ -253,21 +275,21 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 func (h *ProductHandler) GetProduct(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+		h.response.ValidationError(c, "Invalid product ID")
 		return
 	}
 
 	product, err := h.productRepo.FindByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get product"})
+		h.response.InternalError(c, "Failed to get product")
 		return
 	}
 	if product == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+		h.response.NotFound(c, "Product not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, product)
+	h.response.Success(c, product)
 }
 
 // @Summary Get product by slug
@@ -283,15 +305,15 @@ func (h *ProductHandler) GetProductBySlug(c *gin.Context) {
 
 	product, err := h.productRepo.FindBySlug(slug)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get product"})
+		h.response.InternalError(c, "Failed to get product")
 		return
 	}
 	if product == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+		h.response.NotFound(c, "Product not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, product)
+	h.response.Success(c, product)
 }
 
 // @Summary Update a product
@@ -306,23 +328,23 @@ func (h *ProductHandler) GetProductBySlug(c *gin.Context) {
 func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+		h.response.ValidationError(c, "Invalid product ID")
 		return
 	}
 
 	product, err := h.productRepo.FindByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get product"})
+		h.response.InternalError(c, "Failed to get product")
 		return
 	}
 	if product == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+		h.response.NotFound(c, "Product not found")
 		return
 	}
 
 	var req UpdateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.response.ValidationError(c, err.Error())
 		return
 	}
 
@@ -349,11 +371,11 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	}
 
 	if err := h.productRepo.Update(product); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product"})
+		h.response.InternalError(c, "Failed to update product")
 		return
 	}
 
-	c.JSON(http.StatusOK, product)
+	h.response.Success(c, product)
 }
 
 // @Summary Delete a product
@@ -367,16 +389,16 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+		h.response.ValidationError(c, "Invalid product ID")
 		return
 	}
 
 	if err := h.productRepo.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete product"})
+		h.response.InternalError(c, "Failed to delete product")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Product deleted successfully"})
+	h.response.Success(c, gin.H{"message": "Product deleted successfully"})
 }
 
 // @Summary Get all products
@@ -395,11 +417,11 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
 	if offset < 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid offset: must be >= 0"})
+		h.response.ValidationError(c, "Invalid offset: must be >= 0")
 		return
 	}
 	if limit <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit: must be > 0"})
+		h.response.ValidationError(c, "Invalid limit: must be > 0")
 		return
 	}
 
@@ -412,14 +434,14 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 	if categoryID != "" {
 		catID, parseErr := strconv.ParseUint(categoryID, 10, 32)
 		if parseErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category ID"})
+			h.response.ValidationError(c, "Invalid category ID")
 			return
 		}
 		products, err = h.productRepo.FindByCategoryID(uint(catID), offset, limit)
 	} else if active != "" {
 		isActive, parseErr := strconv.ParseBool(active)
 		if parseErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid active value"})
+			h.response.ValidationError(c, "Invalid active value")
 			return
 		}
 		products, err = h.productRepo.FindByActive(isActive, offset, limit)
@@ -428,16 +450,16 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get products"})
+		h.response.InternalError(c, "Failed to get products")
 		return
 	}
 
-	c.JSON(http.StatusOK, products)
+	h.response.Success(c, products)
 }
 
 // ProductVariant Handlers
 // @Summary Create a product variant
-// @Description Creates a new variant for a product
+// @Description Creates a new variant for a product and updates inventory
 // @Tags Variants
 // @Accept json
 // @Produce json
@@ -448,7 +470,7 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 func (h *ProductHandler) CreateVariant(c *gin.Context) {
 	var req CreateProductVariantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.response.ValidationError(c, err.Error())
 		return
 	}
 
@@ -457,15 +479,46 @@ func (h *ProductHandler) CreateVariant(c *gin.Context) {
 		SKU:        req.SKU,
 		Price:      req.Price,
 		Stock:      req.Stock,
+		Reserved:   0,
 		Attributes: req.Attributes,
 	}
 
 	if err := h.variantRepo.Create(variant); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create variant"})
+		h.response.InternalError(c, "Failed to create variant")
 		return
 	}
 
-	c.JSON(http.StatusCreated, variant)
+	// Update inventory with variant stock
+	if h.inventoryRepo != nil && req.Stock > 0 {
+		// Find existing inventory or create new one
+		inv, err := h.inventoryRepo.FindByProductID(req.ProductID)
+		if err != nil {
+			h.response.InternalError(c, "Failed to update inventory")
+			return
+		}
+
+		if inv == nil {
+			// Create new inventory
+			inv = &inventory.Inventory{
+				ProductID: req.ProductID,
+				Quantity:  req.Stock,
+				Reserved:  0,
+			}
+			if err := h.inventoryRepo.Create(inv); err != nil {
+				h.response.InternalError(c, "Failed to create inventory")
+				return
+			}
+		} else {
+			// Update existing inventory (add stock)
+			newQuantity := inv.Quantity + req.Stock
+			if err := h.inventoryRepo.UpdateQuantity(req.ProductID, newQuantity); err != nil {
+				h.response.InternalError(c, "Failed to update inventory")
+				return
+			}
+		}
+	}
+
+	h.response.Created(c, variant)
 }
 
 // @Summary Get variant by ID
@@ -479,21 +532,21 @@ func (h *ProductHandler) CreateVariant(c *gin.Context) {
 func (h *ProductHandler) GetVariant(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid variant ID"})
+		h.response.ValidationError(c, "Invalid variant ID")
 		return
 	}
 
 	variant, err := h.variantRepo.FindByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get variant"})
+		h.response.InternalError(c, "Failed to get variant")
 		return
 	}
 	if variant == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Variant not found"})
+		h.response.NotFound(c, "Variant not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, variant)
+	h.response.Success(c, variant)
 }
 
 // @Summary Update a variant
@@ -508,23 +561,23 @@ func (h *ProductHandler) GetVariant(c *gin.Context) {
 func (h *ProductHandler) UpdateVariant(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid variant ID"})
+		h.response.ValidationError(c, "Invalid variant ID")
 		return
 	}
 
 	variant, err := h.variantRepo.FindByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get variant"})
+		h.response.InternalError(c, "Failed to get variant")
 		return
 	}
 	if variant == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Variant not found"})
+		h.response.NotFound(c, "Variant not found")
 		return
 	}
 
 	var req UpdateProductVariantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.response.ValidationError(c, err.Error())
 		return
 	}
 
@@ -542,11 +595,11 @@ func (h *ProductHandler) UpdateVariant(c *gin.Context) {
 	}
 
 	if err := h.variantRepo.Update(variant); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update variant"})
+		h.response.InternalError(c, "Failed to update variant")
 		return
 	}
 
-	c.JSON(http.StatusOK, variant)
+	h.response.Success(c, variant)
 }
 
 // @Summary Delete a variant
@@ -560,16 +613,16 @@ func (h *ProductHandler) UpdateVariant(c *gin.Context) {
 func (h *ProductHandler) DeleteVariant(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid variant ID"})
+		h.response.ValidationError(c, "Invalid variant ID")
 		return
 	}
 
 	if err := h.variantRepo.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete variant"})
+		h.response.InternalError(c, "Failed to delete variant")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Variant deleted successfully"})
+	h.response.Success(c, gin.H{"message": "Variant deleted successfully"})
 }
 
 // @Summary Get variants by product
@@ -583,17 +636,17 @@ func (h *ProductHandler) DeleteVariant(c *gin.Context) {
 func (h *ProductHandler) GetVariantsByProduct(c *gin.Context) {
 	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+		h.response.ValidationError(c, "Invalid product ID")
 		return
 	}
 
 	variants, err := h.variantRepo.FindByProductID(uint(productID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get variants"})
+		h.response.InternalError(c, "Failed to get variants")
 		return
 	}
 
-	c.JSON(http.StatusOK, variants)
+	h.response.Success(c, variants)
 }
 
 // ProductImage Handlers
@@ -609,7 +662,7 @@ func (h *ProductHandler) GetVariantsByProduct(c *gin.Context) {
 func (h *ProductHandler) CreateImage(c *gin.Context) {
 	var req CreateProductImageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.response.ValidationError(c, err.Error())
 		return
 	}
 
@@ -627,11 +680,11 @@ func (h *ProductHandler) CreateImage(c *gin.Context) {
 	}
 
 	if err := h.imageRepo.Create(image); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create image"})
+		h.response.InternalError(c, "Failed to create image")
 		return
 	}
 
-	c.JSON(http.StatusCreated, image)
+	h.response.Created(c, image)
 }
 
 // @Summary Get image by ID
@@ -645,21 +698,21 @@ func (h *ProductHandler) CreateImage(c *gin.Context) {
 func (h *ProductHandler) GetImage(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid image ID"})
+		h.response.ValidationError(c, "Invalid image ID")
 		return
 	}
 
 	image, err := h.imageRepo.FindByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get image"})
+		h.response.InternalError(c, "Failed to get image")
 		return
 	}
 	if image == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
+		h.response.NotFound(c, "Image not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, image)
+	h.response.Success(c, image)
 }
 
 // @Summary Update an image
@@ -674,23 +727,23 @@ func (h *ProductHandler) GetImage(c *gin.Context) {
 func (h *ProductHandler) UpdateImage(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid image ID"})
+		h.response.ValidationError(c, "Invalid image ID")
 		return
 	}
 
 	image, err := h.imageRepo.FindByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get image"})
+		h.response.InternalError(c, "Failed to get image")
 		return
 	}
 	if image == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
+		h.response.NotFound(c, "Image not found")
 		return
 	}
 
 	var req UpdateProductImageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.response.ValidationError(c, err.Error())
 		return
 	}
 
@@ -705,11 +758,11 @@ func (h *ProductHandler) UpdateImage(c *gin.Context) {
 	}
 
 	if err := h.imageRepo.Update(image); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update image"})
+		h.response.InternalError(c, "Failed to update image")
 		return
 	}
 
-	c.JSON(http.StatusOK, image)
+	h.response.Success(c, image)
 }
 
 // @Summary Delete an image
@@ -723,16 +776,16 @@ func (h *ProductHandler) UpdateImage(c *gin.Context) {
 func (h *ProductHandler) DeleteImage(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid image ID"})
+		h.response.ValidationError(c, "Invalid image ID")
 		return
 	}
 
 	if err := h.imageRepo.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete image"})
+		h.response.InternalError(c, "Failed to delete image")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Image deleted successfully"})
+	h.response.Success(c, gin.H{"message": "Image deleted successfully"})
 }
 
 // @Summary Get images by product
@@ -746,17 +799,17 @@ func (h *ProductHandler) DeleteImage(c *gin.Context) {
 func (h *ProductHandler) GetImagesByProduct(c *gin.Context) {
 	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+		h.response.ValidationError(c, "Invalid product ID")
 		return
 	}
 
 	images, err := h.imageRepo.FindByProductID(uint(productID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get images"})
+		h.response.InternalError(c, "Failed to get images")
 		return
 	}
 
-	c.JSON(http.StatusOK, images)
+	h.response.Success(c, images)
 }
 
 // @Summary Set main image
@@ -771,20 +824,20 @@ func (h *ProductHandler) GetImagesByProduct(c *gin.Context) {
 func (h *ProductHandler) SetMainImage(c *gin.Context) {
 	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+		h.response.ValidationError(c, "Invalid product ID")
 		return
 	}
 
 	imageID, err := strconv.ParseUint(c.Param("image_id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid image ID"})
+		h.response.ValidationError(c, "Invalid image ID")
 		return
 	}
 
 	if err := h.imageRepo.SetMainImage(uint(productID), uint(imageID)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set main image"})
+		h.response.InternalError(c, "Failed to set main image")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Main image set successfully"})
+	h.response.Success(c, gin.H{"message": "Main image set successfully"})
 }

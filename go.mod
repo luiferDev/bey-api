@@ -29,6 +29,7 @@ require (
 	github.com/go-openapi/swag/typeutils v0.25.4 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
 	github.com/go-sql-driver/mysql v1.9.3 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/swaggo/swag v1.16.6 // indirect

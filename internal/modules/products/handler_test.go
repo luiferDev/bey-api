@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"bey/internal/shared/response"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -47,10 +48,23 @@ func TestGetProducts_Success(t *testing.T) {
 		t.Errorf("Expected status 200, got %d", w.Code)
 	}
 
-	var products []Product
-	if err := json.Unmarshal(w.Body.Bytes(), &products); err != nil {
+	var apiResp response.ApiResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &apiResp); err != nil {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}
+
+	if !apiResp.Success {
+		t.Error("Expected success to be true")
+	}
+
+	// Data should be an array of products
+	products, ok := apiResp.Data.([]interface{})
+	if !ok {
+		t.Fatalf("Expected Data to be array, got %T", apiResp.Data)
+	}
+
+	// Verify we got a valid response (empty array is ok)
+	_ = products
 }
 
 func TestGetProducts_InvalidPagination_NegativeOffset(t *testing.T) {
@@ -204,9 +218,19 @@ func TestGetProducts_WithPagination(t *testing.T) {
 		t.Errorf("Expected status 200, got %d", w.Code)
 	}
 
-	var products []Product
-	if err := json.Unmarshal(w.Body.Bytes(), &products); err != nil {
+	var apiResp response.ApiResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &apiResp); err != nil {
 		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+
+	if !apiResp.Success {
+		t.Error("Expected success to be true")
+	}
+
+	// Data should be an array of products
+	products, ok := apiResp.Data.([]interface{})
+	if !ok {
+		t.Fatalf("Expected Data to be array, got %T", apiResp.Data)
 	}
 
 	if len(products) != 2 {

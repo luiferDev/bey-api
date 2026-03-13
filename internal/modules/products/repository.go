@@ -117,6 +117,18 @@ func (r *ProductRepository) FindByID(id uint) (*Product, error) {
 	return &product, nil
 }
 
+// GetPriceByID returns only the BasePrice of a product (optimized for order creation)
+func (r *ProductRepository) GetPriceByID(id uint) (float64, error) {
+	var product Product
+	if err := r.db.Model(&Product{}).Select("base_price").First(&product, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return product.BasePrice, nil
+}
+
 func (r *ProductRepository) FindBySlug(slug string) (*Product, error) {
 	var product Product
 	if err := r.db.Preload("Category").Preload("Variants").Preload("Images").Where("slug = ?", slug).First(&product).Error; err != nil {
@@ -284,6 +296,56 @@ func (r *ProductVariantRepository) FindByProductID(productID uint) ([]ProductVar
 
 func (r *ProductVariantRepository) UpdateStock(id uint, stock int) error {
 	return r.db.Model(&ProductVariant{}).Where("id = ?", id).Update("stock", stock).Error
+}
+
+// GetPriceAndStock returns price and available stock for a variant
+func (r *ProductVariantRepository) GetPriceAndStock(id uint) (float64, int, int, error) {
+	var variant ProductVariant
+	if err := r.db.Select("price", "stock", "reserved").First(&variant, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, 0, 0, nil
+		}
+		return 0, 0, 0, err
+	}
+	return variant.Price, variant.Stock, variant.Reserved, nil
+}
+
+// ReserveStock reserves stock for a variant (used in orders)
+// Decrements stock, increments reserved
+func (r *ProductVariantRepository) ReserveStock(id uint, quantity int) error {
+	result := r.db.Model(&ProductVariant{}).
+		Where("id = ? AND (stock - reserved) >= ?", id, quantity).
+		Updates(map[string]interface{}{
+			"stock":    gorm.Expr("stock - ?", quantity),
+			"reserved": gorm.Expr("reserved + ?", quantity),
+		})
+	if result.RowsAffected == 0 {
+		return errors.New("insufficient stock")
+	}
+	return result.Error
+}
+
+// ReleaseStock releases reserved stock (e.g., on order cancellation)
+// Increments stock, decrements reserved
+func (r *ProductVariantRepository) ReleaseStock(id uint, quantity int) error {
+	result := r.db.Model(&ProductVariant{}).
+		Where("id = ? AND reserved >= ?", id, quantity).
+		Updates(map[string]interface{}{
+			"stock":    gorm.Expr("stock + ?", quantity),
+			"reserved": gorm.Expr("reserved - ?", quantity),
+		})
+	if result.RowsAffected == 0 {
+		return errors.New("insufficient reserved stock")
+	}
+	return result.Error
+}
+
+// ConfirmSale converts reserved stock to sold (e.g., after payment)
+// Just decrements reserved (stock already decreased)
+func (r *ProductVariantRepository) ConfirmSale(id uint, quantity int) error {
+	return r.db.Model(&ProductVariant{}).
+		Where("id = ? AND reserved >= ?", id, quantity).
+		Update("reserved", gorm.Expr("reserved - ?", quantity)).Error
 }
 
 // ProductImageRepository

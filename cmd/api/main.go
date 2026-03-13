@@ -38,6 +38,7 @@ import (
 	"bey/internal/modules/orders"
 	"bey/internal/modules/products"
 	"bey/internal/modules/users"
+	"bey/internal/shared"
 	"bey/internal/shared/middleware"
 	"bey/internal/shared/response"
 
@@ -58,7 +59,7 @@ func main() {
 		log.Fatalf("Invalid worker_pool_size: %d (must be > 0)", cfg.Concurrency.WorkerPool.WorkerPoolSize)
 	}
 
-	db, err := database.New(cfg.Database)
+	db, err := database.New(cfg)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -91,6 +92,9 @@ func main() {
 
 	rateLimiter := middleware.NewRateLimiter(cfg.Concurrency.RateLimit)
 
+	// Initialize CORS with configured origins
+	middleware.InitCORS(cfg.Security.GetAllowedOrigins())
+
 	router := gin.Default()
 
 	router.Use(middleware.CORSMiddleware())
@@ -99,20 +103,27 @@ func main() {
 
 	responseHandler := response.NewResponseHandler()
 
-	orderService := orders.NewOrderServiceWithTaskQueue(orders.NewOrderRepository(db.GetDB()), taskQueue)
-
 	categoryRepo := products.NewCategoryRepository(db.GetDB())
 	productRepo := products.NewProductRepository(db.GetDB())
 	variantRepo := products.NewProductVariantRepository(db.GetDB())
 	imageRepo := products.NewProductImageRepository(db.GetDB())
 	productService := products.NewProductServiceWithTaskQueue(categoryRepo, productRepo, variantRepo, imageRepo, taskQueue)
 
+	inventoryRepo := inventory.NewInventoryRepository(db.GetDB())
+	orderService := orders.NewOrderServiceWithAllDepsAndVariant(
+		orders.NewOrderRepository(db.GetDB()),
+		taskQueue,
+		productRepo,
+		inventoryRepo,
+		variantRepo,
+	)
+
 	// Register API routes first (higher priority)
 	api := router.Group("/api/v1")
 	{
 		users.RegisterRoutes(api, db.GetDB())
 		products.SetupRoutesWithService(api, db.GetDB(), productService)
-		orders.RegisterRoutesWithService(api, db.GetDB(), orderService)
+		orders.RegisterRoutesWithProductAndVariant(api, db.GetDB(), orderService, productRepo, variantRepo)
 		inventory.RegisterRoutes(api, db.GetDB())
 	}
 
@@ -128,7 +139,18 @@ func main() {
 	}
 
 	router.GET("/health", func(c *gin.Context) {
-		responseHandler.Success(c, gin.H{"status": "healthy"})
+		health := shared.PerformHealthCheck(
+			db.GetDB(),
+			cfg.Concurrency.WorkerPool.WorkerPoolSize,
+			0,    // Queue depth would require accessing the internal channel
+			true, // Assuming running if we got this far
+		)
+
+		if health.Status == "unhealthy" {
+			c.JSON(http.StatusServiceUnavailable, health)
+			return
+		}
+		responseHandler.Success(c, health)
 	})
 
 	go func() {
