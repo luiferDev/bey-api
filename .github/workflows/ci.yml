@@ -7,8 +7,8 @@ on:
     branches: [main, develop]
 
 env:
-  GO_VERSION: '1.25'
-  GOLANGCI_LINT_VERSION: 'latest'
+  GO_VERSION: '1.23'
+  GOLANGCI_LINT_VERSION: 'v1.60'
 
 jobs:
   lint:
@@ -28,7 +28,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: --timeout=5m
+          args: --timeout=5m --config=.golangci.yml
 
   test:
     name: Test

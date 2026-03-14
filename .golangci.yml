@@ -28,6 +28,11 @@ issues:
   exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
+  exclude-dirs:
+    - vendor
+    - .git
+    - openspec
+    - cmd/api/docs
   exclude-rules:
     # Exclude ALL linters from test files
     - path: _test\.go
@@ -90,11 +95,6 @@ issues:
 run:
   timeout: 5m
   modules-download-mode: readonly
-  skip-dirs:
-    - vendor
-    - .git
-    - openspec
-    - cmd/api/docs
 
 output:
   formats:
