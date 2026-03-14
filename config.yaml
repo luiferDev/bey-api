@@ -6,7 +6,7 @@ app:
   swagger_enabled: true
 
 database:
-  host: "localhost"
+  host: "postgres"
   port: 5432
   user: "bey_user"
   password: "bey_password"
