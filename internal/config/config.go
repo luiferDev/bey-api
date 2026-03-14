@@ -27,6 +27,8 @@ type AppConfig struct {
 	Mode           string `yaml:"mode"`
 	StaticPath     string `yaml:"static_path"`
 	SwaggerEnabled bool   `yaml:"swagger_enabled"`
+	AdminEmail     string `yaml:"admin_email"`
+	AdminPassword  string `yaml:"admin_password"`
 }
 
 type DatabaseConfig struct {
@@ -218,6 +220,22 @@ func (c *Config) GetEmailConfig() EmailConfig {
 // GetOAuthConfig returns the OAuth configuration
 func (c *Config) GetOAuthConfig() OAuthConfig {
 	return c.OAuth
+}
+
+// GetAdminEmail returns admin email from env var or config
+func (c *Config) GetAdminEmail() string {
+	if e := os.Getenv("ADMIN_EMAIL"); e != "" {
+		return e
+	}
+	return c.App.AdminEmail
+}
+
+// GetAdminPassword returns admin password from env var or config
+func (c *Config) GetAdminPassword() string {
+	if p := os.Getenv("ADMIN_PASSWORD"); p != "" {
+		return p
+	}
+	return c.App.AdminPassword
 }
 
 func Load(path string) (*Config, error) {

@@ -4,6 +4,8 @@ app:
   mode: "debug"
   static_path: "./cmd/api/static"
   swagger_enabled: true
+  admin_email: "admin@bey.com"
+  admin_password: "admin123"
 
 database:
   host: "postgres"

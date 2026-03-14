@@ -6,6 +6,130 @@ definitions:
   gin.H:
     additionalProperties: {}
     type: object
+  internal_modules_auth.ForgotPasswordRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  internal_modules_auth.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  internal_modules_auth.LoginResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      refresh_token:
+        type: string
+      requires_2fa:
+        type: boolean
+      temp_token:
+        type: string
+    type: object
+  internal_modules_auth.OAuthRedirectResponse:
+    properties:
+      url:
+        type: string
+    type: object
+  internal_modules_auth.ResendVerificationRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  internal_modules_auth.ResetPasswordRequest:
+    properties:
+      new_password:
+        minLength: 6
+        type: string
+      token:
+        type: string
+    required:
+    - new_password
+    - token
+    type: object
+  internal_modules_auth.TokenResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      refresh_token:
+        type: string
+    type: object
+  internal_modules_auth.TwoFADisableRequest:
+    properties:
+      backup_code:
+        type: string
+      code:
+        type: string
+    type: object
+  internal_modules_auth.TwoFAEnableRequest:
+    properties:
+      code:
+        type: string
+    required:
+    - code
+    type: object
+  internal_modules_auth.TwoFAEnableResponse:
+    properties:
+      backup_codes:
+        items:
+          type: string
+        type: array
+      success:
+        type: boolean
+    type: object
+  internal_modules_auth.TwoFALoginVerifyRequest:
+    properties:
+      code:
+        type: string
+      temp_token:
+        type: string
+    required:
+    - code
+    - temp_token
+    type: object
+  internal_modules_auth.TwoFASetupResponse:
+    properties:
+      provisioning_uri:
+        type: string
+      qr_code:
+        type: string
+      secret:
+        type: string
+    type: object
+  internal_modules_auth.TwoFAVerifyRequest:
+    properties:
+      code:
+        type: string
+    required:
+    - code
+    type: object
+  internal_modules_auth.TwoFAVerifyResponse:
+    properties:
+      valid:
+        type: boolean
+    type: object
+  internal_modules_auth.VerifyEmailRequest:
+    properties:
+      token:
+        type: string
+    required:
+    - token
+    type: object
   internal_modules_inventory.InventoryResponse:
     properties:
       available:
@@ -31,6 +155,9 @@ definitions:
       product_id:
         type: integer
       quantity:
+        type: integer
+      variant_id:
+        description: Opcional - si se especifica, usa la variante
         type: integer
     required:
     - product_id
@@ -64,6 +191,8 @@ definitions:
         type: integer
       unit_price:
         type: number
+      variant_id:
+        type: integer
     type: object
   internal_modules_orders.OrderResponse:
     properties:
@@ -248,6 +377,9 @@ definitions:
         type: number
       product_id:
         type: integer
+      reserved:
+        description: Reservado en compras/checkout
+        type: integer
       sku:
         type: string
       stock:
@@ -305,17 +437,14 @@ definitions:
     properties:
       email:
         type: string
-      first_name:
-        type: string
-      last_name:
+      name:
         type: string
       password:
-        minLength: 8
+        minLength: 6
         type: string
     required:
     - email
-    - first_name
-    - last_name
+    - name
     - password
     type: object
   internal_modules_users.UpdateUserRequest:
@@ -359,6 +488,302 @@ info:
   title: Bey API
   version: "1.0"
 paths:
+  /api/v1/auth/2fa/disable:
+    post:
+      consumes:
+      - application/json
+      description: Disable two-factor authentication (requires auth)
+      parameters:
+      - description: TOTP code or backup code
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_auth.TwoFADisableRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Disable 2FA
+      tags:
+      - Auth
+  /api/v1/auth/2fa/enable:
+    post:
+      consumes:
+      - application/json
+      description: Enable two-factor authentication with code (requires auth)
+      parameters:
+      - description: TOTP code
+        in: body
+        name: code
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_auth.TwoFAEnableRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_auth.TwoFAEnableResponse'
+      security:
+      - BearerAuth: []
+      summary: Enable 2FA
+      tags:
+      - Auth
+  /api/v1/auth/2fa/login-verify:
+    post:
+      consumes:
+      - application/json
+      description: Verify 2FA during login with temp token
+      parameters:
+      - description: Temp token and TOTP code
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_auth.TwoFALoginVerifyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_auth.LoginResponse'
+      summary: Login with 2FA
+      tags:
+      - Auth
+  /api/v1/auth/2fa/setup:
+    post:
+      consumes:
+      - application/json
+      description: Setup two-factor authentication (requires auth)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_auth.TwoFASetupResponse'
+      security:
+      - BearerAuth: []
+      summary: Setup 2FA
+      tags:
+      - Auth
+  /api/v1/auth/2fa/verify:
+    post:
+      consumes:
+      - application/json
+      description: Verify two-factor authentication code (requires auth)
+      parameters:
+      - description: TOTP code
+        in: body
+        name: code
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_auth.TwoFAVerifyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_auth.TwoFAVerifyResponse'
+      security:
+      - BearerAuth: []
+      summary: Verify 2FA
+      tags:
+      - Auth
+  /api/v1/auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: Send password reset email
+      parameters:
+      - description: Email address
+        in: body
+        name: email
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_auth.ForgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Forgot password
+      tags:
+      - Auth
+  /api/v1/auth/google:
+    get:
+      description: Initiate Google OAuth2 login flow
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_auth.OAuthRedirectResponse'
+      summary: Google OAuth login
+      tags:
+      - Auth
+  /api/v1/auth/google/callback:
+    get:
+      description: Handle Google OAuth2 callback
+      parameters:
+      - description: OAuth state
+        in: query
+        name: state
+        required: true
+        type: string
+      - description: Authorization code
+        in: query
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_auth.LoginResponse'
+      summary: Google OAuth callback
+      tags:
+      - Auth
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user and return JWT tokens
+      parameters:
+      - description: Login credentials
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_auth.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_auth.LoginResponse'
+      summary: User login
+      tags:
+      - Auth
+  /api/v1/auth/logout:
+    post:
+      description: Logout user and clear cookies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Logout
+      tags:
+      - Auth
+  /api/v1/auth/refresh:
+    post:
+      description: Refresh access token using refresh token cookie
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_auth.TokenResponse'
+      summary: Refresh token
+      tags:
+      - Auth
+  /api/v1/auth/resend-verification:
+    post:
+      consumes:
+      - application/json
+      description: Resend verification email to user
+      parameters:
+      - description: Email address
+        in: body
+        name: email
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_auth.ResendVerificationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Resend verification email
+      tags:
+      - Auth
+  /api/v1/auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: Reset password using token from email
+      parameters:
+      - description: Token and new password
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_auth.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Reset password
+      tags:
+      - Auth
+  /api/v1/auth/verify-email:
+    post:
+      consumes:
+      - application/json
+      description: Verify user email with token
+      parameters:
+      - description: Verification token
+        in: body
+        name: token
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_auth.VerifyEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Verify email
+      tags:
+      - Auth
   /api/v1/categories:
     get:
       consumes:
@@ -572,7 +997,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: Updates inventory quantity for a product
+      description: Updates inventory quantity for a product (creates if not exists)
       parameters:
       - description: Product ID
         in: path
@@ -595,11 +1020,36 @@ paths:
       summary: Update inventory
       tags:
       - Inventory
+  /api/v1/inventory/{product_id}/release:
+    post:
+      consumes:
+      - application/json
+      description: Releases reserved inventory quantity for a product
+      parameters:
+      - description: Product ID
+        in: path
+        name: product_id
+        required: true
+        type: integer
+      - description: Quantity to release
+        in: body
+        name: quantity
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Release inventory
+      tags:
+      - Inventory
   /api/v1/inventory/{product_id}/reserve:
     post:
       consumes:
       - application/json
-      description: Reserves inventory quantity for a product
+      description: Reserves inventory quantity for a product (creates if not exists)
       parameters:
       - description: Product ID
         in: path
@@ -679,6 +1129,48 @@ paths:
           schema:
             $ref: '#/definitions/internal_modules_orders.OrderResponse'
       summary: Get order by ID
+      tags:
+      - Orders
+  /api/v1/orders/{id}/cancel:
+    post:
+      consumes:
+      - application/json
+      description: Cancels an order and releases reserved inventory
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_orders.OrderResponse'
+      summary: Cancel order
+      tags:
+      - Orders
+  /api/v1/orders/{id}/confirm:
+    post:
+      consumes:
+      - application/json
+      description: Confirms a sale after payment (finalizes the reservation)
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_orders.OrderResponse'
+      summary: Confirm order sale
       tags:
       - Orders
   /api/v1/orders/{id}/status:
@@ -946,7 +1438,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Creates a new variant for a product
+      description: Creates a new variant for a product and updates inventory
       parameters:
       - description: Product ID
         in: path
@@ -1012,7 +1504,7 @@ paths:
       - application/json
       description: Creates a new user account
       parameters:
-      - description: User data
+      - description: User data (name, email, password)
         in: body
         name: user
         required: true

@@ -48,22 +48,39 @@ import (
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
 	_ "bey/cmd/api/docs"
 )
 
-func seedAdminUser(db *gorm.DB) error {
+func seedAdminUser(db *gorm.DB, cfg *config.Config) error {
+	adminEmail := cfg.GetAdminEmail()
+	adminPassword := cfg.GetAdminPassword()
+
+	if adminEmail == "" {
+		adminEmail = "admin@bey.com"
+	}
+	if adminPassword == "" {
+		adminPassword = "admin123"
+	}
+
 	var count int64
-	db.Model(&users.User{}).Where("email = ?", "admin@bey.com").Count(&count)
+	db.Model(&users.User{}).Where("email = ?", adminEmail).Count(&count)
 	if count > 0 {
 		log.Println("Admin user already exists, skipping seed")
 		return nil
 	}
 
+	// Hash the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash admin password: %w", err)
+	}
+
 	adminUser := &users.User{
-		Email:     "admin@bey.com",
-		Password:  "$2a$10$FLqGJ6Xg59Eh0ETrlX2mN.c6pY1AJGY8q6dSkoxhv1t2yWvKCwA1m",
+		Email:     adminEmail,
+		Password:  string(hashedPassword),
 		FirstName: "Admin",
 		LastName:  "User",
 		Role:      "admin",
@@ -74,7 +91,7 @@ func seedAdminUser(db *gorm.DB) error {
 		return fmt.Errorf("failed to seed admin user: %w", err)
 	}
 
-	log.Println("Admin user seeded successfully")
+	log.Printf("Admin user seeded successfully: %s / %s", adminEmail, adminPassword)
 	return nil
 }
 
@@ -112,7 +129,7 @@ func main() {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
-	if err := seedAdminUser(db.GetDB()); err != nil {
+	if err := seedAdminUser(db.GetDB(), cfg); err != nil {
 		log.Printf("Warning: Failed to seed admin user: %v", err)
 	}
 
