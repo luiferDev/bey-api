@@ -8,8 +8,8 @@ app:
 database:
   host: "localhost"
   port: 5432
-  user: "luifer"
-  password: "158365402luifer"
+  user: "bey_user"
+  password: "bey_password"
   name: "bey_db"
   sslmode: "disable"
   max_open_conns: 25
@@ -21,7 +21,7 @@ concurrency:
     worker_pool_size: 4
     queue_depth_limit: 100
   rate_limit:
-    enabled: false
+    enabled: true
     requests_per_second: 100
     burst_capacity: 200
     endpoint_limits: {}
@@ -32,3 +32,71 @@ security:
     - "http://localhost:8080"
   jwt_secret: "your-secret-key-change-in-production"
   jwt_expiry_hours: 2
+  jwt_access_expiry: "15m"
+  jwt_refresh_expiry: "168h"
+  jwt_issuer: "bey_api"
+  jwt_algorithm: "HS256"
+  csrf_enabled: true
+
+rate_limit:
+  # Enable/disable rate limiting globally
+  enabled: true
+  redis:
+    # Redis backend for distributed rate limiting (optional)
+    # When enabled, rate limits are shared across multiple API instances
+    enabled: false
+    host: "localhost"
+    port: 6379
+    password: ""
+    db: 0
+  defaults:
+    # Default rate limits applied to all endpoints
+    requests_per_minute: 60
+    burst_capacity: 10
+  endpoints:
+    # Endpoint-specific rate limits (overrides defaults)
+    # Format: "/path": { requests_per_minute: X, burst_capacity: Y }
+    /api/v1/auth/login:
+      # Strict limit for auth endpoints to prevent brute force
+      requests_per_minute: 5
+      burst_capacity: 2
+    /api/v1/auth/refresh:
+      requests_per_minute: 10
+      burst_capacity: 3
+    /api/v1/admin:
+      # Admin endpoints have higher limits
+      requests_per_minute: 60
+      burst_capacity: 10
+
+email:
+  # Email sending configuration for password reset & verification
+  enabled: true
+  from_name: "Bey API"
+  from_email: "noreply@beyapi.com"
+  smtp:
+    # Gmail SMTP settings
+    # For Gmail: use smtp.gmail.com on port 587 (TLS) or 465 (SSL)
+    # IMPORTANT: Use an App Password, NOT your regular Gmail password
+    # To generate App Password:
+    #   1. Enable 2-Factor Authentication on your Google Account
+    #   2. Go to https://myaccount.google.com/apppasswords
+    #   3. Generate a new app password for "Mail"
+    #   4. Use that 16-character password here (e.g., "abcd efgh ijkl mnop")
+    host: "smtp.gmail.com"
+    port: 587
+    username: "your-email@gmail.com"
+    password: "your-app-password"
+
+oauth:
+  google:
+    # Google OAuth2 credentials
+    # Get these from Google Cloud Console:
+    # 1. Go to https://console.cloud.google.com/
+    # 2. Create a project or select existing
+    # 3. Go to APIs & Services > Credentials
+    # 4. Create OAuth 2.0 Client ID
+    # 5. Set authorized redirect URIs
+    client_id: "your-google-client-id"
+    client_secret: "your-google-client-secret"
+    # Redirect URL (must match Google Cloud Console settings)
+    redirect_url: "http://localhost:8080/api/v1/auth/google/callback"

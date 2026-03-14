@@ -17,7 +17,9 @@ func setupTestDBForUsersHandler(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
-	db.AutoMigrate(&User{})
+	if err := db.AutoMigrate(&User{}); err != nil {
+		t.Fatalf("Failed to migrate database: %v", err)
+	}
 	return db
 }
 
@@ -35,7 +37,10 @@ func TestGetUsers_Success(t *testing.T) {
 
 	router.GET("/api/v1/users", handler.List)
 
-	req, _ := http.NewRequest("GET", "/api/v1/users", nil)
+	req, err := http.NewRequest("GET", "/api/v1/users", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -58,7 +63,10 @@ func TestGetUsers_EmptyList(t *testing.T) {
 
 	router.GET("/api/v1/users", handler.List)
 
-	req, _ := http.NewRequest("GET", "/api/v1/users", nil)
+	req, err := http.NewRequest("GET", "/api/v1/users", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -103,7 +111,7 @@ func TestCreateUser_Success(t *testing.T) {
 
 	router.POST("/api/v1/users", handler.Create)
 
-	body := `{"email":"test@example.com","password":"password123","first_name":"John","last_name":"Doe"}`
+	body := `{"email":"test@example.com","password":"password123","name":"John Doe"}`
 	req, _ := http.NewRequest("POST", "/api/v1/users", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()

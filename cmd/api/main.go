@@ -34,6 +34,9 @@ import (
 	"bey/internal/concurrency"
 	"bey/internal/config"
 	"bey/internal/database"
+	"bey/internal/modules/admin"
+	"bey/internal/modules/auth"
+	"bey/internal/modules/email"
 	"bey/internal/modules/inventory"
 	"bey/internal/modules/orders"
 	"bey/internal/modules/products"
@@ -44,10 +47,36 @@ import (
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
-	"github.com/swaggo/gin-swagger"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	"gorm.io/gorm"
 
 	_ "bey/cmd/api/docs"
 )
+
+func seedAdminUser(db *gorm.DB) error {
+	var count int64
+	db.Model(&users.User{}).Where("email = ?", "admin@bey.com").Count(&count)
+	if count > 0 {
+		log.Println("Admin user already exists, skipping seed")
+		return nil
+	}
+
+	adminUser := &users.User{
+		Email:     "admin@bey.com",
+		Password:  "$2a$10$FLqGJ6Xg59Eh0ETrlX2mN.c6pY1AJGY8q6dSkoxhv1t2yWvKCwA1m",
+		FirstName: "Admin",
+		LastName:  "User",
+		Role:      "admin",
+		Active:    true,
+	}
+
+	if err := db.Create(adminUser).Error; err != nil {
+		return fmt.Errorf("failed to seed admin user: %w", err)
+	}
+
+	log.Println("Admin user seeded successfully")
+	return nil
+}
 
 func main() {
 	cfg, err := config.Load("config.yaml")
@@ -63,7 +92,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}()
 
 	if err := db.AutoMigrate(
 		&users.User{},
@@ -74,8 +107,13 @@ func main() {
 		&orders.Order{},
 		&orders.OrderItem{},
 		&inventory.Inventory{},
+		&auth.RefreshToken{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
+	}
+
+	if err := seedAdminUser(db.GetDB()); err != nil {
+		log.Printf("Warning: Failed to seed admin user: %v", err)
 	}
 
 	taskQueue := concurrency.NewInMemoryTaskQueue()
@@ -90,9 +128,13 @@ func main() {
 	}
 	log.Printf("Worker pool started with %d workers", cfg.Concurrency.WorkerPool.WorkerPoolSize)
 
-	rateLimiter := middleware.NewRateLimiter(cfg.Concurrency.RateLimit)
+	rateLimiterConfig := cfg.GetRateLimitConfig()
+	rateLimiter := middleware.NewRateLimiterWithStorage(
+		cfg.Concurrency.RateLimit,
+		rateLimiterConfig,
+		nil,
+	)
 
-	// Initialize CORS with configured origins
 	middleware.InitCORS(cfg.Security.GetAllowedOrigins())
 
 	router := gin.Default()
@@ -118,22 +160,38 @@ func main() {
 		variantRepo,
 	)
 
-	// Register API routes first (higher priority)
-	api := router.Group("/api/v1")
-	{
-		users.RegisterRoutes(api, db.GetDB())
-		products.SetupRoutesWithService(api, db.GetDB(), productService)
-		orders.RegisterRoutesWithProductAndVariant(api, db.GetDB(), orderService, productRepo, variantRepo)
-		inventory.RegisterRoutes(api, db.GetDB())
+	authService := auth.NewAuthService(db.GetDB(), cfg)
+
+	emailService, err := email.NewEmailService(cfg)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize email service: %v", err)
+	} else {
+		authService = auth.NewAuthServiceWithEmail(db.GetDB(), cfg, emailService)
+		log.Println("Email service initialized successfully")
+	}
+	authMiddleware := auth.NewAuthMiddleware(authService, cfg)
+	adminMiddleware := func(c *gin.Context) {
+		authMiddleware.RequireAuth()(c)
+		if c.IsAborted() {
+			return
+		}
+		middleware.RequireRole(middleware.RoleAdmin)(c)
 	}
 
-	// Register swagger UI
+	api := router.Group("/api/v1")
+	{
+		auth.RegisterRoutes(router, authService, cfg)
+		admin.RegisterRoutes(api, db.GetDB(), authMiddleware.RequireAuth(), adminMiddleware)
+		users.RegisterRoutesWithAuth(api, db.GetDB(), authMiddleware.RequireAuth(), adminMiddleware)
+		products.SetupRoutesWithService(api, db.GetDB(), productService, authMiddleware.RequireAuth(), adminMiddleware)
+		orders.RegisterRoutesWithAllDeps(api, db.GetDB(), orderService, productRepo, variantRepo, authMiddleware.RequireAuth(), adminMiddleware)
+		inventory.RegisterRoutesWithAuth(api, db.GetDB(), authMiddleware.RequireAuth(), adminMiddleware)
+	}
+
 	if cfg.App.SwaggerEnabled {
-		// Use ginSwagger.WrapHandler with embedded swagger files
 		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
-	// Register static files under /dashboard prefix to avoid conflict with /api
 	if cfg.App.StaticPath != "" {
 		router.Static("/dashboard", cfg.App.StaticPath)
 	}
@@ -142,8 +200,8 @@ func main() {
 		health := shared.PerformHealthCheck(
 			db.GetDB(),
 			cfg.Concurrency.WorkerPool.WorkerPoolSize,
-			0,    // Queue depth would require accessing the internal channel
-			true, // Assuming running if we got this far
+			0,
+			true,
 		)
 
 		if health.Status == "unhealthy" {

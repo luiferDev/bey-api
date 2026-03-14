@@ -12,7 +12,9 @@ func TestWorkerPool_GracefulShutdown_EmptyQueue(t *testing.T) {
 	}
 
 	pool := NewWorkerPool(2, 10, handler)
-	pool.Start()
+	if err := pool.Start(); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
 
 	if err := pool.Shutdown(); err != nil {
 		t.Fatalf("Shutdown failed: %v", err)
@@ -36,11 +38,15 @@ func TestWorkerPool_GracefulShutdown_WithPendingTasks(t *testing.T) {
 	}
 
 	pool := NewWorkerPool(1, 10, handler)
-	pool.Start()
+	if err := pool.Start(); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
 
 	for i := 0; i < 3; i++ {
 		task := &Task{Type: TaskTypeOrderProcessing}
-		pool.Submit(task)
+		if err := pool.Submit(task); err != nil {
+			t.Fatalf("Submit failed: %v", err)
+		}
 	}
 
 	time.Sleep(10 * time.Millisecond)
@@ -70,10 +76,16 @@ func TestWorkerPool_GracefulShutdown_Concurrent(t *testing.T) {
 			}
 
 			pool := NewWorkerPool(2, 5, handler)
-			pool.Start()
+			if err := pool.Start(); err != nil {
+				errors <- err
+				return
+			}
 
 			for j := 0; j < 3; j++ {
-				pool.Submit(&Task{Type: TaskTypeOrderProcessing})
+				if err := pool.Submit(&Task{Type: TaskTypeOrderProcessing}); err != nil {
+					errors <- err
+					return
+				}
 			}
 
 			if err := pool.Shutdown(); err != nil {
@@ -98,7 +110,9 @@ func TestWorkerPool_GracefulShutdown_DoubleShutdown(t *testing.T) {
 	}
 
 	pool := NewWorkerPool(2, 10, handler)
-	pool.Start()
+	if err := pool.Start(); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
 
 	if err := pool.Shutdown(); err != nil {
 		t.Fatalf("First shutdown failed: %v", err)
@@ -123,14 +137,20 @@ func TestWorkerPool_ShutdownDuringTaskExecution(t *testing.T) {
 	}
 
 	pool := NewWorkerPool(1, 10, handler)
-	pool.Start()
+	if err := pool.Start(); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
 
-	pool.Submit(&Task{Type: TaskTypeOrderProcessing})
+	if err := pool.Submit(&Task{Type: TaskTypeOrderProcessing}); err != nil {
+		t.Fatalf("Submit failed: %v", err)
+	}
 
 	time.Sleep(10 * time.Millisecond)
 
 	go func() {
-		pool.Shutdown()
+		if err := pool.Shutdown(); err != nil {
+			t.Logf("Shutdown error: %v", err)
+		}
 		shutdownCalled <- true
 	}()
 
@@ -153,9 +173,13 @@ func TestWorkerPool_Shutdown_ResubmitAfterShutdown(t *testing.T) {
 	}
 
 	pool := NewWorkerPool(2, 10, handler)
-	pool.Start()
+	if err := pool.Start(); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
 
-	pool.Shutdown()
+	if err := pool.Shutdown(); err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
 
 	task := &Task{Type: TaskTypeOrderProcessing}
 	if err := pool.Submit(task); err != ErrWorkerPoolNotStarted {
@@ -194,5 +218,7 @@ func TestWorkerPool_StartMultipleTimes(t *testing.T) {
 		t.Fatalf("Second start failed: %v", err)
 	}
 
-	pool.Shutdown()
+	if err := pool.Shutdown(); err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
 }

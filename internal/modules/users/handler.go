@@ -1,8 +1,6 @@
 package users
 
 import (
-	"golang.org/x/crypto/bcrypt"
-
 	"bey/internal/shared/response"
 
 	"github.com/gin-gonic/gin"
@@ -10,14 +8,16 @@ import (
 )
 
 type UserHandler struct {
-	repo *UserRepository
-	resp *response.ResponseHandler
+	repo    *UserRepository
+	resp    *response.ResponseHandler
+	creator UserCreator
 }
 
 func NewUserHandler(db *gorm.DB) *UserHandler {
 	return &UserHandler{
-		repo: NewUserRepository(db),
-		resp: response.NewResponseHandler(),
+		repo:    NewUserRepository(db),
+		resp:    response.NewResponseHandler(),
+		creator: NewRegularUserCreator(db),
 	}
 }
 
@@ -26,7 +26,7 @@ func NewUserHandler(db *gorm.DB) *UserHandler {
 // @Tags Users
 // @Accept json
 // @Produce json
-// @Param user body CreateUserRequest true "User data"
+// @Param user body CreateUserRequest true "User data (name, email, password)"
 // @Success 201 {object} UserResponse
 // @Router /api/v1/users [post]
 func (h *UserHandler) Create(c *gin.Context) {
@@ -36,28 +36,18 @@ func (h *UserHandler) Create(c *gin.Context) {
 		return
 	}
 
-	existing, _ := h.repo.FindByEmail(req.Email)
+	existing, err := h.repo.FindByEmail(req.Email)
+	if err != nil {
+		h.resp.InternalError(c, "failed to check existing user")
+		return
+	}
 	if existing != nil {
 		h.resp.Error(c, 400, "email already exists")
 		return
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	user, err := h.creator.Create(&req)
 	if err != nil {
-		h.resp.InternalError(c, "failed to hash password")
-		return
-	}
-
-	user := &User{
-		Email:     req.Email,
-		Password:  string(hashedPassword),
-		FirstName: req.FirstName,
-		LastName:  req.LastName,
-		Role:      "customer",
-		Active:    true,
-	}
-
-	if err := h.repo.Create(user); err != nil {
 		h.resp.InternalError(c, "failed to create user")
 		return
 	}

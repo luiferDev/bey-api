@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "design-patterns-expert": {
+      "source": "rysweet/amplihack",
+      "sourceType": "github",
+      "computedHash": "f10b6641611c4939c0647039b0acaa98833582724a8e3a4c7f2067fe6afe1c81"
+    },
     "docker-expert": {
       "source": "sickn33/antigravity-awesome-skills",
       "sourceType": "github",
@@ -31,10 +36,20 @@
       "sourceType": "github",
       "computedHash": "698bf93a84dae18fd7bd0b1d35c21427307fde78fbdf4624be9726f5f98189ca"
     },
+    "oauth-implementation": {
+      "source": "aj-geddes/useful-ai-prompts",
+      "sourceType": "github",
+      "computedHash": "a5ee27daf00d7b5cb451282bc8244ab3e82a959718c3e55ea30971b9851f0e04"
+    },
     "paypal-integration": {
       "source": "wshobson/agents",
       "sourceType": "github",
       "computedHash": "878a5bf72335496ec60ec1d24964bc9829b5a9d6ec9c97447c257704703b91ff"
+    },
+    "rate-limiter-config": {
+      "source": "jeremylongshore/claude-code-plugins-plus-skills",
+      "sourceType": "github",
+      "computedHash": "f58b1eabbcfe9ac03c1a721cbfeb66dba94c11b84b6a963fff6b3d041f5d0c57"
     }
   }
 }

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -239,5 +240,121 @@ func TestRateLimiter_RateLimiterDisabled(t *testing.T) {
 
 	if rl.config.Enabled != false {
 		t.Error("Expected rate limiter to be disabled")
+	}
+}
+
+func TestInMemoryStorage_Get_Empty(t *testing.T) {
+	storage := NewInMemoryStorage()
+	ctx := context.Background()
+
+	count, err := storage.Get(ctx, "nonexistent")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if count != 0 {
+		t.Errorf("expected 0 for nonexistent key, got %d", count)
+	}
+}
+
+func TestInMemoryStorage_Increment(t *testing.T) {
+	storage := NewInMemoryStorage()
+	ctx := context.Background()
+	window := time.Minute
+
+	count1, err := storage.Increment(ctx, "test-key", window)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if count1 != 1 {
+		t.Errorf("expected first increment to return 1, got %d", count1)
+	}
+
+	count2, err := storage.Increment(ctx, "test-key", window)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if count2 != 2 {
+		t.Errorf("expected second increment to return 2, got %d", count2)
+	}
+}
+
+func TestInMemoryStorage_Get_AfterIncrement(t *testing.T) {
+	storage := NewInMemoryStorage()
+	ctx := context.Background()
+	window := time.Minute
+
+	storage.Increment(ctx, "test-key", window)
+
+	count, err := storage.Get(ctx, "test-key")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if count != 1 {
+		t.Errorf("expected 1, got %d", count)
+	}
+}
+
+func TestInMemoryStorage_Reset(t *testing.T) {
+	storage := NewInMemoryStorage()
+	ctx := context.Background()
+	window := time.Minute
+
+	storage.Increment(ctx, "test-key", window)
+
+	err := storage.Reset(ctx, "test-key")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	count, err := storage.Get(ctx, "test-key")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if count != 0 {
+		t.Errorf("expected 0 after reset, got %d", count)
+	}
+}
+
+func TestInMemoryStorage_Increment_DifferentKeys(t *testing.T) {
+	storage := NewInMemoryStorage()
+	ctx := context.Background()
+	window := time.Minute
+
+	storage.Increment(ctx, "key1", window)
+	storage.Increment(ctx, "key1", window)
+	storage.Increment(ctx, "key2", window)
+
+	count1, _ := storage.Get(ctx, "key1")
+	count2, _ := storage.Get(ctx, "key2")
+
+	if count1 != 2 {
+		t.Errorf("key1: expected 2, got %d", count1)
+	}
+	if count2 != 1 {
+		t.Errorf("key2: expected 1, got %d", count2)
+	}
+}
+
+func TestInMemoryStorage_Get_Expired(t *testing.T) {
+	storage := NewInMemoryStorage()
+	ctx := context.Background()
+	window := 1 * time.Millisecond
+
+	storage.Increment(ctx, "test-key", window)
+
+	time.Sleep(10 * time.Millisecond)
+
+	count, err := storage.Get(ctx, "test-key")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if count != 0 {
+		t.Errorf("expected 0 for expired key, got %d", count)
 	}
 }

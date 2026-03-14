@@ -413,8 +413,20 @@ func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 // @Success 200 {array} Product
 // @Router /api/v1/products [get]
 func (h *ProductHandler) GetProducts(c *gin.Context) {
-	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	offsetStr := c.DefaultQuery("offset", "0")
+	limitStr := c.DefaultQuery("limit", "10")
+
+	offset, offsetErr := strconv.Atoi(offsetStr)
+	if offsetErr != nil {
+		h.response.ValidationError(c, "Invalid offset: must be a number")
+		return
+	}
+
+	limit, limitErr := strconv.Atoi(limitStr)
+	if limitErr != nil {
+		h.response.ValidationError(c, "Invalid limit: must be a number")
+		return
+	}
 
 	if offset < 0 {
 		h.response.ValidationError(c, "Invalid offset: must be >= 0")

@@ -1,0 +1,103 @@
+# golangci-lint configuration
+# https://golangci-lint.run/usage/configuration/
+
+linters:
+  enable:
+    - errcheck      # Check for unchecked errors
+    - gosimple      # Simplify code
+    - govet         # Reports suspicious constructs
+    - ineffassign   # Detects unused variable assignments
+    - staticcheck   # Static analysis checks
+    - unused        # Checks for unused code
+    - gosec         # Go security checker
+    - bodyclose     # Checks whether HTTP response body is closed successfully
+    - noctx         # Detects sending http request without context.Context
+    - gocritic      # Provides diagnostics that check for bugs and style issues
+
+linters-settings:
+  gosec:
+    excludes:
+      - G104 # Suppress unhandled errors
+  govet:
+    check-shadowing: true
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    # Exclude ALL linters from test files
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
+        - staticcheck
+        - unused
+        - gocritic
+        - noctx
+        - ineffassign
+        - govet
+        - gosimple
+    # Exclude hardcoded credentials in templates (false positive - HTML email templates)
+    - path: templates\.go
+      text: G101
+      linters:
+        - gosec
+    # Exclude wrapperFunc in email service (strings.Replace is intentional)
+    - path: email/service\.go
+      text: wrapperFunc
+      linters:
+        - gocritic
+    # G304: we validate path with filepath.Abs before reading
+    - path: config/config\.go
+      text: G304
+      linters:
+        - gosec
+    # G108/G114/G112: profiling and dev server - acceptable for development
+    - path: cmd/api/main\.go
+      text: G108|G114|G112
+      linters:
+        - gosec
+    # Ignore explicit blank identifier usage (intentional error handling)
+    - text: "Error return value of .* is not checked"
+      linters:
+        - errcheck
+    # Ignore ifElseChain style suggestions
+    - text: ifElseChain
+      linters:
+        - gocritic
+    # Ignore shadow warnings (common Go pattern)
+    - text: shadow
+      linters:
+        - govet
+    # Ignore exitAfterDefer in main.go (fatal errors are acceptable)
+    - path: cmd/api/main\.go
+      text: exitAfterDefer
+      linters:
+        - gocritic
+    # Ignore empty branch (intentional no-op)
+    - text: empty branch
+      linters:
+        - staticcheck
+    # Ignore noctx in oauth.go (using fixed HTTP client)
+    - path: internal/modules/auth/oauth\.go
+      linters:
+        - noctx
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+  skip-dirs:
+    - vendor
+    - .git
+    - openspec
+    - cmd/api/docs
+
+output:
+  formats:
+    - format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true

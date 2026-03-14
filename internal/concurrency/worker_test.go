@@ -45,7 +45,9 @@ func TestWorkerPool_SubmitAndProcess(t *testing.T) {
 		t.Errorf("Expected task status completed, got %s", task.Status)
 	}
 
-	pool.Shutdown()
+	if err := pool.Shutdown(); err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
 }
 
 func TestWorkerPool_MultipleTasks(t *testing.T) {
@@ -60,7 +62,9 @@ func TestWorkerPool_MultipleTasks(t *testing.T) {
 	}
 
 	pool := NewWorkerPool(2, 10, handler)
-	pool.Start()
+	if err := pool.Start(); err != nil {
+		t.Fatalf("Failed to start pool: %v", err)
+	}
 
 	for i := 0; i < 5; i++ {
 		task := &Task{
@@ -80,7 +84,9 @@ func TestWorkerPool_MultipleTasks(t *testing.T) {
 	}
 	mu.Unlock()
 
-	pool.Shutdown()
+	if err := pool.Shutdown(); err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
 }
 
 func TestWorkerPool_QueueDepthLimit(t *testing.T) {
@@ -91,7 +97,9 @@ func TestWorkerPool_QueueDepthLimit(t *testing.T) {
 
 	queueDepth := 2
 	pool := NewWorkerPool(1, queueDepth, handler)
-	pool.Start()
+	if err := pool.Start(); err != nil {
+		t.Fatalf("Failed to start pool: %v", err)
+	}
 
 	submitted := 0
 	failed := 0
@@ -116,7 +124,9 @@ func TestWorkerPool_QueueDepthLimit(t *testing.T) {
 		t.Errorf("Expected 3 tasks to fail due to queue full, got %d", failed)
 	}
 
-	pool.Shutdown()
+	if err := pool.Shutdown(); err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
 }
 
 func TestWorkerPool_QueueFullError(t *testing.T) {
@@ -126,7 +136,9 @@ func TestWorkerPool_QueueFullError(t *testing.T) {
 	}
 
 	pool := NewWorkerPool(1, 1, handler)
-	pool.Start()
+	if err := pool.Start(); err != nil {
+		t.Fatalf("Failed to start pool: %v", err)
+	}
 
 	task1 := &Task{Type: TaskTypeOrderProcessing}
 	if err := pool.Submit(task1); err != nil {
@@ -138,7 +150,9 @@ func TestWorkerPool_QueueFullError(t *testing.T) {
 		t.Errorf("Expected ErrQueueFull, got %v", err)
 	}
 
-	pool.Shutdown()
+	if err := pool.Shutdown(); err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
 }
 
 func TestWorkerPool_TaskErrorHandling(t *testing.T) {
@@ -149,7 +163,9 @@ func TestWorkerPool_TaskErrorHandling(t *testing.T) {
 	}
 
 	pool := NewWorkerPool(1, 10, handler)
-	pool.Start()
+	if err := pool.Start(); err != nil {
+		t.Fatalf("Failed to start pool: %v", err)
+	}
 
 	task := &Task{
 		Type:    TaskTypeOrderProcessing,
@@ -170,7 +186,9 @@ func TestWorkerPool_TaskErrorHandling(t *testing.T) {
 		t.Errorf("Expected error message '%s', got '%s'", expectedErr.Error(), task.Error)
 	}
 
-	pool.Shutdown()
+	if err := pool.Shutdown(); err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
 }
 
 func TestWorkerPool_SubmitBeforeStart(t *testing.T) {
@@ -199,11 +217,15 @@ func TestWorkerPool_Shutdown(t *testing.T) {
 	}
 
 	pool := NewWorkerPool(2, 10, handler)
-	pool.Start()
+	if err := pool.Start(); err != nil {
+		t.Fatalf("Failed to start pool: %v", err)
+	}
 
 	for i := 0; i < 3; i++ {
 		task := &Task{Type: TaskTypeOrderProcessing}
-		pool.Submit(task)
+		if err := pool.Submit(task); err != nil {
+			t.Fatalf("Failed to submit task: %v", err)
+		}
 	}
 
 	time.Sleep(20 * time.Millisecond)
@@ -226,7 +248,9 @@ func TestWorkerPool_CancelTask(t *testing.T) {
 	}
 
 	pool := NewWorkerPool(1, 10, handler)
-	pool.Start()
+	if err := pool.Start(); err != nil {
+		t.Fatalf("Failed to start pool: %v", err)
+	}
 
 	task := &Task{
 		Type:   TaskTypeOrderProcessing,
@@ -246,7 +270,9 @@ func TestWorkerPool_CancelTask(t *testing.T) {
 		t.Error("Task should have been cancelled before execution")
 	}
 
-	pool.Shutdown()
+	if err := pool.Shutdown(); err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
 }
 
 func TestWorkerPool_ContextCancellation(t *testing.T) {
@@ -260,7 +286,9 @@ func TestWorkerPool_ContextCancellation(t *testing.T) {
 	}
 
 	pool := NewWorkerPool(2, 10, handler)
-	pool.Start()
+	if err := pool.Start(); err != nil {
+		t.Fatalf("Failed to start pool: %v", err)
+	}
 
 	cancel()
 

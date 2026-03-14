@@ -1,104 +1,112 @@
 # Skill Registry - Bey API
 
-## Overview
-This file registers all available skills for the Bey API project. The agent should load skills from this registry when working on relevant tasks.
-
----
+As your FIRST step before starting any work, identify and load skills relevant to your task from this registry.
 
 ## Project-Level Skills (`.agents/skills/`)
 
 These skills are **specific to this project** and override global skills if duplicates exist.
 
-| Skill Name | Path | Trigger Keywords | Description |
-|------------|------|------------------|-------------|
-| **golang-patterns** | `.agents/skills/golang-patterns/SKILL.md` | go, golang, patterns | Idiomatic Go patterns, best practices |
-| **golang-testing** | `.agents/skills/golang-testing/SKILL.md` | test, testing, go test | Go testing patterns (table-driven, subtests, benchmarks) |
-| **golang-concurrency-patterns** | `.agents/skills/golang-concurrency-patterns/SKILL.md` | goroutine, channel, concurrent, worker pool | Go concurrency patterns (goroutines, channels, sync) |
-| **golang-pro** | `.agents/skills/golang-pro/SKILL.md` | advanced, pro | Advanced Go patterns |
+| Trigger | Skill | Path |
+|---------|-------|------|
+| Go patterns, idiomatic Go | golang-patterns | .agents/skills/golang-patterns/SKILL.md |
+| Go testing, table-driven tests | golang-testing | .agents/skills/golang-testing/SKILL.md |
+| Go concurrency, goroutines, channels | golang-concurrency-patterns | .agents/skills/golang-concurrency-patterns/SKILL.md |
+| Go microservices, gRPC, pprof | golang-pro | .agents/skills/golang-pro/SKILL.md |
+| Docker, containerization, multi-stage builds | docker-expert | .agents/skills/docker-expert/SKILL.md |
+| Multi-stage Dockerfile | multi-stage-dockerfile | .agents/skills/multi-stage-dockerfile/SKILL.md |
+| PayPal payment, Express Checkout | paypal-integration | .agents/skills/paypal-integration/SKILL.md |
+| Design patterns, GoF, architecture | design-patterns-expert | .agents/skills/design-patterns-expert/SKILL.md |
 
----
-
-## Global Skills (`~/.opencode/skills/`)
+## User Skills (`~/.opencode/skills/`)
 
 These skills are **global** and available for any project. Use when project-level skills don't exist.
 
 ### Go & APIs
-| Skill Name | Path | Trigger Keywords | Description |
-|------------|------|------------------|-------------|
-| **golang-patterns** | `~/.opencode/skills/golang-patterns/SKILL.md` | go, golang, patterns | Idiomatic Go patterns |
-| **golang-testing** | `~/.opencode/skills/golang-testing/SKILL.md` | test, testing, go test | Go testing patterns |
-| **golang-gin-api** | `~/.opencode/skills/golang-gin-api/golang-gin-api/SKILL.md` | gin, api, rest, route, handler | Gin REST API patterns |
+| Trigger | Skill | Path |
+|---------|-------|------|
+| Go patterns, idiomatic Go | golang-patterns | ~/.opencode/skills/golang-patterns/SKILL.md |
+| Go testing, table-driven tests | golang-testing | ~/.opencode/skills/golang-testing/SKILL.md |
+| Gin REST API, Go web server | golang-gin-api | ~/.opencode/skills/golang-gin-api/golang-gin-api/SKILL.md |
 
 ### SDD (Spec-Driven Development)
-| Skill Name | Path | Trigger Keywords | Description |
-|------------|------|------------------|-------------|
-| **sdd-init** | `~/.opencode/skills/sdd-init/SKILL.md` | sdd init, openspec init | Initialize SDD structure |
-| **sdd-explore** | `~/.opencode/skills/sdd-explore/SKILL.md` | explore, investigate, research | Explore/investigate ideas |
-| **sdd-propose** | `~/.opencode/skills/sdd-propose/SKILL.md` | propose, proposal | Create change proposal |
-| **sdd-spec** | `~/.opencode/skills/sdd-spec/SKILL.md` | spec, specification | Write specifications |
-| **sdd-design** | `~/.opencode/skills/sdd-design/SKILL.md` | design, architecture | Technical design |
-| **sdd-tasks** | `~/.opencode/skills/sdd-tasks/SKILL.md` | tasks, breakdown | Task breakdown |
-| **sdd-apply** | `~/.opencode/skills/sdd-apply/SKILL.md` | implement, apply | Implement tasks |
-| **sdd-verify** | `~/.opencode/skills/sdd-verify/SKILL.md` | verify, test, validate | Verify implementation |
-| **sdd-archive** | `~/.opencode/skills/sdd-archive/SKILL.md` | archive, sync | Archive completed changes |
+| Trigger | Skill | Path |
+|---------|-------|------|
+| sdd init, openspec init | sdd-init | ~/.opencode/skills/sdd-init/SKILL.md |
+| explore, investigate, research | sdd-explore | ~/.opencode/skills/sdd-explore/SKILL.md |
+| propose, proposal | sdd-propose | ~/.opencode/skills/sdd-propose/SKILL.md |
+| spec, specification | sdd-spec | ~/.opencode/skills/sdd-spec/SKILL.md |
+| design, architecture | sdd-design | ~/.opencode/skills/sdd-design/SKILL.md |
+| tasks, breakdown | sdd-tasks | ~/.opencode/skills/sdd-tasks/SKILL.md |
+| implement, apply | sdd-apply | ~/.opencode/skills/sdd-apply/SKILL.md |
+| verify, test, validate | sdd-verify | ~/.opencode/skills/sdd-verify/SKILL.md |
+| archive, sync | sdd-archive | ~/.opencode/skills/sdd-archive/SKILL.md |
 
 ### Utilities
-| Skill Name | Path | Trigger Keywords | Description |
-|------------|------|------------------|-------------|
-| **skill-creator** | `~/.opencode/skills/skill-creator/SKILL.md` | create skill, new skill | Create new AI skills |
-| **github-pr** | `~/.opencode/skills/github-pr/SKILL.md` | pr, pull request | Create pull requests |
-| **jira-task** | `~/.opencode/skills/jira-task/SKILL.md` | jira, ticket | Create Jira tasks |
-| **jira-epic** | `~/.opencode/skills/jira-epic/SKILL.md` | epic, jira epic | Create Jira epics |
+| Trigger | Skill | Path |
+|---------|-------|------|
+| create skill, new skill | skill-creator | ~/.opencode/skills/skill-creator/SKILL.md |
+| pr, pull request | github-pr | ~/.opencode/skills/github-pr/SKILL.md |
+| jira, ticket | jira-task | ~/.opencode/skills/jira-task/SKILL.md |
+| epic, jira epic | jira-epic | ~/.opencode/skills/jira-epic/SKILL.md |
 
----
+### Frontend Frameworks
+| Trigger | Skill | Path |
+|---------|-------|------|
+| React 19, React Compiler | react-19 | ~/.opencode/skills/react-19/SKILL.md |
+| Next.js 15, App Router | nextjs-15 | ~/.opencode/skills/nextjs-15/SKILL.md |
+| Zustand 5 state management | zustand-5 | ~/.opencode/skills/zustand-5/SKILL.md |
+| Tailwind CSS 4 | tailwind-4 | ~/.opencode/skills/tailwind-4/SKILL.md |
+| React Native, Expo | react-native | ~/.opencode/skills/react-native/SKILL.md |
 
-## Skill Loading Priority
+### Angular
+| Trigger | Skill | Path |
+|---------|-------|------|
+| Angular standalone, signals | angular-core | ~/.opencode/skills/angular/core/SKILL.md |
+| Angular architecture, project structure | angular-architecture | ~/.opencode/skills/angular/architecture/SKILL.md |
+| Angular forms, Reactive Forms | angular-forms | ~/.opencode/skills/angular/forms/SKILL.md |
+| Angular performance, NgOptimizedImage | angular-performance | ~/.opencode/skills/angular/performance/SKILL.md |
 
-When working on a task, follow this order:
+### TypeScript & Validation
+| Trigger | Skill | Path |
+|---------|-------|------|
+| TypeScript strict patterns | typescript | ~/.opencode/skills/typescript/SKILL.md |
+| Zod 4 validation | zod-4 | ~/.opencode/skills/zod-4/SKILL.md |
 
-1. **Check project-level** (`.agents/skills/`) - Load if matching
-2. **Check global** (`~/.opencode/skills/`) - Load if project-level doesn't exist
-3. **Apply all patterns** from the loaded skill before writing code
+### Backend
+| Trigger | Skill | Path |
+|---------|-------|------|
+| Django REST Framework | django-drf | ~/.opencode/skills/django-drf/SKILL.md |
+| Spring Boot 3 | spring-boot-3 | ~/.opencode/skills/spring-boot-3/SKILL.md |
+| Java 21, records, virtual threads | java-21 | ~/.opencode/skills/java-21/SKILL.md |
+| Hexagonal architecture Java | hexagonal-architecture-layers-java | ~/.opencode/skills/hexagonal-architecture-layers-java/SKILL.md |
 
----
+### Testing
+| Trigger | Skill | Path |
+|---------|-------|------|
+| Python pytest | pytest | ~/.opencode/skills/pytest/SKILL.md |
+| Playwright E2E testing | playwright | ~/.opencode/skills/playwright/SKILL.md |
+| Identity service testing, bun:test | identity-testing | ~/.opencode/skills/identity-testing/SKILL.md |
+| Astro testing | astro-testing | ~/.opencode/skills/astro-testing/SKILL.md |
 
-## Usage Examples
+### Other
+| Trigger | Skill | Path |
+|---------|-------|------|
+| Vercel AI SDK 5 | ai-sdk-5 | ~/.opencode/skills/ai-sdk-5/SKILL.md |
+| Electron desktop apps | electron | ~/.opencode/skills/electron/SKILL.md |
+| Elixir Phoenix antipatterns | elixir-antipatterns | ~/.opencode/skills/elixir-antipatterns/SKILL.md |
 
-### Go Testing
-```
-Task: Write tests for product repository
-→ Load: golang-testing (from .agents/skills/)
-→ Apply: table-driven tests, subtests, benchmarks
-```
+## Project Conventions
 
-### Gin API Development
-```
-Task: Create new endpoint
-→ Load: golang-gin-api (from ~/.opencode/skills/)
-→ Apply: handler patterns, routing, middleware
-```
+| File | Path | Notes |
+|------|------|-------|
+| AGENTS.md | AGENTS.md | Index — references files below |
+| cmd/api/main.go | cmd/api/main.go | Entry point |
+| internal/config/ | internal/config/ | YAML config loading |
+| internal/database/ | internal/database/ | DB connection |
+| internal/concurrency/ | internal/concurrency/ | Worker pool, task queue |
+| internal/modules/ | internal/modules/ | Feature modules |
+| internal/shared/ | internal/shared/ | Middleware, response helpers |
+| config.yaml | config.yaml | Configuration file |
+| openspec/ | openspec/ | SDD specifications |
 
-### SDD Workflow
-```
-Task: Implement new feature with specs
-→ Load: sdd-explore → sdd-propose → sdd-spec → sdd-design → sdd-tasks → sdd-apply → sdd-verify
-→ Apply: full SDD lifecycle
-```
-
----
-
-## Adding New Skills
-
-To add a new skill to this registry:
-
-1. Create the skill file in `.agents/skills/` (project) or `~/.opencode/skills/` (global)
-2. Add entry to this registry with:
-   - Skill name
-   - Path
-   - Trigger keywords
-   - Description
-3. Run: `skill-registry` to update
-
----
-
-*Last updated: 2026-03-13*
+Read the convention files listed above for project-specific patterns and rules. All referenced paths have been extracted — no need to read index files to discover more.

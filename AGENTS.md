@@ -33,10 +33,11 @@ Estas skills están específicas para este proyecto y tienen prioridad sobre las
 | **golang-patterns** | `.agents/skills/golang-patterns/SKILL.md` | Idiomatic Go patterns, best practices |
 | **golang-testing** | `.agents/skills/golang-testing/SKILL.md` | Go testing patterns (table-driven, subtests, benchmarks) |
 | **golang-concurrency-patterns** | `.agents/skills/golang-concurrency-patterns/SKILL.md` | Go concurrency patterns (goroutines, channels, sync) |
-| **golang-pro** | `.agents/skills/golang-pro/SKILL.md` | Advanced Go patterns |
+| **golang-pro** | `.agents/skills/golang-pro/SKILL.md` | Advanced Go patterns, microservices, pprof |
 | **docker-expert** | `.agents/skills/docker-expert/SKILL.md` | Docker containerization, multi-stage builds, security |
 | **multi-stage-dockerfile** | `.agents/skills/multi-stage-dockerfile/SKILL.md` | Optimized multi-stage Dockerfiles |
 | **paypal-integration** | `.agents/skills/paypal-integration/SKILL.md` | PayPal payment processing |
+| **design-patterns-expert** | `.agents/skills/design-patterns-expert/SKILL.md` | GoF design patterns, architecture decisions |
 
 ### Global Skills (`~/.opencode/skills/`)
 

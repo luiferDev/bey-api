@@ -76,6 +76,11 @@ func LoggerMiddleware() gin.HandlerFunc {
 
 var rateLimiter *RateLimiter
 
+// GetRateLimiter returns the configured rate limiter instance
+func GetRateLimiter() *RateLimiter {
+	return rateLimiter
+}
+
 func InitRateLimiter(enabled bool, requestsPerSecond, burstCapacity int, endpointLimits map[string]int) {
 	rateLimiter = NewRateLimiter(concurrency.RateLimitConfig{
 		Enabled:           enabled,

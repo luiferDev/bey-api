@@ -36,10 +36,18 @@ func TestGetDBPassword(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set env var for test
 			if tt.envValue != "" {
-				os.Setenv("DB_PASSWORD", tt.envValue)
-				defer os.Unsetenv("DB_PASSWORD")
+				if err := os.Setenv("DB_PASSWORD", tt.envValue); err != nil {
+					t.Fatalf("Failed to set DB_PASSWORD: %v", err)
+				}
+				defer func() {
+					if err := os.Unsetenv("DB_PASSWORD"); err != nil {
+						t.Logf("Failed to unset DB_PASSWORD: %v", err)
+					}
+				}()
 			} else {
-				os.Unsetenv("DB_PASSWORD")
+				if err := os.Unsetenv("DB_PASSWORD"); err != nil {
+					t.Logf("Failed to unset DB_PASSWORD: %v", err)
+				}
 			}
 
 			cfg := &Config{
@@ -80,10 +88,18 @@ func TestGetDBHost(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envValue != "" {
-				os.Setenv("DB_HOST", tt.envValue)
-				defer os.Unsetenv("DB_HOST")
+				if err := os.Setenv("DB_HOST", tt.envValue); err != nil {
+					t.Fatalf("Failed to set DB_HOST: %v", err)
+				}
+				defer func() {
+					if err := os.Unsetenv("DB_HOST"); err != nil {
+						t.Logf("Failed to unset DB_HOST: %v", err)
+					}
+				}()
 			} else {
-				os.Unsetenv("DB_HOST")
+				if err := os.Unsetenv("DB_HOST"); err != nil {
+					t.Logf("Failed to unset DB_HOST: %v", err)
+				}
 			}
 
 			cfg := &Config{

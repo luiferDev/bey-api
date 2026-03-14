@@ -8,64 +8,89 @@ import (
 )
 
 func SetupRoutes(router *gin.RouterGroup, db *gorm.DB) {
-	SetupRoutesWithService(router, db, nil)
+	SetupRoutesWithService(router, db, nil, nil, nil)
 }
 
-func SetupRoutesWithService(router *gin.RouterGroup, db *gorm.DB, productService *ProductService) {
-	// Inicializar repositorios
+func SetupRoutesWithService(router *gin.RouterGroup, db *gorm.DB, productService *ProductService, authMiddleware gin.HandlerFunc, adminMiddleware gin.HandlerFunc) {
 	categoryRepo := NewCategoryRepository(db)
 	productRepo := NewProductRepository(db)
 	variantRepo := NewProductVariantRepository(db)
 	imageRepo := NewProductImageRepository(db)
 	inventoryRepo := inventory.NewInventoryRepository(db)
 
-	// Inicializar handler con inventory
 	handler := NewProductHandlerWithInventory(categoryRepo, productRepo, variantRepo, imageRepo, inventoryRepo)
 
-	// Rutas de categorías
 	categories := router.Group("/categories")
 	{
-		categories.POST("", handler.CreateCategory)
 		categories.GET("", handler.GetCategories)
 		categories.GET("/:id", handler.GetCategory)
 		categories.GET("/slug/:slug", handler.GetCategoryBySlug)
-		categories.PUT("/:id", handler.UpdateCategory)
-		categories.DELETE("/:id", handler.DeleteCategory)
+
+		if adminMiddleware != nil {
+			categories.POST("", adminMiddleware, handler.CreateCategory)
+			categories.PUT("/:id", adminMiddleware, handler.UpdateCategory)
+			categories.DELETE("/:id", adminMiddleware, handler.DeleteCategory)
+		} else {
+			categories.POST("", handler.CreateCategory)
+			categories.PUT("/:id", handler.UpdateCategory)
+			categories.DELETE("/:id", handler.DeleteCategory)
+		}
 	}
 
-	// Rutas de productos
 	products := router.Group("/products")
 	{
-		products.POST("", handler.CreateProduct)
 		products.GET("", handler.GetProducts)
 		products.GET("/slug/:slug", handler.GetProductBySlug)
 		products.GET("/:id", handler.GetProduct)
-		products.PUT("/:id", handler.UpdateProduct)
-		products.DELETE("/:id", handler.DeleteProduct)
 
-		// Rutas de variantes de productos
-		products.POST("/:id/variants", handler.CreateVariant)
-		products.GET("/:id/variants", handler.GetVariantsByProduct)
+		if adminMiddleware != nil {
+			products.POST("", adminMiddleware, handler.CreateProduct)
+			products.PUT("/:id", adminMiddleware, handler.UpdateProduct)
+			products.DELETE("/:id", adminMiddleware, handler.DeleteProduct)
+			products.POST("/:id/variants", adminMiddleware, handler.CreateVariant)
+			products.POST("/:id/images", adminMiddleware, handler.CreateImage)
+			products.PUT("/:id/images/:image_id/main", adminMiddleware, handler.SetMainImage)
+		} else {
+			products.POST("", handler.CreateProduct)
+			products.PUT("/:id", handler.UpdateProduct)
+			products.DELETE("/:id", handler.DeleteProduct)
+			products.POST("/:id/variants", handler.CreateVariant)
+			products.POST("/:id/images", handler.CreateImage)
+			products.PUT("/:id/images/:image_id/main", handler.SetMainImage)
+		}
 
-		// Rutas de imágenes de productos
-		products.POST("/:id/images", handler.CreateImage)
-		products.GET("/:id/images", handler.GetImagesByProduct)
-		products.PUT("/:id/images/:image_id/main", handler.SetMainImage)
+		if authMiddleware != nil {
+			products.GET("/:id/variants", authMiddleware, handler.GetVariantsByProduct)
+			products.GET("/:id/images", authMiddleware, handler.GetImagesByProduct)
+		} else {
+			products.GET("/:id/variants", handler.GetVariantsByProduct)
+			products.GET("/:id/images", handler.GetImagesByProduct)
+		}
 	}
 
-	// Rutas de variantes (independientes)
 	variants := router.Group("/variants")
 	{
 		variants.GET("/:id", handler.GetVariant)
-		variants.PUT("/:id", handler.UpdateVariant)
-		variants.DELETE("/:id", handler.DeleteVariant)
+
+		if adminMiddleware != nil {
+			variants.PUT("/:id", adminMiddleware, handler.UpdateVariant)
+			variants.DELETE("/:id", adminMiddleware, handler.DeleteVariant)
+		} else {
+			variants.PUT("/:id", handler.UpdateVariant)
+			variants.DELETE("/:id", handler.DeleteVariant)
+		}
 	}
 
-	// Rutas de imágenes (independientes)
 	images := router.Group("/images")
 	{
 		images.GET("/:id", handler.GetImage)
-		images.PUT("/:id", handler.UpdateImage)
-		images.DELETE("/:id", handler.DeleteImage)
+
+		if adminMiddleware != nil {
+			images.PUT("/:id", adminMiddleware, handler.UpdateImage)
+			images.DELETE("/:id", adminMiddleware, handler.DeleteImage)
+		} else {
+			images.PUT("/:id", handler.UpdateImage)
+			images.DELETE("/:id", handler.DeleteImage)
+		}
 	}
 }

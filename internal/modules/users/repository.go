@@ -55,3 +55,27 @@ func (r *UserRepository) FindAll(offset, limit int) ([]User, error) {
 	}
 	return users, nil
 }
+
+func (r *UserRepository) FindByVerificationToken(token string) (*User, error) {
+	var user User
+	hashedToken := token
+	if err := r.db.Where("verification_token = ?", hashedToken).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *UserRepository) FindByResetToken(token string) (*User, error) {
+	var user User
+	hashedToken := token
+	if err := r.db.Where("reset_token = ?", hashedToken).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &user, nil
+}
