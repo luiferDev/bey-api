@@ -2,6 +2,8 @@ package orders
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"time"
 
 	"bey/internal/concurrency"
@@ -263,4 +265,39 @@ func (s *OrderService) GetTaskStatus(taskID string) (*concurrency.Task, error) {
 	}
 
 	return s.taskQueue.GetStatus(taskID)
+}
+
+func (s *OrderService) UpdatePaymentStatus(orderID uint, paymentStatus, transactionID string) error {
+	order, err := s.repo.FindByID(orderID)
+	if err != nil {
+		return fmt.Errorf("find order: %w", err)
+	}
+	if order == nil {
+		return errors.New("order not found")
+	}
+
+	order.PaymentStatus = paymentStatus
+	if transactionID != "" {
+		order.PaymentTransactionID = transactionID
+	}
+
+	if paymentStatus == "paid" {
+		order.Status = "confirmed"
+		if s.variantRepo != nil {
+			for _, item := range order.Items {
+				if item.VariantID != nil {
+					if err := s.variantRepo.ConfirmSale(*item.VariantID, item.Quantity); err != nil {
+						log.Printf("Failed to confirm sale for variant %d: %v", *item.VariantID, err)
+					}
+				}
+			}
+		}
+	}
+
+	if err := s.repo.Update(order); err != nil {
+		return fmt.Errorf("update order: %w", err)
+	}
+
+	log.Printf("Updated order %d payment status to %s", orderID, paymentStatus)
+	return nil
 }

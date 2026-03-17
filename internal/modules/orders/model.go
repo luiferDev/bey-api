@@ -7,16 +7,19 @@ import (
 )
 
 type Order struct {
-	ID              uint           `gorm:"primarykey" json:"id"`
-	UserID          uint           `gorm:"index" json:"user_id"`
-	Status          string         `gorm:"size:50;default:pending" json:"status"`
-	TotalPrice      float64        `gorm:"precision:10;scale:2" json:"total_price"`
-	ShippingAddress string         `gorm:"type:text" json:"shipping_address"`
-	Notes           string         `gorm:"type:text" json:"notes"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
-	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
-	Items           []OrderItem    `gorm:"foreignKey:OrderID" json:"items"`
+	ID                   uint           `gorm:"primarykey" json:"id"`
+	UserID               uint           `gorm:"index" json:"user_id"`
+	Status               string         `gorm:"size:50;default:pending" json:"status"`
+	TotalPrice           float64        `gorm:"precision:10;scale:2" json:"total_price"`
+	ShippingAddress      string         `gorm:"type:text" json:"shipping_address"`
+	Notes                string         `gorm:"type:text" json:"notes"`
+	PaymentTransactionID string         `gorm:"size:255" json:"payment_transaction_id"`
+	PaymentLinkID        string         `gorm:"size:255" json:"payment_link_id"`
+	PaymentStatus        string         `gorm:"size:50;default:pending" json:"payment_status"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
+	DeletedAt            gorm.DeletedAt `gorm:"index" json:"-"`
+	Items                []OrderItem    `gorm:"foreignKey:OrderID" json:"items"`
 }
 
 type OrderItem struct {
