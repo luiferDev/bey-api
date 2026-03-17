@@ -12,14 +12,13 @@ func RegisterRoutes(rg *gin.RouterGroup, db *gorm.DB) {
 func RegisterRoutesWithAuth(rg *gin.RouterGroup, db *gorm.DB, authMiddleware gin.HandlerFunc, adminMiddleware gin.HandlerFunc) {
 	handler := NewInventoryHandler(db)
 
+	// Inventory routes - all public (no auth required)
 	inventory := rg.Group("/inventory")
 	{
-		if authMiddleware != nil {
-			inventory.GET("/:product_id", authMiddleware, handler.GetByProductID)
-		} else {
-			inventory.GET("/:product_id", handler.GetByProductID)
-		}
+		// GET by product_id - public
+		inventory.GET("/:product_id", handler.GetByProductID)
 
+		// Admin only - update, reserve, release
 		if adminMiddleware != nil {
 			inventory.PUT("/:product_id", adminMiddleware, handler.Update)
 			inventory.POST("/:product_id/reserve", adminMiddleware, handler.Reserve)

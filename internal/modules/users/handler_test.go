@@ -78,7 +78,7 @@ func TestGetUsers_EmptyList(t *testing.T) {
 func TestCreateUser_InvalidBody(t *testing.T) {
 	router, handler := setupTestRouterWithUsers(t)
 
-	router.POST("/api/v1/users", handler.Create)
+	router.POST("/api/v1/users", handler.Register)
 
 	req, _ := http.NewRequest("POST", "/api/v1/users", bytes.NewBufferString("invalid"))
 	req.Header.Set("Content-Type", "application/json")
@@ -93,7 +93,7 @@ func TestCreateUser_InvalidBody(t *testing.T) {
 func TestCreateUser_MissingFields(t *testing.T) {
 	router, handler := setupTestRouterWithUsers(t)
 
-	router.POST("/api/v1/users", handler.Create)
+	router.POST("/api/v1/users", handler.Register)
 
 	body := `{"email":"test@example.com"}`
 	req, _ := http.NewRequest("POST", "/api/v1/users", bytes.NewBufferString(body))
@@ -109,7 +109,7 @@ func TestCreateUser_MissingFields(t *testing.T) {
 func TestCreateUser_Success(t *testing.T) {
 	router, handler := setupTestRouterWithUsers(t)
 
-	router.POST("/api/v1/users", handler.Create)
+	router.POST("/api/v1/users", handler.Register)
 
 	body := `{"email":"test@example.com","password":"password123","name":"John Doe"}`
 	req, _ := http.NewRequest("POST", "/api/v1/users", bytes.NewBufferString(body))
@@ -125,7 +125,7 @@ func TestCreateUser_Success(t *testing.T) {
 func TestCreateUser_DuplicateEmail(t *testing.T) {
 	router, handler := setupTestRouterWithUsers(t)
 
-	router.POST("/api/v1/users", handler.Create)
+	router.POST("/api/v1/users", handler.Register)
 
 	body := `{"email":"test@example.com","password":"password123","first_name":"John","last_name":"Doe"}`
 	req1, _ := http.NewRequest("POST", "/api/v1/users", bytes.NewBufferString(body))

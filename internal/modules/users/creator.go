@@ -12,6 +12,8 @@ type CreateUserRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
 	Name     string `json:"name" binding:"required"`
+	Surname  string `json:"surname"`
+	Phone    string `json:"phone"`
 }
 
 type UserCreator interface {
@@ -51,6 +53,8 @@ func (c *RegularUserCreator) buildUser(req *CreateUserRequest, hashedPassword st
 		Email:     req.Email,
 		Password:  hashedPassword,
 		FirstName: req.Name,
+		LastName:  req.Surname,
+		Phone:     req.Phone,
 		Role:      "customer",
 		Active:    true,
 	}
@@ -88,6 +92,8 @@ func (c *AdminUserCreator) buildUser(req *CreateUserRequest, hashedPassword stri
 		Email:     req.Email,
 		Password:  hashedPassword,
 		FirstName: req.Name,
+		LastName:  req.Surname,
+		Phone:     req.Phone,
 		Role:      "admin",
 		Active:    true,
 	}

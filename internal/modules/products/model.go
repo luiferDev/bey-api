@@ -43,16 +43,25 @@ type Product struct {
 
 // ProductVariant - Inventario y SKU
 type ProductVariant struct {
-	ID         uint              `gorm:"primaryKey" json:"id"`
-	ProductID  uint              `json:"product_id"`
-	SKU        string            `gorm:"size:100;uniqueIndex;not null" json:"sku"`
-	Price      float64           `gorm:"type:decimal(12,2);not null" json:"price"`
-	Stock      int               `gorm:"default:0" json:"stock"`
-	Reserved   int               `gorm:"default:0" json:"reserved"` // Reservado en compras/checkout
-	Attributes datatypes.JSONMap `gorm:"type:jsonb;not null" json:"attributes"`
-	CreatedAt  time.Time         `json:"created_at"`
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	ProductID uint      `json:"product_id"`
+	SKU       string    `gorm:"size:100;uniqueIndex;not null" json:"sku"`
+	Price     float64   `gorm:"type:decimal(12,2);not null" json:"price"`
+	Stock     int       `gorm:"default:0" json:"stock"`
+	Reserved  int       `gorm:"default:0" json:"reserved"` // Reservado en compras/checkout
+	CreatedAt time.Time `json:"created_at"`
 	// Relaciones
-	Images []ProductImage `gorm:"foreignKey:VariantID" json:"images,omitempty"`
+	Attribute *ProductVariantAttribute `gorm:"foreignKey:VariantID" json:"attribute,omitempty"`
+	Images    []ProductImage           `gorm:"foreignKey:VariantID" json:"images,omitempty"`
+}
+
+// ProductVariantAttribute - Tabla embebida para atributos específicos de variante
+type ProductVariantAttribute struct {
+	ID        uint   `gorm:"primaryKey" json:"id"`
+	VariantID uint   `gorm:"uniqueIndex" json:"variant_id"`
+	Color     string `gorm:"size:50;not null" json:"color"`
+	Size      string `gorm:"size:20;not null" json:"size"`
+	Weight    string `gorm:"size:50;not null" json:"weight"`
 }
 
 // ProductImage - Imágenes de productos/variantes

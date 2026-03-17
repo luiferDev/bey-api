@@ -107,7 +107,7 @@ func (r *ProductRepository) Create(product *Product) error {
 
 func (r *ProductRepository) FindByID(id uint) (*Product, error) {
 	var product Product
-	if err := r.db.Preload("Category").Preload("Variants").Preload("Images").First(&product, id).Error; err != nil {
+	if err := r.db.Preload("Category").Preload("Variants.Attribute").Preload("Variants.Images").Preload("Images").First(&product, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -131,7 +131,7 @@ func (r *ProductRepository) GetPriceByID(id uint) (float64, error) {
 
 func (r *ProductRepository) FindBySlug(slug string) (*Product, error) {
 	var product Product
-	if err := r.db.Preload("Category").Preload("Variants").Preload("Images").Where("slug = ?", slug).First(&product).Error; err != nil {
+	if err := r.db.Preload("Category").Preload("Variants.Attribute").Preload("Variants.Images").Preload("Images").Where("slug = ?", slug).First(&product).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -258,7 +258,7 @@ func (r *ProductVariantRepository) Create(variant *ProductVariant) error {
 
 func (r *ProductVariantRepository) FindByID(id uint) (*ProductVariant, error) {
 	var variant ProductVariant
-	if err := r.db.Preload("Images").First(&variant, id).Error; err != nil {
+	if err := r.db.Preload("Attribute").Preload("Images").First(&variant, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -269,7 +269,7 @@ func (r *ProductVariantRepository) FindByID(id uint) (*ProductVariant, error) {
 
 func (r *ProductVariantRepository) FindBySKU(sku string) (*ProductVariant, error) {
 	var variant ProductVariant
-	if err := r.db.Preload("Images").Where("sku = ?", sku).First(&variant).Error; err != nil {
+	if err := r.db.Preload("Attribute").Preload("Images").Where("sku = ?", sku).First(&variant).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -288,7 +288,7 @@ func (r *ProductVariantRepository) Delete(id uint) error {
 
 func (r *ProductVariantRepository) FindByProductID(productID uint) ([]ProductVariant, error) {
 	var variants []ProductVariant
-	if err := r.db.Where("product_id = ?", productID).Preload("Images").Find(&variants).Error; err != nil {
+	if err := r.db.Where("product_id = ?", productID).Preload("Attribute").Preload("Images").Find(&variants).Error; err != nil {
 		return nil, err
 	}
 	return variants, nil
@@ -346,6 +346,30 @@ func (r *ProductVariantRepository) ConfirmSale(id uint, quantity int) error {
 	return r.db.Model(&ProductVariant{}).
 		Where("id = ? AND reserved >= ?", id, quantity).
 		Update("reserved", gorm.Expr("reserved - ?", quantity)).Error
+}
+
+// ProductVariantAttribute CRUD
+func (r *ProductVariantRepository) CreateAttribute(attribute *ProductVariantAttribute) error {
+	return r.db.Create(attribute).Error
+}
+
+func (r *ProductVariantRepository) FindAttributeByVariantID(variantID uint) (*ProductVariantAttribute, error) {
+	var attribute ProductVariantAttribute
+	if err := r.db.Where("variant_id = ?", variantID).First(&attribute).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &attribute, nil
+}
+
+func (r *ProductVariantRepository) UpdateAttribute(attribute *ProductVariantAttribute) error {
+	return r.db.Save(attribute).Error
+}
+
+func (r *ProductVariantRepository) DeleteAttribute(variantID uint) error {
+	return r.db.Where("variant_id = ?", variantID).Delete(&ProductVariantAttribute{}).Error
 }
 
 // ProductImageRepository

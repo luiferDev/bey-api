@@ -23,7 +23,7 @@ func setupParallelTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	db.AutoMigrate(&Category{}, &Product{}, &ProductVariant{}, &ProductImage{})
+	db.AutoMigrate(&Category{}, &Product{}, &ProductVariant{}, &ProductVariantAttribute{}, &ProductImage{})
 
 	t.Cleanup(func() {
 		sqlDB, _ := db.DB()

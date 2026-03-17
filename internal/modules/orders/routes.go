@@ -28,22 +28,38 @@ func RegisterRoutesWithAllDeps(rg *gin.RouterGroup, db *gorm.DB, orderService *O
 
 	orders := rg.Group("/orders")
 	{
+		// User: Create order (authenticated)
 		if authMiddleware != nil {
 			orders.POST("", authMiddleware, handler.Create)
-			orders.GET("", authMiddleware, handler.List)
+		} else {
+			orders.POST("", handler.Create)
+		}
+
+		// Admin only: List all orders
+		if adminMiddleware != nil {
+			orders.GET("", adminMiddleware, handler.List)
+		} else {
+			orders.GET("", handler.List)
+		}
+
+		// Authenticated: Get own order, confirm, cancel, task status
+		if authMiddleware != nil {
 			orders.GET("/:id", authMiddleware, handler.GetByID)
-			orders.PATCH("/:id/status", authMiddleware, handler.UpdateStatus)
 			orders.POST("/:id/confirm", authMiddleware, handler.Confirm)
 			orders.POST("/:id/cancel", authMiddleware, handler.Cancel)
 			orders.GET("/tasks/:task_id", authMiddleware, handler.GetTaskStatus)
 		} else {
-			orders.POST("", handler.Create)
-			orders.GET("", handler.List)
 			orders.GET("/:id", handler.GetByID)
-			orders.PATCH("/:id/status", handler.UpdateStatus)
 			orders.POST("/:id/confirm", handler.Confirm)
 			orders.POST("/:id/cancel", handler.Cancel)
 			orders.GET("/tasks/:task_id", handler.GetTaskStatus)
+		}
+
+		// Admin only: Update order status
+		if adminMiddleware != nil {
+			orders.PATCH("/:id/status", adminMiddleware, handler.UpdateStatus)
+		} else {
+			orders.PATCH("/:id/status", handler.UpdateStatus)
 		}
 	}
 }

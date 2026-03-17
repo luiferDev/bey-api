@@ -14,20 +14,48 @@ func RegisterRoutesWithAuth(rg *gin.RouterGroup, db *gorm.DB, authMiddleware gin
 
 	users := rg.Group("/users")
 	{
-		users.GET("", handler.List)
-		users.GET("/:id", handler.GetByID)
+		// Public: Register new user
+		users.POST("/register", handler.Register)
 
+		// Admin only: Register admin user
+		if adminMiddleware != nil {
+			users.POST("/register-admin", adminMiddleware, handler.RegisterAdmin)
+		} else {
+			users.POST("/register-admin", handler.RegisterAdmin)
+		}
+
+		// Admin only: List all users
+		if adminMiddleware != nil {
+			users.GET("", adminMiddleware, handler.List)
+		} else {
+			users.GET("", handler.List)
+		}
+
+		// Authenticated: Get user by ID (user themselves or admin)
+		if authMiddleware != nil {
+			users.GET("/:id", authMiddleware, handler.GetByID)
+		} else {
+			users.GET("/:id", handler.GetByID)
+		}
+
+		// Authenticated: Update user (user themselves or admin)
 		if authMiddleware != nil {
 			users.PUT("/:id", authMiddleware, handler.Update)
 		} else {
 			users.PUT("/:id", handler.Update)
 		}
 
+		// Authenticated: Update avatar (user themselves or admin)
+		if authMiddleware != nil {
+			users.PUT("/:id/avatar", authMiddleware, handler.UpdateAvatar)
+		} else {
+			users.PUT("/:id/avatar", handler.UpdateAvatar)
+		}
+
+		// Admin only: Delete user
 		if adminMiddleware != nil {
-			users.POST("", adminMiddleware, handler.Create)
 			users.DELETE("/:id", adminMiddleware, handler.Delete)
 		} else {
-			users.POST("", handler.Create)
 			users.DELETE("/:id", handler.Delete)
 		}
 	}

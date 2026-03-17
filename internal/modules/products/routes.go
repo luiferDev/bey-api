@@ -39,10 +39,16 @@ func SetupRoutesWithService(router *gin.RouterGroup, db *gorm.DB, productService
 
 	products := router.Group("/products")
 	{
+		// Public: GET products
 		products.GET("", handler.GetProducts)
 		products.GET("/slug/:slug", handler.GetProductBySlug)
 		products.GET("/:id", handler.GetProduct)
 
+		// Public: GET variants and images
+		products.GET("/:id/variants", handler.GetVariantsByProduct)
+		products.GET("/:id/images", handler.GetImagesByProduct)
+
+		// Admin only: CRUD products
 		if adminMiddleware != nil {
 			products.POST("", adminMiddleware, handler.CreateProduct)
 			products.PUT("/:id", adminMiddleware, handler.UpdateProduct)
@@ -57,14 +63,6 @@ func SetupRoutesWithService(router *gin.RouterGroup, db *gorm.DB, productService
 			products.POST("/:id/variants", handler.CreateVariant)
 			products.POST("/:id/images", handler.CreateImage)
 			products.PUT("/:id/images/:image_id/main", handler.SetMainImage)
-		}
-
-		if authMiddleware != nil {
-			products.GET("/:id/variants", authMiddleware, handler.GetVariantsByProduct)
-			products.GET("/:id/images", authMiddleware, handler.GetImagesByProduct)
-		} else {
-			products.GET("/:id/variants", handler.GetVariantsByProduct)
-			products.GET("/:id/images", handler.GetImagesByProduct)
 		}
 	}
 

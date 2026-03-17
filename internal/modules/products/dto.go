@@ -1,6 +1,8 @@
 package products
 
 import (
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 	"gorm.io/datatypes"
 	"time"
 )
@@ -69,29 +71,41 @@ type ProductResponse struct {
 
 // ProductVariant DTOs
 type CreateProductVariantRequest struct {
-	ProductID  uint              `json:"product_id" binding:"required"`
-	SKU        string            `json:"sku" binding:"required"`
-	Price      float64           `json:"price" binding:"required,gt=0"`
-	Stock      int               `json:"stock"`
-	Attributes datatypes.JSONMap `json:"attributes" binding:"required"`
+	ProductID uint    `json:"product_id" binding:"required"`
+	SKU       string  `json:"sku" binding:"required"`
+	Price     float64 `json:"price" binding:"required,gt=0"`
+	Stock     int     `json:"stock"`
+	Color     string  `json:"color" binding:"required"`
+	Size      string  `json:"size" binding:"required"`
+	Weight    string  `json:"weight" binding:"required"`
 }
 
 type UpdateProductVariantRequest struct {
-	SKU        *string            `json:"sku"`
-	Price      *float64           `json:"price"`
-	Stock      *int               `json:"stock"`
-	Attributes *datatypes.JSONMap `json:"attributes"`
+	SKU    *string  `json:"sku"`
+	Price  *float64 `json:"price"`
+	Stock  *int     `json:"stock"`
+	Color  *string  `json:"color"`
+	Size   *string  `json:"size"`
+	Weight *string  `json:"weight"`
+}
+
+type ProductVariantAttributeResponse struct {
+	Color  string `json:"color"`
+	Size   string `json:"size"`
+	Weight string `json:"weight"`
 }
 
 type ProductVariantResponse struct {
-	ID         uint                   `json:"id"`
-	ProductID  uint                   `json:"product_id"`
-	SKU        string                 `json:"sku"`
-	Price      float64                `json:"price"`
-	Stock      int                    `json:"stock"`
-	Attributes datatypes.JSONMap      `json:"attributes"`
-	CreatedAt  time.Time              `json:"created_at"`
-	Images     []ProductImageResponse `json:"images,omitempty"`
+	ID        uint                             `json:"id"`
+	ProductID uint                             `json:"product_id"`
+	SKU       string                           `json:"sku"`
+	Price     float64                          `json:"price"`
+	Stock     int                              `json:"stock"`
+	Reserved  int                              `json:"reserved"`
+	Available int                              `json:"available"`
+	Attribute *ProductVariantAttributeResponse `json:"attribute,omitempty"`
+	CreatedAt time.Time                        `json:"created_at"`
+	Images    []ProductImageResponse           `json:"images,omitempty"`
 }
 
 // ProductImage DTOs
@@ -116,4 +130,30 @@ type ProductImageResponse struct {
 	URLImage  string `json:"url_image"`
 	IsMain    bool   `json:"is_main"`
 	SortOrder int    `json:"sort_order"`
+}
+
+var validAttributeKeys = map[string]bool{
+	"color":  true,
+	"size":   true,
+	"weight": true,
+}
+
+func validateAttributes(fl validator.FieldLevel) bool {
+	attrs, ok := fl.Field().Interface().(datatypes.JSONMap)
+	if !ok {
+		return false
+	}
+
+	for key := range attrs {
+		if !validAttributeKeys[key] {
+			return false
+		}
+	}
+	return true
+}
+
+func init() {
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		v.RegisterValidation("validAttributes", validateAttributes)
+	}
 }

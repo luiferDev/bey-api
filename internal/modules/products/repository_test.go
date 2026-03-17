@@ -14,7 +14,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	}
 
 	// Auto migrate
-	db.AutoMigrate(&Category{}, &Product{}, &ProductVariant{}, &ProductImage{})
+	db.AutoMigrate(&Category{}, &Product{}, &ProductVariant{}, &ProductVariantAttribute{}, &ProductImage{})
 
 	return db
 }

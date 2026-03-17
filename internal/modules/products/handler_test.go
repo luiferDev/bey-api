@@ -18,7 +18,7 @@ func setupTestDBForHandler(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
-	db.AutoMigrate(&Category{}, &Product{}, &ProductVariant{}, &ProductImage{})
+	db.AutoMigrate(&Category{}, &Product{}, &ProductVariant{}, &ProductVariantAttribute{}, &ProductImage{})
 	return db
 }
 

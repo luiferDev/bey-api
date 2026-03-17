@@ -91,15 +91,26 @@ func (s *ProductService) CreateProductWithVariants(
 	// Crear variantes si se proporcionan
 	for _, variantReq := range variants {
 		variant := &ProductVariant{
-			ProductID:  product.ID,
-			SKU:        variantReq.SKU,
-			Price:      variantReq.Price,
-			Stock:      variantReq.Stock,
-			Attributes: variantReq.Attributes,
+			ProductID: product.ID,
+			SKU:       variantReq.SKU,
+			Price:     variantReq.Price,
+			Stock:     variantReq.Stock,
 		}
 		if err := s.variantRepo.Create(variant); err != nil {
 			return nil, err
 		}
+
+		// Crear atributos de la variante
+		attribute := &ProductVariantAttribute{
+			VariantID: variant.ID,
+			Color:     variantReq.Color,
+			Size:      variantReq.Size,
+			Weight:    variantReq.Weight,
+		}
+		if err := s.variantRepo.CreateAttribute(attribute); err != nil {
+			return nil, err
+		}
+		variant.Attribute = attribute
 	}
 
 	// Crear imágenes si se proporcionan

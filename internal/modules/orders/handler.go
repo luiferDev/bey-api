@@ -115,7 +115,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 }
 
 // @Summary Get order by ID
-// @Description Retrieves an order by its ID
+// @Description Retrieves an order by its ID (owner or admin)
 // @Tags Orders
 // @Accept json
 // @Produce json
@@ -138,6 +138,16 @@ func (h *OrderHandler) GetByID(c *gin.Context) {
 		h.resp.NotFound(c, "order not found")
 		return
 	}
+
+	// Check if user is owner or admin
+	currentUserID := c.GetUint("user_id")
+	userRole := c.GetString("user_role")
+
+	if userRole != "admin" && order.UserID != currentUserID {
+		h.resp.Error(c, 403, "you can only view your own orders")
+		return
+	}
+
 	h.resp.Success(c, toOrderResponse(order))
 }
 
@@ -271,6 +281,15 @@ func (h *OrderHandler) Confirm(c *gin.Context) {
 		return
 	}
 
+	// Check if user is owner or admin
+	currentUserID := c.GetUint("user_id")
+	userRole := c.GetString("user_role")
+
+	if userRole != "admin" && order.UserID != currentUserID {
+		h.resp.Error(c, 403, "you can only confirm your own orders")
+		return
+	}
+
 	// Only confirm pending or confirmed orders
 	if order.Status != "pending" && order.Status != "confirmed" {
 		h.resp.Error(c, 400, "order cannot be confirmed in current status")
@@ -322,6 +341,15 @@ func (h *OrderHandler) Cancel(c *gin.Context) {
 	}
 	if order == nil {
 		h.resp.NotFound(c, "order not found")
+		return
+	}
+
+	// Check if user is owner or admin
+	currentUserID := c.GetUint("user_id")
+	userRole := c.GetString("user_role")
+
+	if userRole != "admin" && order.UserID != currentUserID {
+		h.resp.Error(c, 403, "you can only cancel your own orders")
 		return
 	}
 

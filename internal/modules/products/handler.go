@@ -9,6 +9,35 @@ import (
 	"bey/internal/shared/response"
 )
 
+func variantToResponse(variant *ProductVariant) ProductVariantResponse {
+	available := variant.Stock - variant.Reserved
+	if available < 0 {
+		available = 0
+	}
+
+	var attrResponse *ProductVariantAttributeResponse
+	if variant.Attribute != nil {
+		attrResponse = &ProductVariantAttributeResponse{
+			Color:  variant.Attribute.Color,
+			Size:   variant.Attribute.Size,
+			Weight: variant.Attribute.Weight,
+		}
+	}
+
+	return ProductVariantResponse{
+		ID:        variant.ID,
+		ProductID: variant.ProductID,
+		SKU:       variant.SKU,
+		Price:     variant.Price,
+		Stock:     variant.Stock,
+		Reserved:  variant.Reserved,
+		Available: available,
+		Attribute: attrResponse,
+		CreatedAt: variant.CreatedAt,
+		Images:    nil,
+	}
+}
+
 type ProductHandler struct {
 	categoryRepo  *CategoryRepository
 	productRepo   *ProductRepository
@@ -477,7 +506,7 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Product ID"
 // @Param variant body CreateProductVariantRequest true "Variant data"
-// @Success 201 {object} ProductVariant
+// @Success 201 {object} ProductVariantResponse
 // @Router /api/v1/products/{id}/variants [post]
 func (h *ProductHandler) CreateVariant(c *gin.Context) {
 	var req CreateProductVariantRequest
@@ -487,18 +516,30 @@ func (h *ProductHandler) CreateVariant(c *gin.Context) {
 	}
 
 	variant := &ProductVariant{
-		ProductID:  req.ProductID,
-		SKU:        req.SKU,
-		Price:      req.Price,
-		Stock:      req.Stock,
-		Reserved:   0,
-		Attributes: req.Attributes,
+		ProductID: req.ProductID,
+		SKU:       req.SKU,
+		Price:     req.Price,
+		Stock:     req.Stock,
+		Reserved:  0,
 	}
 
 	if err := h.variantRepo.Create(variant); err != nil {
 		h.response.InternalError(c, "Failed to create variant")
 		return
 	}
+
+	// Create variant attributes
+	attribute := &ProductVariantAttribute{
+		VariantID: variant.ID,
+		Color:     req.Color,
+		Size:      req.Size,
+		Weight:    req.Weight,
+	}
+	if err := h.variantRepo.CreateAttribute(attribute); err != nil {
+		h.response.InternalError(c, "Failed to create variant attributes")
+		return
+	}
+	variant.Attribute = attribute
 
 	// Update inventory with variant stock
 	if h.inventoryRepo != nil && req.Stock > 0 {
@@ -530,7 +571,7 @@ func (h *ProductHandler) CreateVariant(c *gin.Context) {
 		}
 	}
 
-	h.response.Created(c, variant)
+	h.response.Created(c, variantToResponse(variant))
 }
 
 // @Summary Get variant by ID
@@ -539,7 +580,7 @@ func (h *ProductHandler) CreateVariant(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Variant ID"
-// @Success 200 {object} ProductVariant
+// @Success 200 {object} ProductVariantResponse
 // @Router /api/v1/variants/{id} [get]
 func (h *ProductHandler) GetVariant(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
@@ -558,7 +599,7 @@ func (h *ProductHandler) GetVariant(c *gin.Context) {
 		return
 	}
 
-	h.response.Success(c, variant)
+	h.response.Success(c, variantToResponse(variant))
 }
 
 // @Summary Update a variant
@@ -568,7 +609,7 @@ func (h *ProductHandler) GetVariant(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Variant ID"
 // @Param variant body UpdateProductVariantRequest true "Variant data"
-// @Success 200 {object} ProductVariant
+// @Success 200 {object} ProductVariantResponse
 // @Router /api/v1/variants/{id} [put]
 func (h *ProductHandler) UpdateVariant(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
@@ -602,16 +643,52 @@ func (h *ProductHandler) UpdateVariant(c *gin.Context) {
 	if req.Stock != nil {
 		variant.Stock = *req.Stock
 	}
-	if req.Attributes != nil {
-		variant.Attributes = *req.Attributes
-	}
 
 	if err := h.variantRepo.Update(variant); err != nil {
 		h.response.InternalError(c, "Failed to update variant")
 		return
 	}
 
-	h.response.Success(c, variant)
+	// Update attributes if provided
+	if req.Color != nil || req.Size != nil || req.Weight != nil {
+		attribute, err := h.variantRepo.FindAttributeByVariantID(variant.ID)
+		if err != nil {
+			h.response.InternalError(c, "Failed to get variant attributes")
+			return
+		}
+
+		if attribute == nil {
+			// Create new attribute if doesn't exist
+			attribute = &ProductVariantAttribute{
+				VariantID: variant.ID,
+			}
+		}
+
+		if req.Color != nil {
+			attribute.Color = *req.Color
+		}
+		if req.Size != nil {
+			attribute.Size = *req.Size
+		}
+		if req.Weight != nil {
+			attribute.Weight = *req.Weight
+		}
+
+		if attribute.ID == 0 {
+			if err := h.variantRepo.CreateAttribute(attribute); err != nil {
+				h.response.InternalError(c, "Failed to create variant attributes")
+				return
+			}
+		} else {
+			if err := h.variantRepo.UpdateAttribute(attribute); err != nil {
+				h.response.InternalError(c, "Failed to update variant attributes")
+				return
+			}
+		}
+		variant.Attribute = attribute
+	}
+
+	h.response.Success(c, variantToResponse(variant))
 }
 
 // @Summary Delete a variant
@@ -643,7 +720,7 @@ func (h *ProductHandler) DeleteVariant(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Product ID"
-// @Success 200 {array} ProductVariant
+// @Success 200 {array} ProductVariantResponse
 // @Router /api/v1/products/{id}/variants [get]
 func (h *ProductHandler) GetVariantsByProduct(c *gin.Context) {
 	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
@@ -658,7 +735,12 @@ func (h *ProductHandler) GetVariantsByProduct(c *gin.Context) {
 		return
 	}
 
-	h.response.Success(c, variants)
+	responses := make([]ProductVariantResponse, len(variants))
+	for i, v := range variants {
+		responses[i] = variantToResponse(&v)
+	}
+
+	h.response.Success(c, responses)
 }
 
 // ProductImage Handlers
