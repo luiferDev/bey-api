@@ -34,11 +34,12 @@ import (
 	"bey/internal/concurrency"
 	"bey/internal/config"
 	"bey/internal/database"
-	"bey/internal/modules/admin"
 	"bey/internal/modules/auth"
+	"bey/internal/modules/cart"
 	"bey/internal/modules/email"
 	"bey/internal/modules/inventory"
 	"bey/internal/modules/orders"
+	"bey/internal/modules/payments"
 	"bey/internal/modules/products"
 	"bey/internal/modules/users"
 	"bey/internal/shared"
@@ -125,6 +126,8 @@ func main() {
 		&orders.OrderItem{},
 		&inventory.Inventory{},
 		&auth.RefreshToken{},
+		&payments.Payment{},
+		&payments.PaymentLink{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
@@ -198,11 +201,28 @@ func main() {
 	api := router.Group("/api/v1")
 	{
 		auth.RegisterRoutes(router, authService, cfg)
-		admin.RegisterRoutes(api, db.GetDB(), authMiddleware.RequireAuth(), adminMiddleware)
 		users.RegisterRoutesWithAuth(api, db.GetDB(), authMiddleware.RequireAuth(), adminMiddleware)
 		products.SetupRoutesWithService(api, db.GetDB(), productService, authMiddleware.RequireAuth(), adminMiddleware)
 		orders.RegisterRoutesWithAllDeps(api, db.GetDB(), orderService, productRepo, variantRepo, authMiddleware.RequireAuth(), adminMiddleware)
 		inventory.RegisterRoutesWithAuth(api, db.GetDB(), authMiddleware.RequireAuth(), adminMiddleware)
+
+		if cfg.Cart.Enabled {
+			cartRepo, err := cart.NewRedisCartRepository(cfg.Cart)
+			if err != nil {
+				log.Printf("Warning: Failed to initialize cart repository: %v", err)
+			} else {
+				cart.SetupRoutesWithDeps(api, cartRepo, variantRepo, authMiddleware.RequireAuth())
+				log.Println("Cart module initialized successfully")
+			}
+		}
+
+		if cfg.Wompi.Enabled {
+			paymentRepo := payments.NewPaymentRepository(db.GetDB())
+			paymentLinkRepo := payments.NewPaymentLinkRepository(db.GetDB())
+			paymentService := payments.NewPaymentService(&cfg.Wompi, paymentRepo, paymentLinkRepo, orderService)
+			payments.SetupRoutes(api, db.GetDB(), paymentService, authMiddleware.RequireAuth())
+			log.Println("Payments module initialized successfully")
+		}
 	}
 
 	if cfg.App.SwaggerEnabled {

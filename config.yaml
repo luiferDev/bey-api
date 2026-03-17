@@ -102,3 +102,27 @@ oauth:
     client_secret: "your-google-client-secret"
     # Redirect URL (must match Google Cloud Console settings)
     redirect_url: "http://localhost:8080/api/v1/auth/google/callback"
+
+cart:
+  # Shopping cart Redis configuration
+  enabled: true
+  redis:
+    host: "localhost"
+    port: 6379
+    password: ""
+    db: 1  # Separate DB from rate-limiter (DB 0)
+  # Cart TTL in days
+  ttl_days: 7
+
+wompi:
+  # Wompi payment gateway configuration for Colombian payments
+  enabled: true
+  # Environment: sandbox (testing) or production
+  environment: "sandbox"
+  # Keys from Wompi dashboard
+  public_key: "your-public-key"
+  private_key: "your-private-key"
+  event_key: "your-event-key"
+  integrity_key: "your-integrity-key"
+  # API base URL (different for sandbox vs production)
+  base_url: "https://sandbox.wompi.co"

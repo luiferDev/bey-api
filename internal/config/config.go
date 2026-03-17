@@ -19,6 +19,8 @@ type Config struct {
 	RateLimit   RateLimitConfig               `yaml:"rate_limit"`
 	Email       EmailConfig                   `yaml:"email"`
 	OAuth       OAuthConfig                   `yaml:"oauth"`
+	Cart        CartConfig                    `yaml:"cart"`
+	Wompi       WompiConfig                   `yaml:"wompi"`
 }
 
 type AppConfig struct {
@@ -99,6 +101,32 @@ type GoogleOAuthConfig struct {
 	ClientID     string `yaml:"client_id"`
 	ClientSecret string `yaml:"client_secret"`
 	RedirectURL  string `yaml:"redirect_url"`
+}
+
+type CartConfig struct {
+	Enabled bool        `yaml:"enabled"`
+	Redis   RedisConfig `yaml:"redis"`
+	TTLDays int         `yaml:"ttl_days"`
+}
+
+type WompiConfig struct {
+	Enabled      bool   `yaml:"enabled"`
+	Environment  string `yaml:"environment"` // sandbox, production
+	PublicKey    string `yaml:"public_key"`
+	PrivateKey   string `yaml:"private_key"`
+	EventKey     string `yaml:"event_key"`
+	IntegrityKey string `yaml:"integrity_key"`
+	BaseURL      string `yaml:"base_url"`
+}
+
+func (c *WompiConfig) GetBaseURL() string {
+	if c.BaseURL != "" {
+		return c.BaseURL
+	}
+	if c.Environment == "production" {
+		return "https://wompi.co"
+	}
+	return "https://sandbox.wompi.co"
 }
 
 type SMTPConfig struct {
