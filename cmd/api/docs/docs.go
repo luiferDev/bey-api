@@ -1012,7 +1012,7 @@ const docTemplate = `{
         },
         "/api/v1/orders/{id}": {
             "get": {
-                "description": "Retrieves an order by its ID",
+                "description": "Retrieves an order by its ID (owner or admin)",
                 "consumes": [
                     "application/json"
                 ],
@@ -1499,7 +1499,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_modules_products.ProductVariant"
+                                "$ref": "#/definitions/internal_modules_products.ProductVariantResponse"
                             }
                         }
                     }
@@ -1539,7 +1539,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_modules_products.ProductVariant"
+                            "$ref": "#/definitions/internal_modules_products.ProductVariantResponse"
                         }
                     }
                 }
@@ -1569,9 +1569,11 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
+            }
+        },
+        "/api/v1/users/register": {
             "post": {
-                "description": "Creates a new user account",
+                "description": "Creates a new user account (public endpoint)",
                 "consumes": [
                     "application/json"
                 ],
@@ -1581,10 +1583,44 @@ const docTemplate = `{
                 "tags": [
                     "Users"
                 ],
-                "summary": "Create a new user",
+                "summary": "Register a new user",
                 "parameters": [
                     {
-                        "description": "User data (name, email, password)",
+                        "description": "User data (name, email, password, surname, phone)",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_users.CreateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_users.UserResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/register-admin": {
+            "post": {
+                "description": "Creates a new admin user account (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Register a new admin user",
+                "parameters": [
+                    {
+                        "description": "Admin user data",
                         "name": "user",
                         "in": "body",
                         "required": true,
@@ -1605,7 +1641,7 @@ const docTemplate = `{
         },
         "/api/v1/users/{id}": {
             "get": {
-                "description": "Retrieves a user by their ID",
+                "description": "Retrieves a user by their ID (user themselves or admin)",
                 "consumes": [
                     "application/json"
                 ],
@@ -1635,7 +1671,7 @@ const docTemplate = `{
                 }
             },
             "put": {
-                "description": "Updates an existing user",
+                "description": "Updates an existing user (user themselves or admin)",
                 "consumes": [
                     "application/json"
                 ],
@@ -1674,7 +1710,7 @@ const docTemplate = `{
                 }
             },
             "delete": {
-                "description": "Deletes a user by ID",
+                "description": "Deletes a user by ID (admin only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -1699,6 +1735,47 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/{id}/avatar": {
+            "put": {
+                "description": "Updates the avatar URL for a user (user themselves or admin)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Update user avatar",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Avatar URL",
+                        "name": "avatar",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_users.UserResponse"
                         }
                     }
                 }
@@ -1730,7 +1807,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_modules_products.ProductVariant"
+                            "$ref": "#/definitions/internal_modules_products.ProductVariantResponse"
                         }
                     }
                 }
@@ -1769,7 +1846,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_modules_products.ProductVariant"
+                            "$ref": "#/definitions/internal_modules_products.ProductVariantResponse"
                         }
                     }
                 }
@@ -1804,10 +1881,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "datatypes.JSONMap": {
-            "type": "object",
-            "additionalProperties": true
-        },
         "gin.H": {
             "type": "object",
             "additionalProperties": {}
@@ -2247,14 +2320,16 @@ const docTemplate = `{
         "internal_modules_products.CreateProductVariantRequest": {
             "type": "object",
             "required": [
-                "attributes",
+                "color",
                 "price",
                 "product_id",
-                "sku"
+                "size",
+                "sku",
+                "weight"
             ],
             "properties": {
-                "attributes": {
-                    "$ref": "#/definitions/datatypes.JSONMap"
+                "color": {
+                    "type": "string"
                 },
                 "price": {
                     "type": "number"
@@ -2262,11 +2337,17 @@ const docTemplate = `{
                 "product_id": {
                     "type": "integer"
                 },
+                "size": {
+                    "type": "string"
+                },
                 "sku": {
                     "type": "string"
                 },
                 "stock": {
                     "type": "integer"
+                },
+                "weight": {
+                    "type": "string"
                 }
             }
         },
@@ -2349,11 +2430,39 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_products.ProductImageResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "is_main": {
+                    "type": "boolean"
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "url_image": {
+                    "type": "string"
+                },
+                "variant_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "internal_modules_products.ProductVariant": {
             "type": "object",
             "properties": {
-                "attributes": {
-                    "$ref": "#/definitions/datatypes.JSONMap"
+                "attribute": {
+                    "description": "Relaciones",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/internal_modules_products.ProductVariantAttribute"
+                        }
+                    ]
                 },
                 "created_at": {
                     "type": "string"
@@ -2362,7 +2471,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "images": {
-                    "description": "Relaciones",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/internal_modules_products.ProductImage"
@@ -2376,6 +2484,78 @@ const docTemplate = `{
                 },
                 "reserved": {
                     "description": "Reservado en compras/checkout",
+                    "type": "integer"
+                },
+                "sku": {
+                    "type": "string"
+                },
+                "stock": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_modules_products.ProductVariantAttribute": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "size": {
+                    "type": "string"
+                },
+                "variant_id": {
+                    "type": "integer"
+                },
+                "weight": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_products.ProductVariantAttributeResponse": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "string"
+                },
+                "weight": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_products.ProductVariantResponse": {
+            "type": "object",
+            "properties": {
+                "attribute": {
+                    "$ref": "#/definitions/internal_modules_products.ProductVariantAttributeResponse"
+                },
+                "available": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_modules_products.ProductImageResponse"
+                    }
+                },
+                "price": {
+                    "type": "number"
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "reserved": {
                     "type": "integer"
                 },
                 "sku": {
@@ -2446,17 +2626,23 @@ const docTemplate = `{
         "internal_modules_products.UpdateProductVariantRequest": {
             "type": "object",
             "properties": {
-                "attributes": {
-                    "$ref": "#/definitions/datatypes.JSONMap"
+                "color": {
+                    "type": "string"
                 },
                 "price": {
                     "type": "number"
+                },
+                "size": {
+                    "type": "string"
                 },
                 "sku": {
                     "type": "string"
                 },
                 "stock": {
                     "type": "integer"
+                },
+                "weight": {
+                    "type": "string"
                 }
             }
         },
@@ -2477,6 +2663,12 @@ const docTemplate = `{
                 "password": {
                     "type": "string",
                     "minLength": 6
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "surname": {
+                    "type": "string"
                 }
             }
         },
@@ -2491,6 +2683,9 @@ const docTemplate = `{
                 },
                 "last_name": {
                     "type": "string"
+                },
+                "phone": {
+                    "type": "string"
                 }
             }
         },
@@ -2499,6 +2694,9 @@ const docTemplate = `{
             "properties": {
                 "active": {
                     "type": "boolean"
+                },
+                "avatar_url": {
+                    "type": "string"
                 },
                 "created_at": {
                     "type": "string"
@@ -2513,6 +2711,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "last_name": {
+                    "type": "string"
+                },
+                "phone": {
                     "type": "string"
                 },
                 "role": {

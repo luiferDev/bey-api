@@ -1,8 +1,5 @@
 basePath: /
 definitions:
-  datatypes.JSONMap:
-    additionalProperties: true
-    type: object
   gin.H:
     additionalProperties: {}
     type: object
@@ -293,21 +290,27 @@ definitions:
     type: object
   internal_modules_products.CreateProductVariantRequest:
     properties:
-      attributes:
-        $ref: '#/definitions/datatypes.JSONMap'
+      color:
+        type: string
       price:
         type: number
       product_id:
         type: integer
+      size:
+        type: string
       sku:
         type: string
       stock:
         type: integer
+      weight:
+        type: string
     required:
-    - attributes
+    - color
     - price
     - product_id
+    - size
     - sku
+    - weight
     type: object
   internal_modules_products.Product:
     properties:
@@ -360,16 +363,32 @@ definitions:
         description: Puntero para permitir nulos
         type: integer
     type: object
+  internal_modules_products.ProductImageResponse:
+    properties:
+      id:
+        type: integer
+      is_main:
+        type: boolean
+      product_id:
+        type: integer
+      sort_order:
+        type: integer
+      url_image:
+        type: string
+      variant_id:
+        type: integer
+    type: object
   internal_modules_products.ProductVariant:
     properties:
-      attributes:
-        $ref: '#/definitions/datatypes.JSONMap'
+      attribute:
+        allOf:
+        - $ref: '#/definitions/internal_modules_products.ProductVariantAttribute'
+        description: Relaciones
       created_at:
         type: string
       id:
         type: integer
       images:
-        description: Relaciones
         items:
           $ref: '#/definitions/internal_modules_products.ProductImage'
         type: array
@@ -379,6 +398,53 @@ definitions:
         type: integer
       reserved:
         description: Reservado en compras/checkout
+        type: integer
+      sku:
+        type: string
+      stock:
+        type: integer
+    type: object
+  internal_modules_products.ProductVariantAttribute:
+    properties:
+      color:
+        type: string
+      id:
+        type: integer
+      size:
+        type: string
+      variant_id:
+        type: integer
+      weight:
+        type: string
+    type: object
+  internal_modules_products.ProductVariantAttributeResponse:
+    properties:
+      color:
+        type: string
+      size:
+        type: string
+      weight:
+        type: string
+    type: object
+  internal_modules_products.ProductVariantResponse:
+    properties:
+      attribute:
+        $ref: '#/definitions/internal_modules_products.ProductVariantAttributeResponse'
+      available:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      images:
+        items:
+          $ref: '#/definitions/internal_modules_products.ProductImageResponse'
+        type: array
+      price:
+        type: number
+      product_id:
+        type: integer
+      reserved:
         type: integer
       sku:
         type: string
@@ -424,14 +490,18 @@ definitions:
     type: object
   internal_modules_products.UpdateProductVariantRequest:
     properties:
-      attributes:
-        $ref: '#/definitions/datatypes.JSONMap'
+      color:
+        type: string
       price:
         type: number
+      size:
+        type: string
       sku:
         type: string
       stock:
         type: integer
+      weight:
+        type: string
     type: object
   internal_modules_users.CreateUserRequest:
     properties:
@@ -441,6 +511,10 @@ definitions:
         type: string
       password:
         minLength: 6
+        type: string
+      phone:
+        type: string
+      surname:
         type: string
     required:
     - email
@@ -455,11 +529,15 @@ definitions:
         type: string
       last_name:
         type: string
+      phone:
+        type: string
     type: object
   internal_modules_users.UserResponse:
     properties:
       active:
         type: boolean
+      avatar_url:
+        type: string
       created_at:
         type: string
       email:
@@ -469,6 +547,8 @@ definitions:
       id:
         type: integer
       last_name:
+        type: string
+      phone:
         type: string
       role:
         type: string
@@ -1114,7 +1194,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Retrieves an order by its ID
+      description: Retrieves an order by its ID (owner or admin)
       parameters:
       - description: Order ID
         in: path
@@ -1430,7 +1510,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/internal_modules_products.ProductVariant'
+              $ref: '#/definitions/internal_modules_products.ProductVariantResponse'
             type: array
       summary: Get variants by product
       tags:
@@ -1457,7 +1537,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_modules_products.ProductVariant'
+            $ref: '#/definitions/internal_modules_products.ProductVariantResponse'
       summary: Create a product variant
       tags:
       - Variants
@@ -1499,32 +1579,11 @@ paths:
       summary: List all users
       tags:
       - Users
-    post:
-      consumes:
-      - application/json
-      description: Creates a new user account
-      parameters:
-      - description: User data (name, email, password)
-        in: body
-        name: user
-        required: true
-        schema:
-          $ref: '#/definitions/internal_modules_users.CreateUserRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/internal_modules_users.UserResponse'
-      summary: Create a new user
-      tags:
-      - Users
   /api/v1/users/{id}:
     delete:
       consumes:
       - application/json
-      description: Deletes a user by ID
+      description: Deletes a user by ID (admin only)
       parameters:
       - description: User ID
         in: path
@@ -1544,7 +1603,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Retrieves a user by their ID
+      description: Retrieves a user by their ID (user themselves or admin)
       parameters:
       - description: User ID
         in: path
@@ -1564,7 +1623,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: Updates an existing user
+      description: Updates an existing user (user themselves or admin)
       parameters:
       - description: User ID
         in: path
@@ -1585,6 +1644,77 @@ paths:
           schema:
             $ref: '#/definitions/internal_modules_users.UserResponse'
       summary: Update a user
+      tags:
+      - Users
+  /api/v1/users/{id}/avatar:
+    put:
+      consumes:
+      - application/json
+      description: Updates the avatar URL for a user (user themselves or admin)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Avatar URL
+        in: body
+        name: avatar
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_users.UserResponse'
+      summary: Update user avatar
+      tags:
+      - Users
+  /api/v1/users/register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account (public endpoint)
+      parameters:
+      - description: User data (name, email, password, surname, phone)
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_users.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_modules_users.UserResponse'
+      summary: Register a new user
+      tags:
+      - Users
+  /api/v1/users/register-admin:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new admin user account (admin only)
+      parameters:
+      - description: Admin user data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_users.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_modules_users.UserResponse'
+      summary: Register a new admin user
       tags:
       - Users
   /api/v1/variants/{id}:
@@ -1622,7 +1752,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_modules_products.ProductVariant'
+            $ref: '#/definitions/internal_modules_products.ProductVariantResponse'
       summary: Get variant by ID
       tags:
       - Variants
@@ -1648,7 +1778,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_modules_products.ProductVariant'
+            $ref: '#/definitions/internal_modules_products.ProductVariantResponse'
       summary: Update a variant
       tags:
       - Variants
