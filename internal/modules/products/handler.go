@@ -1,11 +1,15 @@
 package products
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 
 	"bey/internal/modules/inventory"
+	"bey/internal/shared/cache"
 	"bey/internal/shared/response"
 )
 
@@ -45,6 +49,7 @@ type ProductHandler struct {
 	imageRepo     *ProductImageRepository
 	inventoryRepo *inventory.InventoryRepository
 	response      *response.ResponseHandler
+	cache         *cache.CacheService
 }
 
 func NewProductHandler(
@@ -79,6 +84,42 @@ func NewProductHandlerWithInventory(
 	}
 }
 
+func NewProductHandlerWithCache(
+	categoryRepo *CategoryRepository,
+	productRepo *ProductRepository,
+	variantRepo *ProductVariantRepository,
+	imageRepo *ProductImageRepository,
+	cacheSvc *cache.CacheService,
+) *ProductHandler {
+	return &ProductHandler{
+		categoryRepo: categoryRepo,
+		productRepo:  productRepo,
+		variantRepo:  variantRepo,
+		imageRepo:    imageRepo,
+		response:     response.NewResponseHandler(),
+		cache:        cacheSvc,
+	}
+}
+
+func NewProductHandlerWithInventoryAndCache(
+	categoryRepo *CategoryRepository,
+	productRepo *ProductRepository,
+	variantRepo *ProductVariantRepository,
+	imageRepo *ProductImageRepository,
+	inventoryRepo *inventory.InventoryRepository,
+	cacheSvc *cache.CacheService,
+) *ProductHandler {
+	return &ProductHandler{
+		categoryRepo:  categoryRepo,
+		productRepo:   productRepo,
+		variantRepo:   variantRepo,
+		imageRepo:     imageRepo,
+		inventoryRepo: inventoryRepo,
+		response:      response.NewResponseHandler(),
+		cache:         cacheSvc,
+	}
+}
+
 // @Summary Create a new category
 // @Description Creates a new product category
 // @Tags Categories
@@ -105,6 +146,8 @@ func (h *ProductHandler) CreateCategory(c *gin.Context) {
 		h.response.InternalError(c, "Failed to create category")
 		return
 	}
+
+	h.invalidateCategoryCache(category.ID)
 
 	h.response.Created(c, category)
 }
@@ -211,6 +254,8 @@ func (h *ProductHandler) UpdateCategory(c *gin.Context) {
 		return
 	}
 
+	h.invalidateCategoryCache(uint(id))
+
 	h.response.Success(c, category)
 }
 
@@ -233,6 +278,8 @@ func (h *ProductHandler) DeleteCategory(c *gin.Context) {
 		h.response.InternalError(c, "Failed to delete category")
 		return
 	}
+
+	h.invalidateCategoryCache(uint(id))
 
 	h.response.Success(c, gin.H{"message": "Category deleted successfully"})
 }
@@ -289,6 +336,8 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		h.response.InternalError(c, "Failed to create product")
 		return
 	}
+
+	h.invalidateProductCache(product.ID)
 
 	h.response.Created(c, product)
 }
@@ -404,6 +453,8 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 		return
 	}
 
+	h.invalidateProductCache(uint(id))
+
 	h.response.Success(c, product)
 }
 
@@ -426,6 +477,8 @@ func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 		h.response.InternalError(c, "Failed to delete product")
 		return
 	}
+
+	h.invalidateProductCache(uint(id))
 
 	h.response.Success(c, gin.H{"message": "Product deleted successfully"})
 }
@@ -571,6 +624,8 @@ func (h *ProductHandler) CreateVariant(c *gin.Context) {
 		}
 	}
 
+	h.invalidateVariantCache(0, req.ProductID)
+
 	h.response.Created(c, variantToResponse(variant))
 }
 
@@ -688,6 +743,8 @@ func (h *ProductHandler) UpdateVariant(c *gin.Context) {
 		variant.Attribute = attribute
 	}
 
+	h.invalidateVariantCache(variant.ID, variant.ProductID)
+
 	h.response.Success(c, variantToResponse(variant))
 }
 
@@ -706,9 +763,19 @@ func (h *ProductHandler) DeleteVariant(c *gin.Context) {
 		return
 	}
 
+	variant, err := h.variantRepo.FindByID(uint(id))
+	if err != nil {
+		h.response.InternalError(c, "Failed to get variant")
+		return
+	}
+
 	if err := h.variantRepo.Delete(uint(id)); err != nil {
 		h.response.InternalError(c, "Failed to delete variant")
 		return
+	}
+
+	if variant != nil {
+		h.invalidateVariantCache(variant.ID, variant.ProductID)
 	}
 
 	h.response.Success(c, gin.H{"message": "Variant deleted successfully"})
@@ -777,6 +844,8 @@ func (h *ProductHandler) CreateImage(c *gin.Context) {
 		h.response.InternalError(c, "Failed to create image")
 		return
 	}
+
+	h.invalidateImageCache(0, req.ProductID)
 
 	h.response.Created(c, image)
 }
@@ -856,6 +925,8 @@ func (h *ProductHandler) UpdateImage(c *gin.Context) {
 		return
 	}
 
+	h.invalidateImageCache(image.ID, image.ProductID)
+
 	h.response.Success(c, image)
 }
 
@@ -874,9 +945,19 @@ func (h *ProductHandler) DeleteImage(c *gin.Context) {
 		return
 	}
 
+	image, err := h.imageRepo.FindByID(uint(id))
+	if err != nil {
+		h.response.InternalError(c, "Failed to get image")
+		return
+	}
+
 	if err := h.imageRepo.Delete(uint(id)); err != nil {
 		h.response.InternalError(c, "Failed to delete image")
 		return
+	}
+
+	if image != nil {
+		h.invalidateImageCache(image.ID, image.ProductID)
 	}
 
 	h.response.Success(c, gin.H{"message": "Image deleted successfully"})
@@ -933,5 +1014,90 @@ func (h *ProductHandler) SetMainImage(c *gin.Context) {
 		return
 	}
 
+	h.invalidateProductCache(uint(productID))
+
 	h.response.Success(c, gin.H{"message": "Main image set successfully"})
+}
+
+// invalidateProductCache invalidates all product-related cache entries (non-blocking)
+func (h *ProductHandler) invalidateProductCache(productID uint) {
+	if h.cache == nil {
+		return
+	}
+	ctx := context.Background()
+	go func() {
+		if err := h.cache.Delete(ctx, h.cache.Key("cache", "product", fmt.Sprintf("%d", productID))); err != nil {
+			log.Printf("Failed to invalidate product cache %d: %v", productID, err)
+		}
+		if err := h.cache.InvalidatePattern(ctx, "cache:product:list:*"); err != nil {
+			log.Printf("Failed to invalidate product list cache: %v", err)
+		}
+		if err := h.cache.InvalidatePattern(ctx, "cache:product:search:*"); err != nil {
+			log.Printf("Failed to invalidate product search cache: %v", err)
+		}
+	}()
+}
+
+// invalidateCategoryCache invalidates all category-related cache entries (non-blocking)
+func (h *ProductHandler) invalidateCategoryCache(categoryID uint) {
+	if h.cache == nil {
+		return
+	}
+	ctx := context.Background()
+	go func() {
+		if err := h.cache.Delete(ctx, h.cache.Key("cache", "category", fmt.Sprintf("%d", categoryID))); err != nil {
+			log.Printf("Failed to invalidate category cache %d: %v", categoryID, err)
+		}
+		if err := h.cache.Delete(ctx, h.cache.Key("cache", "category", "list")); err != nil {
+			log.Printf("Failed to invalidate category list cache: %v", err)
+		}
+		if err := h.cache.InvalidatePattern(ctx, "cache:product:list:*"); err != nil {
+			log.Printf("Failed to invalidate product list cache after category mutation: %v", err)
+		}
+	}()
+}
+
+// invalidateVariantCache invalidates variant-related cache entries (non-blocking)
+func (h *ProductHandler) invalidateVariantCache(variantID uint, productID uint) {
+	if h.cache == nil {
+		return
+	}
+	ctx := context.Background()
+	go func() {
+		if variantID > 0 {
+			if err := h.cache.Delete(ctx, h.cache.Key("cache", "variant", fmt.Sprintf("%d", variantID))); err != nil {
+				log.Printf("Failed to invalidate variant cache %d: %v", variantID, err)
+			}
+		}
+		if err := h.cache.Delete(ctx, h.cache.Key("cache", "variant", "product", fmt.Sprintf("%d", productID))); err != nil {
+			log.Printf("Failed to invalidate variant product cache %d: %v", productID, err)
+		}
+		if err := h.cache.Delete(ctx, h.cache.Key("cache", "product", fmt.Sprintf("%d", productID))); err != nil {
+			log.Printf("Failed to invalidate product cache %d: %v", productID, err)
+		}
+		if err := h.cache.InvalidatePattern(ctx, "cache:product:list:*"); err != nil {
+			log.Printf("Failed to invalidate product list cache after variant mutation: %v", err)
+		}
+	}()
+}
+
+// invalidateImageCache invalidates image-related cache entries (non-blocking)
+func (h *ProductHandler) invalidateImageCache(imageID uint, productID uint) {
+	if h.cache == nil {
+		return
+	}
+	ctx := context.Background()
+	go func() {
+		if imageID > 0 {
+			if err := h.cache.Delete(ctx, h.cache.Key("cache", "image", fmt.Sprintf("%d", imageID))); err != nil {
+				log.Printf("Failed to invalidate image cache %d: %v", imageID, err)
+			}
+		}
+		if err := h.cache.Delete(ctx, h.cache.Key("cache", "image", "product", fmt.Sprintf("%d", productID))); err != nil {
+			log.Printf("Failed to invalidate image product cache %d: %v", productID, err)
+		}
+		if err := h.cache.Delete(ctx, h.cache.Key("cache", "product", fmt.Sprintf("%d", productID))); err != nil {
+			log.Printf("Failed to invalidate product cache %d: %v", productID, err)
+		}
+	}()
 }

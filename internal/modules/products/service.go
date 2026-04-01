@@ -1,10 +1,14 @@
 package products
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"log"
 	"time"
 
 	"bey/internal/concurrency"
+	"bey/internal/shared/cache"
 )
 
 type ProductService struct {
@@ -13,6 +17,7 @@ type ProductService struct {
 	variantRepo  *ProductVariantRepository
 	imageRepo    *ProductImageRepository
 	taskQueue    concurrency.TaskQueue
+	cache        *cache.CacheService
 }
 
 func NewProductService(
@@ -42,6 +47,40 @@ func NewProductServiceWithTaskQueue(
 		variantRepo:  variantRepo,
 		imageRepo:    imageRepo,
 		taskQueue:    taskQueue,
+	}
+}
+
+func NewProductServiceWithCache(
+	categoryRepo *CategoryRepository,
+	productRepo *ProductRepository,
+	variantRepo *ProductVariantRepository,
+	imageRepo *ProductImageRepository,
+	cacheSvc *cache.CacheService,
+) *ProductService {
+	return &ProductService{
+		categoryRepo: categoryRepo,
+		productRepo:  productRepo,
+		variantRepo:  variantRepo,
+		imageRepo:    imageRepo,
+		cache:        cacheSvc,
+	}
+}
+
+func NewProductServiceWithAllDeps(
+	categoryRepo *CategoryRepository,
+	productRepo *ProductRepository,
+	variantRepo *ProductVariantRepository,
+	imageRepo *ProductImageRepository,
+	taskQueue concurrency.TaskQueue,
+	cacheSvc *cache.CacheService,
+) *ProductService {
+	return &ProductService{
+		categoryRepo: categoryRepo,
+		productRepo:  productRepo,
+		variantRepo:  variantRepo,
+		imageRepo:    imageRepo,
+		taskQueue:    taskQueue,
+		cache:        cacheSvc,
 	}
 }
 
@@ -133,6 +172,9 @@ func (s *ProductService) CreateProductWithVariants(
 			return nil, err
 		}
 	}
+
+	// Invalidate cache after successful creation
+	s.invalidateProductCache()
 
 	// Recargar producto con relaciones
 	return s.productRepo.FindByID(product.ID)
@@ -500,4 +542,50 @@ func (s *ProductService) GetTaskStatus(taskID string) (*concurrency.Task, error)
 	}
 
 	return s.taskQueue.GetStatus(taskID)
+}
+
+// invalidateProductCache removes all product-related cache entries
+func (s *ProductService) invalidateProductCache() {
+	if s.cache == nil {
+		return
+	}
+
+	ctx := context.Background()
+	if err := s.cache.InvalidatePattern(ctx, "cache:product:*"); err != nil {
+		log.Printf("Failed to invalidate product cache: %v", err)
+	}
+}
+
+// invalidateCategoryCache removes all category-related cache entries
+func (s *ProductService) invalidateCategoryCache() {
+	if s.cache == nil {
+		return
+	}
+
+	ctx := context.Background()
+	if err := s.cache.InvalidatePattern(ctx, "cache:category:*"); err != nil {
+		log.Printf("Failed to invalidate category cache: %v", err)
+	}
+}
+
+// InvalidateProductCache public method for handlers to call after mutations
+func (s *ProductService) InvalidateProductCache(productID uint) {
+	if s.cache == nil {
+		return
+	}
+
+	ctx := context.Background()
+	s.cache.Delete(ctx, s.cache.Key("cache", "product", fmt.Sprintf("%d", productID)))
+	s.invalidateProductCache()
+}
+
+// InvalidateCategoryCache public method for handlers to call after mutations
+func (s *ProductService) InvalidateCategoryCache(categoryID uint) {
+	if s.cache == nil {
+		return
+	}
+
+	ctx := context.Background()
+	s.cache.Delete(ctx, s.cache.Key("cache", "category", fmt.Sprintf("%d", categoryID)))
+	s.invalidateCategoryCache()
 }
