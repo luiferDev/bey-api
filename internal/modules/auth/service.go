@@ -22,6 +22,10 @@ type AuthServiceInterface interface {
 	Refresh(ctx context.Context, refreshToken string) (*TokenResponse, error)
 	Logout(ctx context.Context, refreshToken string) error
 	ValidateToken(ctx context.Context, tokenString string) (*TokenClaims, error)
+	VerifyEmail(ctx context.Context, token string) error
+	ResendVerification(ctx context.Context, email string) error
+	ForgotPassword(ctx context.Context, email string) error
+	ResetPassword(ctx context.Context, token, newPassword string) error
 	SetupTwoFactor(ctx context.Context, userID uint) (*TwoFASetupResponse, error)
 	EnableTwoFactor(ctx context.Context, userID uint, code string) (*TwoFAEnableResponse, error)
 	DisableTwoFactor(ctx context.Context, userID uint, code, backupCode string) error

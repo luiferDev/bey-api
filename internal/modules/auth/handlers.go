@@ -18,7 +18,7 @@ import (
 // @Param credentials body LoginRequest true "Login credentials"
 // @Success 200 {object} LoginResponse
 // @Router /api/v1/auth/login [post]
-func HandleLogin(authService *AuthService, cfg *config.Config, responseHandler *response.ResponseHandler) gin.HandlerFunc {
+func HandleLogin(authService AuthServiceInterface, cfg *config.Config, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LoginRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -50,7 +50,7 @@ func HandleLogin(authService *AuthService, cfg *config.Config, responseHandler *
 // @Produce json
 // @Success 200 {object} TokenResponse
 // @Router /api/v1/auth/refresh [post]
-func HandleRefresh(authService *AuthService, cfg *config.Config, responseHandler *response.ResponseHandler) gin.HandlerFunc {
+func HandleRefresh(authService AuthServiceInterface, cfg *config.Config, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		refreshToken, err := GetRefreshTokenCookie(c.Request)
 		if err != nil {
@@ -79,7 +79,7 @@ func HandleRefresh(authService *AuthService, cfg *config.Config, responseHandler
 // @Produce json
 // @Success 200 {object} map[string]string
 // @Router /api/v1/auth/logout [post]
-func HandleLogout(authService *AuthService, cfg *config.Config, responseHandler *response.ResponseHandler) gin.HandlerFunc {
+func HandleLogout(authService AuthServiceInterface, cfg *config.Config, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		refreshToken, err := GetRefreshTokenCookie(c.Request)
 		if err == nil {
@@ -101,7 +101,7 @@ func HandleLogout(authService *AuthService, cfg *config.Config, responseHandler 
 // @Param token body VerifyEmailRequest true "Verification token"
 // @Success 200 {object} map[string]string
 // @Router /api/v1/auth/verify-email [post]
-func HandleVerifyEmail(authService *AuthService, responseHandler *response.ResponseHandler) gin.HandlerFunc {
+func HandleVerifyEmail(authService AuthServiceInterface, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req VerifyEmailRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -126,7 +126,7 @@ func HandleVerifyEmail(authService *AuthService, responseHandler *response.Respo
 // @Param email body ResendVerificationRequest true "Email address"
 // @Success 200 {object} map[string]string
 // @Router /api/v1/auth/resend-verification [post]
-func HandleResendVerification(authService *AuthService, responseHandler *response.ResponseHandler) gin.HandlerFunc {
+func HandleResendVerification(authService AuthServiceInterface, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req ResendVerificationRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -151,7 +151,7 @@ func HandleResendVerification(authService *AuthService, responseHandler *respons
 // @Param email body ForgotPasswordRequest true "Email address"
 // @Success 200 {object} map[string]string
 // @Router /api/v1/auth/forgot-password [post]
-func HandleForgotPassword(authService *AuthService, responseHandler *response.ResponseHandler) gin.HandlerFunc {
+func HandleForgotPassword(authService AuthServiceInterface, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req ForgotPasswordRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -176,7 +176,7 @@ func HandleForgotPassword(authService *AuthService, responseHandler *response.Re
 // @Param credentials body ResetPasswordRequest true "Token and new password"
 // @Success 200 {object} map[string]string
 // @Router /api/v1/auth/reset-password [post]
-func HandleResetPassword(authService *AuthService, responseHandler *response.ResponseHandler) gin.HandlerFunc {
+func HandleResetPassword(authService AuthServiceInterface, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req ResetPasswordRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -201,7 +201,7 @@ func HandleResetPassword(authService *AuthService, responseHandler *response.Res
 // @Security BearerAuth
 // @Success 200 {object} TwoFASetupResponse
 // @Router /api/v1/auth/2fa/setup [post]
-func HandleSetup2FA(authService *AuthService, responseHandler *response.ResponseHandler) gin.HandlerFunc {
+func HandleSetup2FA(authService AuthServiceInterface, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, exists := c.Get("user_id")
 		if !exists {
@@ -233,7 +233,7 @@ func HandleSetup2FA(authService *AuthService, responseHandler *response.Response
 // @Param code body TwoFAEnableRequest true "TOTP code"
 // @Success 200 {object} TwoFAEnableResponse
 // @Router /api/v1/auth/2fa/enable [post]
-func HandleEnable2FA(authService *AuthService, responseHandler *response.ResponseHandler) gin.HandlerFunc {
+func HandleEnable2FA(authService AuthServiceInterface, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, exists := c.Get("user_id")
 		if !exists {
@@ -271,7 +271,7 @@ func HandleEnable2FA(authService *AuthService, responseHandler *response.Respons
 // @Param credentials body TwoFADisableRequest true "TOTP code or backup code"
 // @Success 200 {object} map[string]string
 // @Router /api/v1/auth/2fa/disable [post]
-func HandleDisable2FA(authService *AuthService, responseHandler *response.ResponseHandler) gin.HandlerFunc {
+func HandleDisable2FA(authService AuthServiceInterface, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, exists := c.Get("user_id")
 		if !exists {
@@ -308,7 +308,7 @@ func HandleDisable2FA(authService *AuthService, responseHandler *response.Respon
 // @Param code body TwoFAVerifyRequest true "TOTP code"
 // @Success 200 {object} TwoFAVerifyResponse
 // @Router /api/v1/auth/2fa/verify [post]
-func HandleVerify2FA(authService *AuthService, responseHandler *response.ResponseHandler) gin.HandlerFunc {
+func HandleVerify2FA(authService AuthServiceInterface, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, exists := c.Get("user_id")
 		if !exists {
@@ -345,7 +345,7 @@ func HandleVerify2FA(authService *AuthService, responseHandler *response.Respons
 // @Param credentials body TwoFALoginVerifyRequest true "Temp token and TOTP code"
 // @Success 200 {object} LoginResponse
 // @Router /api/v1/auth/2fa/login-verify [post]
-func HandleLoginWith2FA(authService *AuthService, cfg *config.Config, responseHandler *response.ResponseHandler) gin.HandlerFunc {
+func HandleLoginWith2FA(authService AuthServiceInterface, cfg *config.Config, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req TwoFALoginVerifyRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
