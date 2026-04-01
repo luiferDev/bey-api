@@ -12,6 +12,7 @@ import (
 	"bey/internal/modules/email"
 	"bey/internal/modules/users"
 
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -29,11 +30,12 @@ type AuthServiceInterface interface {
 }
 
 type AuthService struct {
-	db           *gorm.DB
-	config       *config.Config
-	emailService *email.EmailService
-	twoFAService *TwoFAService
-	tempTokens   map[string]tempTokenData
+	db             *gorm.DB
+	config         *config.Config
+	emailService   *email.EmailService
+	twoFAService   *TwoFAService
+	tempTokens     map[string]tempTokenData
+	tokenGenerator *TokenGenerator
 }
 
 type tempTokenData struct {
@@ -43,26 +45,37 @@ type tempTokenData struct {
 
 func NewAuthService(db *gorm.DB, config *config.Config) *AuthService {
 	return &AuthService{
-		db:     db,
-		config: config,
+		db:             db,
+		config:         config,
+		tokenGenerator: NewTokenGenerator(db, config),
 	}
 }
 
 func NewAuthServiceWithEmail(db *gorm.DB, config *config.Config, emailSvc *email.EmailService) *AuthService {
 	return &AuthService{
-		db:           db,
-		config:       config,
-		emailService: emailSvc,
+		db:             db,
+		config:         config,
+		emailService:   emailSvc,
+		tokenGenerator: NewTokenGenerator(db, config),
 	}
 }
 
 func NewAuthServiceWithTwoFA(db *gorm.DB, config *config.Config, emailSvc *email.EmailService, twoFASvc *TwoFAService) *AuthService {
 	return &AuthService{
-		db:           db,
-		config:       config,
-		emailService: emailSvc,
-		twoFAService: twoFASvc,
-		tempTokens:   make(map[string]tempTokenData),
+		db:             db,
+		config:         config,
+		emailService:   emailSvc,
+		twoFAService:   twoFASvc,
+		tempTokens:     make(map[string]tempTokenData),
+		tokenGenerator: NewTokenGenerator(db, config),
+	}
+}
+
+func NewAuthServiceWithRedis(db *gorm.DB, config *config.Config, redisClient *redis.Client) *AuthService {
+	return &AuthService{
+		db:             db,
+		config:         config,
+		tokenGenerator: NewTokenGeneratorWithRedis(db, config, redisClient),
 	}
 }
 
@@ -96,7 +109,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*Login
 		}, nil
 	}
 
-	tokenGenerator := NewTokenGenerator(s.db, s.config)
+	tokenGenerator := s.tokenGenerator
 
 	accessToken, expiresIn, err := tokenGenerator.GenerateAccessToken(user.ID, user.Email, user.Role)
 	if err != nil {
@@ -121,7 +134,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*Login
 }
 
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*TokenResponse, error) {
-	tokenGenerator := NewTokenGenerator(s.db, s.config)
+	tokenGenerator := s.tokenGenerator
 
 	storedToken, err := tokenGenerator.ValidateRefreshToken(refreshToken)
 	if err != nil {
@@ -159,7 +172,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*TokenR
 }
 
 func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
-	tokenGenerator := NewTokenGenerator(s.db, s.config)
+	tokenGenerator := s.tokenGenerator
 	tokenHash := tokenGenerator.HashToken(refreshToken)
 
 	var token RefreshToken
@@ -175,8 +188,7 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 }
 
 func (s *AuthService) ValidateToken(ctx context.Context, tokenString string) (*TokenClaims, error) {
-	tokenGenerator := NewTokenGenerator(s.db, s.config)
-	return tokenGenerator.ValidateToken(tokenString)
+	return s.tokenGenerator.ValidateToken(tokenString)
 }
 
 func (s *AuthService) VerifyEmail(ctx context.Context, token string) error {
@@ -542,7 +554,7 @@ func (s *AuthService) LoginWith2FA(ctx context.Context, tempToken, code string) 
 		return nil, errors.New("invalid verification code")
 	}
 
-	tokenGenerator := NewTokenGenerator(s.db, s.config)
+	tokenGenerator := s.tokenGenerator
 
 	accessToken, expiresIn, err := tokenGenerator.GenerateAccessToken(user.ID, user.Email, user.Role)
 	if err != nil {
@@ -618,7 +630,7 @@ func (s *AuthService) LoginWithGoogle(ctx context.Context, googleUser *GoogleUse
 	}
 
 	// Generate JWT tokens
-	tokenGenerator := NewTokenGenerator(s.db, s.config)
+	tokenGenerator := s.tokenGenerator
 
 	accessToken, expiresIn, err := tokenGenerator.GenerateAccessToken(user.ID, user.Email, user.Role)
 	if err != nil {
