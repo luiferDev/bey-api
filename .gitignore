@@ -46,3 +46,8 @@ cmd/api/docs/swagger.json
 # Test databases
 *.db
 *.db-*
+
+
+# backups
+.backup.sql
+.backup*.sql
