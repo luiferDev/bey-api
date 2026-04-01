@@ -22,6 +22,20 @@ func NewAdminHandler(db *gorm.DB) *AdminHandler {
 	}
 }
 
+// CreateUser godoc
+// @Summary Create a new user (admin only)
+// @Description Creates a new user account. Requires admin role.
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param request body CreateUserRequest true "User creation request"
+// @Success 201 {object} response.ApiResponse{data=UserResponse} "User created successfully"
+// @Failure 400 {object} response.ApiResponse "Bad request - invalid user data or email already exists"
+// @Failure 401 {object} response.ApiResponse "Unauthorized - invalid or missing token"
+// @Failure 403 {object} response.ApiResponse "Forbidden - admin role required"
+// @Failure 500 {object} response.ApiResponse "Internal server error - user creation failed"
+// @Security BearerAuth
+// @Router /api/v1/admin/users [post]
 func (h *AdminHandler) CreateUser(c *gin.Context) {
 	var req CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

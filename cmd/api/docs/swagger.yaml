@@ -1,5 +1,49 @@
-basePath: /
 definitions:
+  admin.CreateUserRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        minLength: 6
+        type: string
+      role:
+        enum:
+        - customer
+        - admin
+        type: string
+    required:
+    - email
+    - name
+    - password
+    - role
+    type: object
+  admin.UserResponse:
+    properties:
+      active:
+        type: boolean
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      role:
+        type: string
+    type: object
+  bey_internal_shared_response.ApiResponse:
+    properties:
+      data: {}
+      error:
+        type: string
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
   gin.H:
     additionalProperties: {}
     type: object
@@ -127,6 +171,44 @@ definitions:
     required:
     - token
     type: object
+  internal_modules_cart.AddToCartRequest:
+    properties:
+      quantity:
+        type: integer
+      variant_id:
+        type: integer
+    required:
+    - quantity
+    - variant_id
+    type: object
+  internal_modules_cart.CartItemResponse:
+    properties:
+      quantity:
+        type: integer
+      variant_id:
+        type: integer
+    type: object
+  internal_modules_cart.CartResponse:
+    properties:
+      created_at:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/internal_modules_cart.CartItemResponse'
+        type: array
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  internal_modules_cart.UpdateCartItemRequest:
+    properties:
+      quantity:
+        minimum: 0
+        type: integer
+    required:
+    - quantity
+    type: object
   internal_modules_inventory.InventoryResponse:
     properties:
       available:
@@ -211,6 +293,150 @@ definitions:
         type: number
       user_id:
         type: integer
+    type: object
+  internal_modules_payments.CreatePaymentLinkRequest:
+    properties:
+      amount_in_cents:
+        type: integer
+      currency:
+        description: 'default: "COP"'
+        type: string
+      description:
+        type: string
+      expires_at:
+        type: string
+      order_id:
+        type: integer
+      redirect_url:
+        type: string
+      reference:
+        type: string
+      single_use:
+        type: boolean
+    required:
+    - amount_in_cents
+    - currency
+    - description
+    - reference
+    type: object
+  internal_modules_payments.CreatePaymentRequest:
+    properties:
+      amount:
+        description: Amount in cents
+        type: integer
+      currency:
+        description: e.g., "COP"
+        type: string
+      payment_token:
+        description: Wompi payment token
+        type: string
+      redirect_url:
+        description: Optional redirect after payment
+        type: string
+      reference:
+        description: Order reference
+        type: string
+    required:
+    - amount
+    - currency
+    - payment_token
+    - reference
+    type: object
+  internal_modules_payments.PaymentLinkResponse:
+    properties:
+      amount:
+        type: integer
+      created_at:
+        type: string
+      currency:
+        type: string
+      description:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: integer
+      order_id:
+        type: integer
+      redirect_url:
+        type: string
+      reference:
+        type: string
+      single_use:
+        type: boolean
+      status:
+        type: string
+      updated_at:
+        type: string
+      url:
+        type: string
+      wompi_link_id:
+        type: string
+    type: object
+  internal_modules_payments.PaymentResponse:
+    properties:
+      amount:
+        type: integer
+      created_at:
+        type: string
+      currency:
+        type: string
+      id:
+        type: integer
+      order_id:
+        type: integer
+      payment_method:
+        type: string
+      redirect_url:
+        type: string
+      reference:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      wompi_transaction_id:
+        type: string
+    type: object
+  internal_modules_payments.Transaction:
+    properties:
+      amount_in_cents:
+        type: integer
+      created_at:
+        type: string
+      currency:
+        type: string
+      error_code:
+        type: string
+      error_message:
+        type: string
+      id:
+        type: string
+      payment_method:
+        type: string
+      reference:
+        type: string
+      status:
+        type: string
+      status_detail:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  internal_modules_payments.WebhookEvent:
+    properties:
+      data:
+        allOf:
+        - $ref: '#/definitions/internal_modules_payments.Transaction'
+        description: Wompi sends data directly
+      event:
+        type: string
+      event_id:
+        type: string
+      signature:
+        type: string
+      timestamp:
+        type: string
     type: object
   internal_modules_products.Category:
     properties:
@@ -553,12 +779,10 @@ definitions:
       role:
         type: string
     type: object
-host: localhost:8080
 info:
   contact:
-    email: support@example.com
+    email: support@bey.com
     name: API Support
-    url: http://www.example.com/support
   description: E-commerce REST API with products, categories, orders, users, and inventory
     management
   license:
@@ -568,6 +792,51 @@ info:
   title: Bey API
   version: "1.0"
 paths:
+  /api/v1/admin/users:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account. Requires admin role.
+      parameters:
+      - description: User creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User created successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/admin.UserResponse'
+              type: object
+        "400":
+          description: Bad request - invalid user data or email already exists
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "403":
+          description: Forbidden - admin role required
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error - user creation failed
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new user (admin only)
+      tags:
+      - Admin
   /api/v1/auth/2fa/disable:
     post:
       consumes:
@@ -864,6 +1133,196 @@ paths:
       summary: Verify email
       tags:
       - Auth
+  /api/v1/cart:
+    delete:
+      consumes:
+      - application/json
+      description: Removes all items from the authenticated user's shopping cart
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cart cleared successfully
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Clear shopping cart
+      tags:
+      - Cart
+    get:
+      consumes:
+      - application/json
+      description: Retrieves the authenticated user's shopping cart items
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cart retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_cart.CartResponse'
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get shopping cart
+      tags:
+      - Cart
+  /api/v1/cart/items:
+    post:
+      consumes:
+      - application/json
+      description: Adds a product variant to the authenticated user's shopping cart
+      parameters:
+      - description: Item to add
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_cart.AddToCartRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Item added to cart
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_cart.CartResponse'
+              type: object
+        "400":
+          description: Bad request - invalid data or insufficient stock
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "404":
+          description: Variant not found
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Add item to cart
+      tags:
+      - Cart
+  /api/v1/cart/items/{variant_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Removes a specific item from the authenticated user's shopping
+        cart
+      parameters:
+      - description: Product variant ID to remove
+        in: path
+        name: variant_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Item removed successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_cart.CartResponse'
+              type: object
+        "400":
+          description: Bad request - invalid variant ID
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove item from cart
+      tags:
+      - Cart
+    put:
+      consumes:
+      - application/json
+      description: Updates the quantity of an item in the authenticated user's shopping
+        cart
+      parameters:
+      - description: Product variant ID
+        in: path
+        name: variant_id
+        required: true
+        type: integer
+      - description: New quantity
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_cart.UpdateCartItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Item updated successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_cart.CartResponse'
+              type: object
+        "400":
+          description: Bad request - invalid data or insufficient stock
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "404":
+          description: Item not found in cart
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Update cart item quantity
+      tags:
+      - Cart
   /api/v1/categories:
     get:
       consumes:
@@ -1299,6 +1758,384 @@ paths:
       summary: Get task status
       tags:
       - Orders
+  /api/v1/payments:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new payment transaction through Wompi gateway for the
+        authenticated user
+      parameters:
+      - description: Payment creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_payments.CreatePaymentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Payment created successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_payments.PaymentResponse'
+              type: object
+        "400":
+          description: Bad request - invalid payment data
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error - payment processing failed
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new payment
+      tags:
+      - Payments
+  /api/v1/payments/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves details of a specific payment by ID
+      parameters:
+      - description: Payment ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Payment details retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_payments.PaymentResponse'
+              type: object
+        "400":
+          description: Bad request - invalid payment ID
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "404":
+          description: Payment not found
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get payment details
+      tags:
+      - Payments
+  /api/v1/payments/{id}/void:
+    post:
+      consumes:
+      - application/json
+      description: Cancels an existing payment transaction
+      parameters:
+      - description: Payment ID to cancel
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Payment cancelled successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_payments.PaymentResponse'
+              type: object
+        "400":
+          description: Bad request - payment cannot be cancelled
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "404":
+          description: Payment not found
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Void/cancel a payment
+      tags:
+      - Payments
+  /api/v1/payments/links:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new payment link through Wompi gateway that can be shared
+        with customers
+      parameters:
+      - description: Payment link creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_payments.CreatePaymentLinkRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Payment link created successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_payments.PaymentLinkResponse'
+              type: object
+        "400":
+          description: Bad request - invalid payment link data
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error - payment link creation failed
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a payment link
+      tags:
+      - Payments
+  /api/v1/payments/links/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves details of a specific payment link by ID
+      parameters:
+      - description: Payment link ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Payment link retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_payments.PaymentLinkResponse'
+              type: object
+        "400":
+          description: Bad request - invalid payment link ID
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "404":
+          description: Payment link not found
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get payment link details
+      tags:
+      - Payments
+  /api/v1/payments/links/{id}/activate:
+    patch:
+      consumes:
+      - application/json
+      description: Activates a previously deactivated payment link
+      parameters:
+      - description: Payment link ID to activate
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Payment link activated successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_payments.PaymentLinkResponse'
+              type: object
+        "400":
+          description: Bad request - payment link cannot be activated
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "404":
+          description: Payment link not found
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Activate a payment link
+      tags:
+      - Payments
+  /api/v1/payments/links/{id}/deactivate:
+    patch:
+      consumes:
+      - application/json
+      description: Deactivates an active payment link to prevent further payments
+      parameters:
+      - description: Payment link ID to deactivate
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Payment link deactivated successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_payments.PaymentLinkResponse'
+              type: object
+        "400":
+          description: Bad request - payment link cannot be deactivated
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "404":
+          description: Payment link not found
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Deactivate a payment link
+      tags:
+      - Payments
+  /api/v1/payments/webhook:
+    post:
+      consumes:
+      - application/json
+      description: Receives and processes webhook events from Wompi payment gateway
+      parameters:
+      - description: Webhook event payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_payments.WebhookEvent'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Webhook processed successfully
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "400":
+          description: Bad request - invalid payload
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid webhook signature
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error - webhook processing failed
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      summary: Handle Wompi webhook
+      tags:
+      - Payments
+  /api/v1/payments/wompi/{wompi_id}/status:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves payment status using Wompi transaction ID
+      parameters:
+      - description: Wompi transaction ID
+        in: path
+        name: wompi_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Payment status retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_payments.PaymentResponse'
+              type: object
+        "400":
+          description: Bad request - invalid Wompi ID or payment error
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get payment status by Wompi ID
+      tags:
+      - Payments
   /api/v1/products:
     get:
       consumes:
@@ -1784,8 +2621,35 @@ paths:
       - Variants
 securityDefinitions:
   BearerAuth:
-    description: Type "Bearer" followed by a space and JWT token.
+    description: 'Enter your Bearer token in the format: Bearer {token}'
     in: header
     name: Authorization
     type: apiKey
 swagger: "2.0"
+tags:
+- description: Authentication, authorization, 2FA, and OAuth2 endpoints
+  name: Auth
+- description: User management and profile operations
+  name: Users
+- description: Product category management
+  name: Categories
+- description: Product catalog management
+  name: Products
+- description: Product variant management (SKU, attributes)
+  name: Variants
+- description: Product and variant image management
+  name: Images
+- description: Order creation, management, and tracking
+  name: Orders
+- description: Stock management and reservations
+  name: Inventory
+- description: Shopping cart operations (Redis-backed)
+  name: Cart
+- description: Payment processing via Wompi gateway
+  name: Payments
+- description: Administrative operations
+  name: Admin
+- description: Health check endpoint
+  name: Health
+- description: Cache metrics and management endpoints
+  name: Cache

@@ -22,6 +22,17 @@ func NewCartHandler(cartService *CartService) *CartHandler {
 	}
 }
 
+// GetCart godoc
+// @Summary Get shopping cart
+// @Description Retrieves the authenticated user's shopping cart items
+// @Tags Cart
+// @Accept json
+// @Produce json
+// @Success 200 {object} response.ApiResponse{data=CartResponse} "Cart retrieved successfully"
+// @Failure 401 {object} response.ApiResponse "Unauthorized - invalid or missing token"
+// @Failure 500 {object} response.ApiResponse "Internal server error"
+// @Security BearerAuth
+// @Router /api/v1/cart [get]
 func (h *CartHandler) GetCart(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	if userID == 0 {
@@ -38,6 +49,20 @@ func (h *CartHandler) GetCart(c *gin.Context) {
 	h.response.Success(c, ToCartResponse(cart))
 }
 
+// AddItem godoc
+// @Summary Add item to cart
+// @Description Adds a product variant to the authenticated user's shopping cart
+// @Tags Cart
+// @Accept json
+// @Produce json
+// @Param request body AddToCartRequest true "Item to add"
+// @Success 200 {object} response.ApiResponse{data=CartResponse} "Item added to cart"
+// @Failure 400 {object} response.ApiResponse "Bad request - invalid data or insufficient stock"
+// @Failure 401 {object} response.ApiResponse "Unauthorized - invalid or missing token"
+// @Failure 404 {object} response.ApiResponse "Variant not found"
+// @Failure 500 {object} response.ApiResponse "Internal server error"
+// @Security BearerAuth
+// @Router /api/v1/cart/items [post]
 func (h *CartHandler) AddItem(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	if userID == 0 {
@@ -68,6 +93,21 @@ func (h *CartHandler) AddItem(c *gin.Context) {
 	h.response.Success(c, ToCartResponse(cart))
 }
 
+// UpdateItem godoc
+// @Summary Update cart item quantity
+// @Description Updates the quantity of an item in the authenticated user's shopping cart
+// @Tags Cart
+// @Accept json
+// @Produce json
+// @Param variant_id path int true "Product variant ID"
+// @Param request body UpdateCartItemRequest true "New quantity"
+// @Success 200 {object} response.ApiResponse{data=CartResponse} "Item updated successfully"
+// @Failure 400 {object} response.ApiResponse "Bad request - invalid data or insufficient stock"
+// @Failure 401 {object} response.ApiResponse "Unauthorized - invalid or missing token"
+// @Failure 404 {object} response.ApiResponse "Item not found in cart"
+// @Failure 500 {object} response.ApiResponse "Internal server error"
+// @Security BearerAuth
+// @Router /api/v1/cart/items/{variant_id} [put]
 func (h *CartHandler) UpdateItem(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	if userID == 0 {
@@ -104,6 +144,19 @@ func (h *CartHandler) UpdateItem(c *gin.Context) {
 	h.response.Success(c, ToCartResponse(cart))
 }
 
+// RemoveItem godoc
+// @Summary Remove item from cart
+// @Description Removes a specific item from the authenticated user's shopping cart
+// @Tags Cart
+// @Accept json
+// @Produce json
+// @Param variant_id path int true "Product variant ID to remove"
+// @Success 200 {object} response.ApiResponse{data=CartResponse} "Item removed successfully"
+// @Failure 400 {object} response.ApiResponse "Bad request - invalid variant ID"
+// @Failure 401 {object} response.ApiResponse "Unauthorized - invalid or missing token"
+// @Failure 500 {object} response.ApiResponse "Internal server error"
+// @Security BearerAuth
+// @Router /api/v1/cart/items/{variant_id} [delete]
 func (h *CartHandler) RemoveItem(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	if userID == 0 {
@@ -126,6 +179,17 @@ func (h *CartHandler) RemoveItem(c *gin.Context) {
 	h.response.Success(c, ToCartResponse(cart))
 }
 
+// ClearCart godoc
+// @Summary Clear shopping cart
+// @Description Removes all items from the authenticated user's shopping cart
+// @Tags Cart
+// @Accept json
+// @Produce json
+// @Success 200 {object} response.ApiResponse "Cart cleared successfully"
+// @Failure 401 {object} response.ApiResponse "Unauthorized - invalid or missing token"
+// @Failure 500 {object} response.ApiResponse "Internal server error"
+// @Security BearerAuth
+// @Router /api/v1/cart [delete]
 func (h *CartHandler) ClearCart(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	if userID == 0 {
