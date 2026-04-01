@@ -4,19 +4,41 @@
 // @termsOfService http://swagger.io/terms/
 
 // @contact.name API Support
-// @contact.url http://www.example.com/support
-// @contact.email support@example.com
-
+// @contact.email support@bey.com
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
-
-// @host localhost:8080
-// @BasePath /
 
 // @securityDefinitions.apikey BearerAuth
 // @in header
 // @name Authorization
-// @description Type "Bearer" followed by a space and JWT token.
+// @description Enter your Bearer token in the format: Bearer {token}
+
+// @tag.name Auth
+// @tag.description Authentication, authorization, 2FA, and OAuth2 endpoints
+// @tag.name Users
+// @tag.description User management and profile operations
+// @tag.name Categories
+// @tag.description Product category management
+// @tag.name Products
+// @tag.description Product catalog management
+// @tag.name Variants
+// @tag.description Product variant management (SKU, attributes)
+// @tag.name Images
+// @tag.description Product and variant image management
+// @tag.name Orders
+// @tag.description Order creation, management, and tracking
+// @tag.name Inventory
+// @tag.description Stock management and reservations
+// @tag.name Cart
+// @tag.description Shopping cart operations (Redis-backed)
+// @tag.name Payments
+// @tag.description Payment processing via Wompi gateway
+// @tag.name Admin
+// @tag.description Administrative operations
+// @tag.name Health
+// @tag.description Health check endpoint
+// @tag.name Cache
+// @tag.description Cache metrics and management endpoints
 
 package main
 
@@ -43,6 +65,7 @@ import (
 	"bey/internal/modules/products"
 	"bey/internal/modules/users"
 	"bey/internal/shared"
+	"bey/internal/shared/cache"
 	"bey/internal/shared/middleware"
 	"bey/internal/shared/response"
 
@@ -155,6 +178,37 @@ func main() {
 		nil,
 	)
 
+	var redisPool *cache.RedisPool
+	var cacheService *cache.CacheService
+	var cacheMetrics *cache.CacheMetrics
+	var cacheHandler *cache.Handler
+	var cacheWarmer *cache.CacheWarmer
+	if cfg.Cache.Enabled {
+		redisAddr := fmt.Sprintf("%s:%d", cfg.RateLimit.Redis.Host, cfg.RateLimit.Redis.Port)
+		redisPassword := cfg.RateLimit.Redis.Password
+		if cfg.RateLimit.Redis.Enabled {
+			redisAddr = fmt.Sprintf("%s:%d", cfg.RateLimit.Redis.Host, cfg.RateLimit.Redis.Port)
+			redisPassword = cfg.RateLimit.Redis.Password
+		} else if cfg.Cart.Enabled {
+			redisAddr = fmt.Sprintf("%s:%d", cfg.Cart.Redis.Host, cfg.Cart.Redis.Port)
+			redisPassword = cfg.Cart.Redis.Password
+		}
+
+		redisPool, err = cache.NewRedisPool(redisAddr, redisPassword, cfg.Cache.DB)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize Redis pool: %v", err)
+		} else {
+			cacheMetrics = cache.NewCacheMetrics()
+			cacheService = cache.NewCacheService(
+				redisPool.GetClient(cfg.Cache.DB),
+				time.Duration(cfg.Cache.DefaultTTL)*time.Second,
+				cacheMetrics,
+			)
+			cacheHandler = cache.NewHandler(cacheService)
+			log.Println("Redis cache pool initialized successfully")
+		}
+	}
+
 	middleware.InitCORS(cfg.Security.GetAllowedOrigins())
 
 	router := gin.Default()
@@ -165,11 +219,34 @@ func main() {
 
 	responseHandler := response.NewResponseHandler()
 
-	categoryRepo := products.NewCategoryRepository(db.GetDB())
-	productRepo := products.NewProductRepository(db.GetDB())
-	variantRepo := products.NewProductVariantRepository(db.GetDB())
-	imageRepo := products.NewProductImageRepository(db.GetDB())
-	productService := products.NewProductServiceWithTaskQueue(categoryRepo, productRepo, variantRepo, imageRepo, taskQueue)
+	var variantRepo *products.ProductVariantRepository
+	var imageRepo *products.ProductImageRepository
+	if cacheService != nil && cacheMetrics != nil {
+		variantRepo = products.NewProductVariantRepositoryWithCache(db.GetDB(), cacheService, cacheMetrics)
+		imageRepo = products.NewProductImageRepositoryWithCache(db.GetDB(), cacheService, cacheMetrics)
+		log.Println("Variant and image repositories initialized with cache")
+	} else {
+		variantRepo = products.NewProductVariantRepository(db.GetDB())
+		imageRepo = products.NewProductImageRepository(db.GetDB())
+	}
+
+	var categoryRepo *products.CategoryRepository
+	var productRepo *products.ProductRepository
+	if cacheService != nil && cacheMetrics != nil {
+		categoryRepo = products.NewCategoryRepositoryWithCache(db.GetDB(), cacheService, cacheMetrics)
+		productRepo = products.NewProductRepositoryWithCache(db.GetDB(), variantRepo, imageRepo, cacheService, cacheMetrics)
+		log.Println("Product and category repositories initialized with cache")
+	} else {
+		categoryRepo = products.NewCategoryRepository(db.GetDB())
+		productRepo = products.NewProductRepository(db.GetDB())
+	}
+
+	var productService *products.ProductService
+	if cacheService != nil {
+		productService = products.NewProductServiceWithAllDeps(categoryRepo, productRepo, variantRepo, imageRepo, taskQueue, cacheService)
+	} else {
+		productService = products.NewProductServiceWithTaskQueue(categoryRepo, productRepo, variantRepo, imageRepo, taskQueue)
+	}
 
 	inventoryRepo := inventory.NewInventoryRepository(db.GetDB())
 	orderService := orders.NewOrderServiceWithAllDepsAndVariant(
@@ -188,6 +265,11 @@ func main() {
 	} else {
 		authService = auth.NewAuthServiceWithEmail(db.GetDB(), cfg, emailService)
 		log.Println("Email service initialized successfully")
+	}
+
+	if redisPool != nil && cacheService != nil {
+		authService = auth.NewAuthServiceWithRedis(db.GetDB(), cfg, redisPool.GetClient(cfg.Cache.DB))
+		log.Println("Auth service upgraded with Redis refresh tokens")
 	}
 	authMiddleware := auth.NewAuthMiddleware(authService, cfg)
 	adminMiddleware := func(c *gin.Context) {
@@ -233,12 +315,37 @@ func main() {
 		router.Static("/dashboard", cfg.App.StaticPath)
 	}
 
+	if cacheHandler != nil {
+		router.GET("/metrics/cache", cacheHandler.GetMetrics)
+		router.POST("/metrics/cache/reset", cacheHandler.ResetMetrics)
+	}
+
+	if cacheService != nil && cfg.Cache.WarmingEnabled {
+		cacheWarmer = cache.NewCacheWarmer(
+			cacheService,
+			products.NewCategoryWarmerAdapter(categoryRepo),
+			products.NewProductWarmerAdapter(productRepo),
+			products.NewVariantWarmerAdapter(variantRepo),
+			cfg.Cache.WarmingProductLimit,
+		)
+	}
+
+	// Health godoc
+	// @Summary Health check
+	// @Description Checks the health status of the API and its dependencies (database, worker pool, cache)
+	// @Tags Health
+	// @Accept json
+	// @Produce json
+	// @Success 200 {object} response.ApiResponse "API is healthy"
+	// @Success 503 {object} response.ApiResponse "API is unhealthy - one or more dependencies failed"
+	// @Router /health [get]
 	router.GET("/health", func(c *gin.Context) {
 		health := shared.PerformHealthCheck(
 			db.GetDB(),
 			cfg.Concurrency.WorkerPool.WorkerPoolSize,
 			0,
 			true,
+			redisPool,
 		)
 
 		if health.Status == "unhealthy" {
@@ -265,6 +372,14 @@ func main() {
 			log.Fatalf("Failed to start server: %v", err)
 		}
 	}()
+
+	if cacheWarmer != nil {
+		go func() {
+			time.Sleep(2 * time.Second)
+			cacheWarmer.Warm(context.Background())
+		}()
+		log.Println("Cache warmer scheduled to start after 2 seconds")
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

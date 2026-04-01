@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"bey/internal/shared/cache"
 )
 
 // HealthResponse represents the health check response structure
@@ -44,6 +46,28 @@ func DatabaseHealthCheck(db *gorm.DB) DependencyStatus {
 	}
 }
 
+// RedisHealthCheck checks Redis connectivity
+func RedisHealthCheck(pool *cache.RedisPool) DependencyStatus {
+	if pool == nil {
+		return DependencyStatus{
+			Status:  "unhealthy",
+			Message: "redis pool not initialized",
+		}
+	}
+
+	if err := pool.Ping(); err != nil {
+		return DependencyStatus{
+			Status:  "unhealthy",
+			Message: "redis ping failed: " + err.Error(),
+		}
+	}
+
+	return DependencyStatus{
+		Status:  "healthy",
+		Message: "connected",
+	}
+}
+
 // WorkerPoolHealthCheck checks worker pool status
 // workerCount: number of workers configured
 // queueDepth: current queue depth (length of task channel)
@@ -65,7 +89,7 @@ func WorkerPoolHealthCheck(workerCount int, queueDepth int, isRunning bool) Depe
 }
 
 // PerformHealthCheck runs all health checks and returns the overall status
-func PerformHealthCheck(db *gorm.DB, workerCount int, queueDepth int, isRunning bool) HealthResponse {
+func PerformHealthCheck(db *gorm.DB, workerCount int, queueDepth int, isRunning bool, redisPool *cache.RedisPool) HealthResponse {
 	deps := make(map[string]DependencyStatus)
 
 	// Check database
@@ -73,6 +97,11 @@ func PerformHealthCheck(db *gorm.DB, workerCount int, queueDepth int, isRunning 
 
 	// Check worker pool
 	deps["worker_pool"] = WorkerPoolHealthCheck(workerCount, queueDepth, isRunning)
+
+	// Check Redis (if pool is provided)
+	if redisPool != nil {
+		deps["redis"] = RedisHealthCheck(redisPool)
+	}
 
 	// Determine overall status
 	overallStatus := "healthy"
