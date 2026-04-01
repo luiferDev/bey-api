@@ -162,12 +162,122 @@ func (h *TestPaymentHandler) Webhook(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "processed"})
 }
 
+func (h *TestPaymentHandler) GetPaymentStatus(c *gin.Context) {
+	wompiID := c.Param("wompi_id")
+	if wompiID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "wompi transaction ID required"})
+		return
+	}
+
+	payment, err := h.service.GetPaymentStatus(wompiID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ToPaymentResponse(payment))
+}
+
+func (h *TestPaymentHandler) VoidPayment(c *gin.Context) {
+	idStr := c.Param("id")
+	var id uint
+	if _, err := parseUintParams(idStr, &id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payment ID"})
+		return
+	}
+
+	payment, err := h.service.CancelPayment(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ToPaymentResponse(payment))
+}
+
+func (h *TestPaymentHandler) CreatePaymentLink(c *gin.Context) {
+	var req CreatePaymentLinkRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	link, err := h.service.CreatePaymentLink(&req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, ToPaymentLinkResponse(link))
+}
+
+func (h *TestPaymentHandler) GetPaymentLink(c *gin.Context) {
+	idStr := c.Param("id")
+	var id uint
+	if _, err := parseUintParams(idStr, &id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payment link ID"})
+		return
+	}
+
+	link, err := h.service.GetPaymentLink(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "payment link not found"})
+		return
+	}
+	if link == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "payment link not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, ToPaymentLinkResponse(link))
+}
+
+func (h *TestPaymentHandler) ActivatePaymentLink(c *gin.Context) {
+	idStr := c.Param("id")
+	var id uint
+	if _, err := parseUintParams(idStr, &id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payment link ID"})
+		return
+	}
+
+	link, err := h.service.ActivatePaymentLink(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ToPaymentLinkResponse(link))
+}
+
+func (h *TestPaymentHandler) DeactivatePaymentLink(c *gin.Context) {
+	idStr := c.Param("id")
+	var id uint
+	if _, err := parseUintParams(idStr, &id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payment link ID"})
+		return
+	}
+
+	link, err := h.service.DeactivatePaymentLink(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ToPaymentLinkResponse(link))
+}
+
 func setupTestRouter(handler *TestPaymentHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.POST("/payments", handler.CreatePayment)
 	r.GET("/payments/:id", handler.GetPayment)
 	r.POST("/payments/webhook", handler.Webhook)
+	r.GET("/payments/wompi/:wompi_id/status", handler.GetPaymentStatus)
+	r.POST("/payments/:id/void", handler.VoidPayment)
+	r.POST("/payments/links", handler.CreatePaymentLink)
+	r.GET("/payments/links/:id", handler.GetPaymentLink)
+	r.PATCH("/payments/links/:id/activate", handler.ActivatePaymentLink)
+	r.PATCH("/payments/links/:id/deactivate", handler.DeactivatePaymentLink)
 	return r
 }
 
@@ -480,5 +590,158 @@ func TestPaymentHandler_Integration(t *testing.T) {
 	}
 	if resp.Status != StatusPending {
 		t.Errorf("expected status pending, got %s", resp.Status)
+	}
+}
+
+func TestPaymentHandler_GetPaymentStatus_Success(t *testing.T) {
+	mockService := &MockPaymentService{
+		getPaymentStatusFunc: func(wompiID string) (*Payment, error) {
+			return &Payment{
+				ID:                 1,
+				WompiTransactionID: wompiID,
+				Amount:             100000,
+				Currency:           "COP",
+				Status:             StatusApproved,
+			}, nil
+		},
+	}
+
+	handler := &TestPaymentHandler{service: mockService}
+	router := setupTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/payments/wompi/tx_123/status", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPaymentHandler_VoidPayment_Success(t *testing.T) {
+	mockService := &MockPaymentService{
+		cancelPaymentFunc: func(id uint) (*Payment, error) {
+			return &Payment{
+				ID:     id,
+				Status: StatusVoided,
+			}, nil
+		},
+	}
+
+	handler := &TestPaymentHandler{service: mockService}
+	router := setupTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodPost, "/payments/1/void", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPaymentHandler_CreatePaymentLink_Success(t *testing.T) {
+	mockService := &MockPaymentService{
+		createPaymentLinkFunc: func(req *CreatePaymentLinkRequest) (*PaymentLink, error) {
+			return &PaymentLink{
+				ID:          1,
+				WompiLinkID: "link_123",
+				URL:         "https://checkout.wompi.co/l/link_123",
+				Amount:      req.AmountInCents,
+				Currency:    req.Currency,
+				Description: req.Description,
+				Status:      StatusActive,
+			}, nil
+		},
+	}
+
+	handler := &TestPaymentHandler{service: mockService}
+	router := setupTestRouter(handler)
+
+	body := `{"amount_in_cents":50000,"currency":"COP","description":"Test payment","reference":"order-123"}`
+	req := httptest.NewRequest(http.MethodPost, "/payments/links", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Errorf("expected status 201, got %d. Body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPaymentHandler_GetPaymentLink_Success(t *testing.T) {
+	mockService := &MockPaymentService{
+		getPaymentLinkFunc: func(id uint) (*PaymentLink, error) {
+			return &PaymentLink{
+				ID:          id,
+				WompiLinkID: "link_123",
+				URL:         "https://checkout.wompi.co/l/link_123",
+				Amount:      50000,
+				Currency:    "COP",
+				Description: "Test payment",
+				Status:      StatusActive,
+			}, nil
+		},
+	}
+
+	handler := &TestPaymentHandler{service: mockService}
+	router := setupTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/payments/links/1", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPaymentHandler_ActivatePaymentLink_Success(t *testing.T) {
+	mockService := &MockPaymentService{
+		activatePaymentLinkFunc: func(id uint) (*PaymentLink, error) {
+			return &PaymentLink{
+				ID:     id,
+				Status: StatusActive,
+			}, nil
+		},
+	}
+
+	handler := &TestPaymentHandler{service: mockService}
+	router := setupTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodPatch, "/payments/links/1/activate", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPaymentHandler_DeactivatePaymentLink_Success(t *testing.T) {
+	mockService := &MockPaymentService{
+		deactivatePaymentLinkFunc: func(id uint) (*PaymentLink, error) {
+			return &PaymentLink{
+				ID:     id,
+				Status: StatusInactive,
+			}, nil
+		},
+	}
+
+	handler := &TestPaymentHandler{service: mockService}
+	router := setupTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodPatch, "/payments/links/1/deactivate", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d. Body: %s", w.Code, w.Body.String())
 	}
 }
