@@ -21,6 +21,7 @@ type Config struct {
 	OAuth       OAuthConfig                   `yaml:"oauth"`
 	Cart        CartConfig                    `yaml:"cart"`
 	Wompi       WompiConfig                   `yaml:"wompi"`
+	Cache       CacheConfig                   `yaml:"cache"`
 }
 
 type AppConfig struct {
@@ -117,6 +118,14 @@ type WompiConfig struct {
 	EventKey     string `yaml:"event_key"`
 	IntegrityKey string `yaml:"integrity_key"`
 	BaseURL      string `yaml:"base_url"`
+}
+
+type CacheConfig struct {
+	Enabled             bool `yaml:"enabled"`
+	DB                  int  `yaml:"db"`
+	DefaultTTL          int  `yaml:"default_ttl"`
+	WarmingEnabled      bool `yaml:"warming_enabled"`
+	WarmingProductLimit int  `yaml:"warming_product_limit"`
 }
 
 func (c *WompiConfig) GetBaseURL() string {
@@ -303,6 +312,22 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.RateLimit.Defaults.BurstCapacity == 0 {
 		cfg.RateLimit.Defaults.BurstCapacity = 10
+	}
+
+	if !cfg.Cache.Enabled {
+		cfg.Cache.Enabled = true
+	}
+	if cfg.Cache.DB == 0 {
+		cfg.Cache.DB = 2
+	}
+	if cfg.Cache.DefaultTTL == 0 {
+		cfg.Cache.DefaultTTL = 28800
+	}
+	if !cfg.Cache.WarmingEnabled {
+		cfg.Cache.WarmingEnabled = true
+	}
+	if cfg.Cache.WarmingProductLimit == 0 {
+		cfg.Cache.WarmingProductLimit = 100
 	}
 
 	return &cfg, nil

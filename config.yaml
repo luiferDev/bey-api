@@ -110,7 +110,7 @@ cart:
     host: "localhost"
     port: 6379
     password: ""
-    db: 1  # Separate DB from rate-limiter (DB 0)
+    db: 1 # Separate DB from rate-limiter (DB 0)
   # Cart TTL in days
   ttl_days: 7
 
@@ -126,3 +126,11 @@ wompi:
   integrity_key: "your-integrity-key"
   # API base URL (different for sandbox vs production)
   base_url: "https://sandbox.wompi.co"
+
+cache:
+  # Redis cache configuration for read-heavy operations
+  enabled: true
+  db: 2 # Separate DB from rate-limiter (DB 0) and cart (DB 1)
+  default_ttl: 28800 # 8 hours in seconds
+  warming_enabled: true
+  warming_product_limit: 100
