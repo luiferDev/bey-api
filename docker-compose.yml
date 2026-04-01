@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: bey_postgres
     environment:
       POSTGRES_USER: bey_user
@@ -15,9 +15,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     container_name: bey_redis
     ports:
       - "6379:6379"
@@ -28,6 +29,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   api:
     build:
@@ -50,6 +52,24 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./
+          target: /app
+          ignore:
+            - .git/
+            - vendor/
+            - .idea/
+            - .vscode/
+        - action: rebuild
+          path: ./go.mod
+        - action: rebuild
+          path: ./go.sum
+        - action: rebuild
+          path: ./Dockerfile
+        - action: rebuild
+          path: ./docker-compose.yml
 
 volumes:
   postgres_data:
