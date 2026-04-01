@@ -144,6 +144,7 @@ func main() {
 		&products.Category{},
 		&products.Product{},
 		&products.ProductVariant{},
+		&products.ProductVariantAttribute{},
 		&products.ProductImage{},
 		&orders.Order{},
 		&orders.OrderItem{},
@@ -241,13 +242,6 @@ func main() {
 		productRepo = products.NewProductRepository(db.GetDB())
 	}
 
-	var productService *products.ProductService
-	if cacheService != nil {
-		productService = products.NewProductServiceWithAllDeps(categoryRepo, productRepo, variantRepo, imageRepo, taskQueue, cacheService)
-	} else {
-		productService = products.NewProductServiceWithTaskQueue(categoryRepo, productRepo, variantRepo, imageRepo, taskQueue)
-	}
-
 	inventoryRepo := inventory.NewInventoryRepository(db.GetDB())
 	orderService := orders.NewOrderServiceWithAllDepsAndVariant(
 		orders.NewOrderRepository(db.GetDB()),
@@ -284,7 +278,7 @@ func main() {
 	{
 		auth.RegisterRoutes(router, authService, cfg)
 		users.RegisterRoutesWithAuth(api, db.GetDB(), authMiddleware.RequireAuth(), adminMiddleware)
-		products.SetupRoutesWithService(api, db.GetDB(), productService, authMiddleware.RequireAuth(), adminMiddleware)
+		products.SetupRoutesWithCache(api, categoryRepo, productRepo, variantRepo, imageRepo, cacheService, authMiddleware.RequireAuth(), adminMiddleware)
 		orders.RegisterRoutesWithAllDeps(api, db.GetDB(), orderService, productRepo, variantRepo, authMiddleware.RequireAuth(), adminMiddleware)
 		inventory.RegisterRoutesWithAuth(api, db.GetDB(), authMiddleware.RequireAuth(), adminMiddleware)
 
