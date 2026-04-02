@@ -287,18 +287,92 @@ func (h *ProductHandler) DeleteCategory(c *gin.Context) {
 // @Summary Get all categories
 // @Description Retrieves a list of all categories
 // @Tags Categories
+// @Summary Get all categories as nested tree
+// @Description Returns the complete category tree with parent-child relationships
+// @Tags Categories
 // @Accept json
 // @Produce json
-// @Success 200 {array} Category
+// @Success 200 {object} response.ApiResponse{data=[]CategoryResponse}
 // @Router /api/v1/categories [get]
 func (h *ProductHandler) GetCategories(c *gin.Context) {
-	categories, err := h.categoryRepo.FindAll()
+	categories, err := h.categoryRepo.FindTree()
 	if err != nil {
 		h.response.InternalError(c, "Failed to get categories")
 		return
 	}
 
-	h.response.Success(c, categories)
+	h.response.Success(c, toCategoryResponseList(categories))
+}
+
+// GetCategoryTree godoc
+// @Summary Get full category tree (alias for GET /categories)
+// @Description Returns the complete nested category tree with all levels
+// @Tags Categories
+// @Produce json
+// @Success 200 {object} response.ApiResponse{data=[]CategoryResponse}
+// @Router /api/v1/categories/tree [get]
+func (h *ProductHandler) GetCategoryTree(c *gin.Context) {
+	h.GetCategories(c)
+}
+
+// GetCategoryChildren godoc
+// @Summary Get direct children of a category
+// @Description Returns immediate subcategories of the specified category
+// @Tags Categories
+// @Produce json
+// @Param id path int true "Category ID"
+// @Success 200 {object} response.ApiResponse{data=[]CategoryResponse}
+// @Failure 400 {object} response.ApiResponse "Invalid category ID"
+// @Failure 404 {object} response.ApiResponse "Category not found"
+// @Router /api/v1/categories/{id}/children [get]
+func (h *ProductHandler) GetCategoryChildren(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		h.response.ValidationError(c, "invalid category ID")
+		return
+	}
+
+	exists, err := h.categoryRepo.Exists(uint(id))
+	if err != nil {
+		h.response.InternalError(c, "failed to check category")
+		return
+	}
+	if !exists {
+		h.response.NotFound(c, "category not found")
+		return
+	}
+
+	children, err := h.categoryRepo.FindChildren(uint(id))
+	if err != nil {
+		h.response.InternalError(c, "failed to fetch children")
+		return
+	}
+	h.response.Success(c, toCategoryResponseList(children))
+}
+
+// GetCategoryBreadcrumbs godoc
+// @Summary Get breadcrumbs for a category
+// @Description Returns the path from root category to the specified category
+// @Tags Categories
+// @Produce json
+// @Param id path int true "Category ID"
+// @Success 200 {object} response.ApiResponse{data=[]CategoryResponse}
+// @Failure 400 {object} response.ApiResponse "Invalid category ID"
+// @Failure 404 {object} response.ApiResponse "Category not found"
+// @Router /api/v1/categories/{id}/breadcrumbs [get]
+func (h *ProductHandler) GetCategoryBreadcrumbs(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		h.response.ValidationError(c, "invalid category ID")
+		return
+	}
+
+	breadcrumbs, err := h.categoryRepo.FindBreadcrumbs(uint(id))
+	if err != nil {
+		h.response.NotFound(c, "category not found")
+		return
+	}
+	h.response.Success(c, toCategoryResponseList(breadcrumbs))
 }
 
 // Product Handlers
@@ -1100,4 +1174,37 @@ func (h *ProductHandler) invalidateImageCache(imageID uint, productID uint) {
 			log.Printf("Failed to invalidate product cache %d: %v", productID, err)
 		}
 	}()
+}
+
+// toCategoryResponse converts a Category to CategoryResponse
+func toCategoryResponse(cat Category) CategoryResponse {
+	resp := CategoryResponse{
+		ID:          cat.ID,
+		Name:        cat.Name,
+		Slug:        cat.Slug,
+		Description: cat.Description,
+		ParentID:    cat.ParentID,
+		Path:        cat.Path,
+		Level:       cat.Level,
+		IsActive:    cat.IsActive,
+		SortOrder:   cat.SortOrder,
+		CreatedAt:   cat.CreatedAt,
+		UpdatedAt:   cat.UpdatedAt,
+	}
+	if cat.Subcategories != nil {
+		resp.Subcategories = make([]CategoryResponse, len(cat.Subcategories))
+		for i, sub := range cat.Subcategories {
+			resp.Subcategories[i] = toCategoryResponse(sub)
+		}
+	}
+	return resp
+}
+
+// toCategoryResponseList converts a slice of Categories to CategoryResponses
+func toCategoryResponseList(categories []Category) []CategoryResponse {
+	responses := make([]CategoryResponse, len(categories))
+	for i, cat := range categories {
+		responses[i] = toCategoryResponse(cat)
+	}
+	return responses
 }

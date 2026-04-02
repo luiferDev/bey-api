@@ -23,8 +23,12 @@ func SetupRoutesWithService(router *gin.RouterGroup, db *gorm.DB, productService
 
 	categories := router.Group("/categories")
 	{
+		// Public: GET categories (specific routes before param routes)
+		categories.GET("/tree", handler.GetCategoryTree)
 		categories.GET("", handler.GetCategories)
 		categories.GET("/:id", handler.GetCategory)
+		categories.GET("/:id/children", handler.GetCategoryChildren)
+		categories.GET("/:id/breadcrumbs", handler.GetCategoryBreadcrumbs)
 		categories.GET("/slug/:slug", handler.GetCategoryBySlug)
 
 		if adminMiddleware != nil {
@@ -108,8 +112,12 @@ func SetupRoutesWithCache(
 
 	categories := router.Group("/categories")
 	{
+		// Public: GET categories (specific routes before param routes)
+		categories.GET("/tree", handler.GetCategoryTree)
 		categories.GET("", handler.GetCategories)
 		categories.GET("/:id", handler.GetCategory)
+		categories.GET("/:id/children", handler.GetCategoryChildren)
+		categories.GET("/:id/breadcrumbs", handler.GetCategoryBreadcrumbs)
 		categories.GET("/slug/:slug", handler.GetCategoryBySlug)
 
 		if adminMiddleware != nil {

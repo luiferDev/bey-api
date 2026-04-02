@@ -9,27 +9,37 @@ import (
 
 // Category DTOs
 type CreateCategoryRequest struct {
-	ParentID    *uint  `json:"parent_id"`
-	Name        string `json:"name" binding:"required"`
-	Slug        string `json:"slug" binding:"required"`
+	Name        string `json:"name" binding:"required,max=255"`
+	Slug        string `json:"slug" binding:"required,max=255"`
 	Description string `json:"description"`
+	ParentID    *uint  `json:"parent_id"`
+	IsActive    *bool  `json:"is_active"`
+	SortOrder   *int   `json:"sort_order"`
 }
 
 type UpdateCategoryRequest struct {
-	ParentID    *uint   `json:"parent_id"`
 	Name        *string `json:"name"`
 	Slug        *string `json:"slug"`
 	Description *string `json:"description"`
+	ParentID    *uint   `json:"parent_id"`
+	IsActive    *bool   `json:"is_active"`
+	SortOrder   *int    `json:"sort_order"`
 }
 
 type CategoryResponse struct {
 	ID            uint               `json:"id"`
-	ParentID      *uint              `json:"parent_id"`
 	Name          string             `json:"name"`
 	Slug          string             `json:"slug"`
 	Description   string             `json:"description"`
-	CreatedAt     time.Time          `json:"created_at"`
+	ParentID      *uint              `json:"parent_id"`
+	Path          string             `json:"path"`
+	Level         int                `json:"level"`
+	IsActive      bool               `json:"is_active"`
+	SortOrder     int                `json:"sort_order"`
 	Subcategories []CategoryResponse `json:"subcategories,omitempty"`
+	ProductCount  int                `json:"product_count"`
+	CreatedAt     time.Time          `json:"created_at"`
+	UpdatedAt     time.Time          `json:"updated_at"`
 }
 
 // Product DTOs

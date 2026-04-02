@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
 
 	"bey/internal/shared/cache"
 
@@ -28,7 +30,27 @@ func NewCategoryRepositoryWithCache(db *gorm.DB, cacheSvc *cache.CacheService, m
 }
 
 func (r *CategoryRepository) Create(category *Category) error {
-	return r.db.Create(category).Error
+	if err := r.db.Create(category).Error; err != nil {
+		return err
+	}
+
+	if category.ParentID != nil && *category.ParentID > 0 {
+		var parent Category
+		if err := r.db.First(&parent, *category.ParentID).Error; err != nil {
+			return fmt.Errorf("parent category not found: %w", err)
+		}
+		category.Path = parent.Path + fmt.Sprintf("%d/", category.ID)
+		category.Level = parent.Level + 1
+	} else {
+		category.ParentID = nil
+		category.Path = fmt.Sprintf("/%d/", category.ID)
+		category.Level = 0
+	}
+
+	return r.db.Model(category).Updates(map[string]interface{}{
+		"path":  category.Path,
+		"level": category.Level,
+	}).Error
 }
 
 func (r *CategoryRepository) FindByID(id uint) (*Category, error) {
@@ -102,19 +124,97 @@ func (r *CategoryRepository) FindBySlug(slug string) (*Category, error) {
 }
 
 func (r *CategoryRepository) Update(category *Category) error {
-	if err := r.db.Save(category).Error; err != nil {
-		log.Printf("ERROR: Failed to update category %d: %v", category.ID, err)
+	var existing Category
+	if err := r.db.First(&existing, category.ID).Error; err != nil {
 		return err
 	}
+
+	oldParentID := existing.ParentID
+	newParentID := category.ParentID
+
+	if newParentID != nil && *newParentID > 0 {
+		if r.isDescendant(*newParentID, category.ID) {
+			return errors.New("circular reference detected: category cannot be its own descendant")
+		}
+	}
+
+	if err := r.db.Model(category).Updates(category).Error; err != nil {
+		return err
+	}
+
+	if (oldParentID == nil && newParentID != nil) ||
+		(oldParentID != nil && newParentID == nil) ||
+		(oldParentID != nil && newParentID != nil && *oldParentID != *newParentID) {
+		return r.updateSubtreePath(category.ID, newParentID)
+	}
+
+	return nil
+}
+
+func (r *CategoryRepository) isDescendant(potentialDescendantID, ancestorID uint) bool {
+	var cat Category
+	if err := r.db.First(&cat, potentialDescendantID).Error; err != nil {
+		return false
+	}
+	return strings.Contains(cat.Path, fmt.Sprintf("/%d/", ancestorID))
+}
+
+func (r *CategoryRepository) updateSubtreePath(categoryID uint, newParentID *uint) error {
+	var parent Category
+	var newPath string
+	var newLevel int
+
+	if newParentID != nil && *newParentID > 0 {
+		if err := r.db.First(&parent, *newParentID).Error; err != nil {
+			return err
+		}
+		newPath = parent.Path
+		newLevel = parent.Level + 1
+	} else {
+		newPath = ""
+		newLevel = 0
+	}
+
+	var category Category
+	if err := r.db.First(&category, categoryID).Error; err != nil {
+		return err
+	}
+	oldPrefix := category.Path
+	newPrefix := newPath + fmt.Sprintf("%d/", categoryID)
+
+	if err := r.db.Model(&Category{}).Where("id = ?", categoryID).Updates(map[string]interface{}{
+		"path":  newPrefix,
+		"level": newLevel,
+	}).Error; err != nil {
+		return err
+	}
+
+	var descendants []Category
+	if err := r.db.Where("path LIKE ?", oldPrefix+"%").Find(&descendants).Error; err != nil {
+		return err
+	}
+
+	for _, desc := range descendants {
+		descPath := strings.Replace(desc.Path, oldPrefix, newPrefix, 1)
+		descLevel := desc.Level + (newLevel - category.Level)
+		if err := r.db.Model(&Category{}).Where("id = ?", desc.ID).Updates(map[string]interface{}{
+			"path":  descPath,
+			"level": descLevel,
+		}).Error; err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 func (r *CategoryRepository) Delete(id uint) error {
-	if err := r.db.Delete(&Category{}, id).Error; err != nil {
-		log.Printf("ERROR: Failed to delete category %d: %v", id, err)
-		return err
+	var count int64
+	r.db.Model(&Category{}).Where("parent_id = ?", id).Count(&count)
+	if count > 0 {
+		return errors.New("cannot delete category with children")
 	}
-	return nil
+	return r.db.Delete(&Category{}, id).Error
 }
 
 func (r *CategoryRepository) FindAll() ([]Category, error) {
@@ -155,6 +255,73 @@ func (r *CategoryRepository) FindByParentID(parentID uint) ([]Category, error) {
 		return nil, err
 	}
 	return categories, nil
+}
+
+func (r *CategoryRepository) FindTree() ([]Category, error) {
+	var categories []Category
+	if err := r.db.Where("deleted_at IS NULL").Order("sort_order, name").Find(&categories).Error; err != nil {
+		return nil, err
+	}
+	return r.buildTree(categories), nil
+}
+
+func (r *CategoryRepository) FindChildren(parentID uint) ([]Category, error) {
+	var children []Category
+	if err := r.db.Where("parent_id = ? AND deleted_at IS NULL", parentID).Order("sort_order, name").Find(&children).Error; err != nil {
+		return nil, err
+	}
+	return children, nil
+}
+
+func (r *CategoryRepository) FindBreadcrumbs(categoryID uint) ([]Category, error) {
+	var category Category
+	if err := r.db.First(&category, categoryID).Error; err != nil {
+		return nil, err
+	}
+
+	pathParts := strings.Split(strings.Trim(category.Path, "/"), "/")
+	var ids []uint
+	for _, p := range pathParts {
+		if id, err := strconv.ParseUint(p, 10, 64); err == nil {
+			ids = append(ids, uint(id))
+		}
+	}
+
+	var breadcrumbs []Category
+	if len(ids) > 0 {
+		if err := r.db.Where("id IN ? AND deleted_at IS NULL", ids).Order("level").Find(&breadcrumbs).Error; err != nil {
+			return nil, err
+		}
+	}
+	return breadcrumbs, nil
+}
+
+func (r *CategoryRepository) buildTree(categories []Category) []Category {
+	categoryMap := make(map[uint]*Category)
+	var roots []Category
+
+	for i := range categories {
+		categoryMap[categories[i].ID] = &categories[i]
+	}
+
+	for i := range categories {
+		cat := &categories[i]
+		if cat.ParentID != nil && *cat.ParentID > 0 {
+			if parent, ok := categoryMap[*cat.ParentID]; ok {
+				parent.Subcategories = append(parent.Subcategories, *cat)
+			}
+		} else {
+			roots = append(roots, *cat)
+		}
+	}
+
+	return roots
+}
+
+func (r *CategoryRepository) Exists(id uint) (bool, error) {
+	var count int64
+	err := r.db.Model(&Category{}).Where("id = ? AND deleted_at IS NULL", id).Count(&count).Error
+	return count > 0, err
 }
 
 // ProductRepository

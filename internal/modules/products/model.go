@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 // JSONMap is a type alias for JSON map that works with both GORM and swagger
@@ -11,15 +12,20 @@ type JSONMap = datatypes.JSONMap
 
 // Category - Tabla recursiva
 type Category struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	ParentID    *uint     `json:"parent_id"`
-	Name        string    `gorm:"size:100;not null" json:"name"`
-	Slug        string    `gorm:"size:150;uniqueIndex;not null" json:"slug"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	// Relaciones
-	Subcategories []Category `gorm:"foreignKey:ParentID" json:"subcategories,omitempty"`
-	Products      []Product  `gorm:"foreignKey:CategoryID" json:"products,omitempty"`
+	ID            uint           `gorm:"primaryKey" json:"id"`
+	Name          string         `gorm:"size:255;not null" json:"name"`
+	Slug          string         `gorm:"size:255;uniqueIndex;not null" json:"slug"`
+	Description   string         `gorm:"type:text" json:"description"`
+	ParentID      *uint          `gorm:"index" json:"parent_id"`
+	Path          string         `gorm:"size:500;index" json:"path"`
+	Level         int            `gorm:"default:0;index" json:"level"`
+	IsActive      bool           `gorm:"default:true" json:"is_active"`
+	SortOrder     int            `gorm:"default:0" json:"sort_order"`
+	Subcategories []Category     `gorm:"foreignKey:ParentID" json:"subcategories,omitempty"`
+	Products      []Product      `gorm:"foreignKey:CategoryID" json:"products,omitempty"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // commit

@@ -44,6 +44,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"net/http"
@@ -78,6 +80,14 @@ import (
 	_ "bey/cmd/api/docs"
 )
 
+func generateRandomPassword(length int) string {
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("failed to generate random password: %v", err))
+	}
+	return base64.URLEncoding.EncodeToString(b)[:length]
+}
+
 func seedAdminUser(db *gorm.DB, cfg *config.Config) error {
 	adminEmail := cfg.GetAdminEmail()
 	adminPassword := cfg.GetAdminPassword()
@@ -85,8 +95,9 @@ func seedAdminUser(db *gorm.DB, cfg *config.Config) error {
 	if adminEmail == "" {
 		adminEmail = "admin@bey.com"
 	}
-	if adminPassword == "" {
-		adminPassword = "admin123"
+	if adminPassword == "" || adminPassword == "REPLACE_WITH_STRONG_RANDOM_PASSWORD" {
+		log.Println("WARNING: Default admin password detected. Generating a strong random password.")
+		adminPassword = generateRandomPassword(32)
 	}
 
 	var count int64
@@ -115,7 +126,7 @@ func seedAdminUser(db *gorm.DB, cfg *config.Config) error {
 		return fmt.Errorf("failed to seed admin user: %w", err)
 	}
 
-	log.Printf("Admin user seeded successfully: %s / %s", adminEmail, adminPassword)
+	log.Printf("Admin user seeded successfully: %s", adminEmail)
 	return nil
 }
 
@@ -213,6 +224,11 @@ func main() {
 	middleware.InitCORS(cfg.Security.GetAllowedOrigins())
 
 	router := gin.Default()
+
+	router.Use(func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 10<<20) // 10MB
+		c.Next()
+	})
 
 	router.Use(middleware.CORSMiddleware())
 	router.Use(middleware.LoggerMiddleware())
@@ -349,10 +365,12 @@ func main() {
 		responseHandler.Success(c, health)
 	})
 
-	go func() {
-		log.Printf("pprof server starting on %s:%d", cfg.App.Host, cfg.App.Port+1)
-		log.Println(http.ListenAndServe(fmt.Sprintf("%s:%d", cfg.App.Host, cfg.App.Port+1), nil))
-	}()
+	if cfg.App.Mode == "debug" {
+		go func() {
+			log.Printf("pprof server starting on 127.0.0.1:%d", cfg.App.Port+1)
+			log.Println(http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", cfg.App.Port+1), nil))
+		}()
+	}
 
 	addr := fmt.Sprintf("%s:%d", cfg.App.Host, cfg.App.Port)
 	srv := &http.Server{
