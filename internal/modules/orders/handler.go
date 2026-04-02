@@ -2,6 +2,7 @@ package orders
 
 import (
 	"bey/internal/shared/response"
+	"log"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -9,8 +10,14 @@ import (
 )
 
 type VariantStockHandler interface {
+	ReserveStock(id uint, quantity int) error
 	ConfirmSale(id uint, quantity int) error
 	ReleaseStock(id uint, quantity int) error
+}
+
+type InventoryHandler interface {
+	Reserve(productID uint, quantity int) error
+	Release(productID uint, quantity int) error
 }
 
 type OrderHandler struct {
@@ -19,8 +26,9 @@ type OrderHandler struct {
 	productRepo  interface {
 		GetPriceByID(id uint) (float64, error)
 	}
-	variantRepo VariantStockHandler
-	resp        *response.ResponseHandler
+	variantRepo   VariantStockHandler
+	inventoryRepo InventoryHandler
+	resp          *response.ResponseHandler
 }
 
 func NewOrderHandler(db *gorm.DB) *OrderHandler {
@@ -32,13 +40,14 @@ func NewOrderHandler(db *gorm.DB) *OrderHandler {
 
 func NewOrderHandlerWithAllDeps(db *gorm.DB, orderService *OrderService, productRepo interface {
 	GetPriceByID(id uint) (float64, error)
-}, variantRepo VariantStockHandler) *OrderHandler {
+}, variantRepo VariantStockHandler, inventoryRepo InventoryHandler) *OrderHandler {
 	return &OrderHandler{
-		repo:         NewOrderRepository(db),
-		orderService: orderService,
-		productRepo:  productRepo,
-		variantRepo:  variantRepo,
-		resp:         response.NewResponseHandler(),
+		repo:          NewOrderRepository(db),
+		orderService:  orderService,
+		productRepo:   productRepo,
+		variantRepo:   variantRepo,
+		inventoryRepo: inventoryRepo,
+		resp:          response.NewResponseHandler(),
 	}
 }
 
@@ -52,6 +61,8 @@ func NewOrderHandlerWithAllDeps(db *gorm.DB, orderService *OrderService, product
 // @Success 202
 // @Router /api/v1/orders [post]
 func (h *OrderHandler) Create(c *gin.Context) {
+	userID := c.GetUint("user_id")
+
 	var req CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.resp.ValidationError(c, err.Error())
@@ -59,7 +70,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	}
 
 	if h.orderService != nil {
-		taskID, err := h.orderService.SubmitAsyncOrder(req)
+		taskID, err := h.orderService.SubmitAsyncOrder(req, userID)
 		if err != nil {
 			h.resp.InternalError(c, "failed to submit order task")
 			return
@@ -98,7 +109,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	}
 
 	order := &Order{
-		UserID:          req.UserID,
+		UserID:          userID,
 		Status:          "pending",
 		TotalPrice:      totalPrice,
 		ShippingAddress: req.ShippingAddress,
@@ -109,6 +120,19 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	if err := h.repo.Create(order); err != nil {
 		h.resp.InternalError(c, "failed to create order")
 		return
+	}
+
+	// Reserve inventory for all order items (prevent overselling)
+	for _, item := range order.Items {
+		if item.VariantID != nil && h.variantRepo != nil {
+			if err := h.variantRepo.ReserveStock(*item.VariantID, item.Quantity); err != nil {
+				log.Printf("Warning: failed to reserve variant stock for variant %d: %v", *item.VariantID, err)
+			}
+		} else if h.inventoryRepo != nil {
+			if err := h.inventoryRepo.Reserve(item.ProductID, item.Quantity); err != nil {
+				log.Printf("Warning: failed to reserve inventory for product %d: %v", item.ProductID, err)
+			}
+		}
 	}
 
 	h.resp.Created(c, toOrderResponse(order))
@@ -177,6 +201,14 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
+	// Check if user is owner or admin
+	userID := c.GetUint("user_id")
+	userRole := c.GetString("user_role")
+	if userRole != "admin" && order.UserID != userID {
+		h.resp.Error(c, 403, "you don't have access to this order")
+		return
+	}
+
 	var req struct {
 		Status string `json:"status" binding:"required"`
 	}
@@ -202,7 +234,16 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 // @Success 200 {array} OrderResponse
 // @Router /api/v1/orders [get]
 func (h *OrderHandler) List(c *gin.Context) {
-	orders, err := h.repo.FindAll(0, 100)
+	userID := c.GetUint("user_id")
+	userRole := c.GetString("user_role")
+
+	var orders []Order
+	var err error
+	if userRole == "admin" {
+		orders, err = h.repo.FindAll(0, 100)
+	} else {
+		orders, err = h.repo.FindByUserID(userID)
+	}
 	if err != nil {
 		h.resp.InternalError(c, "failed to list orders")
 		return
@@ -245,12 +286,18 @@ func (h *OrderHandler) GetTaskStatus(c *gin.Context) {
 		return
 	}
 
+	userRole := c.GetString("user_role")
+	errorMsg := task.Error
+	if errorMsg != "" && userRole != "admin" {
+		errorMsg = "An error occurred while processing your order"
+	}
+
 	h.resp.Success(c, gin.H{
 		"task_id":    task.ID,
 		"type":       task.Type,
 		"status":     task.Status,
 		"result":     task.Result,
-		"error":      task.Error,
+		"error":      errorMsg,
 		"created_at": task.CreatedAt,
 		"updated_at": task.UpdatedAt,
 	})
@@ -297,16 +344,18 @@ func (h *OrderHandler) Confirm(c *gin.Context) {
 	}
 
 	// Confirm stock for each item
-	if h.variantRepo != nil {
-		for _, item := range order.Items {
-			if item.VariantID != nil {
-				// Confirm variant sale (just reduces reserved)
-				if err := h.variantRepo.ConfirmSale(*item.VariantID, item.Quantity); err != nil {
-					h.resp.InternalError(c, "failed to confirm variant stock")
-					return
-				}
+	for _, item := range order.Items {
+		if item.VariantID != nil && h.variantRepo != nil {
+			// Confirm variant sale (reduces reserved count)
+			if err := h.variantRepo.ConfirmSale(*item.VariantID, item.Quantity); err != nil {
+				h.resp.InternalError(c, "failed to confirm variant stock")
+				return
 			}
-			// TODO: Also confirm inventory if no variant
+		} else if h.inventoryRepo != nil {
+			// Confirm inventory sale (reduces reserved count)
+			if err := h.inventoryRepo.Release(item.ProductID, item.Quantity); err != nil {
+				log.Printf("Warning: failed to confirm inventory for product %d: %v", item.ProductID, err)
+			}
 		}
 	}
 

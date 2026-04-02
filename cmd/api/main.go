@@ -259,8 +259,9 @@ func main() {
 	}
 
 	inventoryRepo := inventory.NewInventoryRepository(db.GetDB())
+	orderRepo := orders.NewOrderRepository(db.GetDB())
 	orderService := orders.NewOrderServiceWithAllDepsAndVariant(
-		orders.NewOrderRepository(db.GetDB()),
+		orderRepo,
 		taskQueue,
 		productRepo,
 		inventoryRepo,
@@ -295,7 +296,7 @@ func main() {
 		auth.RegisterRoutes(router, authService, cfg)
 		users.RegisterRoutesWithAuth(api, db.GetDB(), authMiddleware.RequireAuth(), adminMiddleware)
 		products.SetupRoutesWithCache(api, categoryRepo, productRepo, variantRepo, imageRepo, cacheService, authMiddleware.RequireAuth(), adminMiddleware)
-		orders.RegisterRoutesWithAllDeps(api, db.GetDB(), orderService, productRepo, variantRepo, authMiddleware.RequireAuth(), adminMiddleware)
+		orders.RegisterRoutesWithAllDeps(api, db.GetDB(), orderService, productRepo, variantRepo, inventoryRepo, authMiddleware.RequireAuth(), adminMiddleware)
 		inventory.RegisterRoutesWithAuth(api, db.GetDB(), authMiddleware.RequireAuth(), adminMiddleware)
 
 		if cfg.Cart.Enabled {
@@ -303,7 +304,7 @@ func main() {
 			if err != nil {
 				log.Printf("Warning: Failed to initialize cart repository: %v", err)
 			} else {
-				cart.SetupRoutesWithDeps(api, cartRepo, variantRepo, authMiddleware.RequireAuth())
+				cart.SetupRoutesWithDeps(api, cartRepo, variantRepo, orderRepo, variantRepo, inventoryRepo, authMiddleware.RequireAuth())
 				log.Println("Cart module initialized successfully")
 			}
 		}

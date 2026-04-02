@@ -12,19 +12,19 @@ type ProductPriceFinder interface {
 }
 
 func RegisterRoutes(rg *gin.RouterGroup, db *gorm.DB) {
-	RegisterRoutesWithAllDeps(rg, db, nil, nil, nil, nil, nil)
+	RegisterRoutesWithAllDeps(rg, db, nil, nil, nil, nil, nil, nil)
 }
 
 func RegisterRoutesWithService(rg *gin.RouterGroup, db *gorm.DB, orderService *OrderService) {
-	RegisterRoutesWithAllDeps(rg, db, orderService, nil, nil, nil, nil)
+	RegisterRoutesWithAllDeps(rg, db, orderService, nil, nil, nil, nil, nil)
 }
 
 func RegisterRoutesWithServiceAndProductRepo(rg *gin.RouterGroup, db *gorm.DB, orderService *OrderService, productRepo ProductPriceFinder) {
-	RegisterRoutesWithAllDeps(rg, db, orderService, productRepo, nil, nil, nil)
+	RegisterRoutesWithAllDeps(rg, db, orderService, productRepo, nil, nil, nil, nil)
 }
 
-func RegisterRoutesWithAllDeps(rg *gin.RouterGroup, db *gorm.DB, orderService *OrderService, productRepo ProductPriceFinder, variantRepo VariantStockHandler, authMiddleware gin.HandlerFunc, adminMiddleware gin.HandlerFunc) {
-	handler := NewOrderHandlerWithAllDeps(db, orderService, productRepo, variantRepo)
+func RegisterRoutesWithAllDeps(rg *gin.RouterGroup, db *gorm.DB, orderService *OrderService, productRepo ProductPriceFinder, variantRepo VariantStockHandler, inventoryRepo InventoryHandler, authMiddleware gin.HandlerFunc, adminMiddleware gin.HandlerFunc) {
+	handler := NewOrderHandlerWithAllDeps(db, orderService, productRepo, variantRepo, inventoryRepo)
 
 	orders := rg.Group("/orders")
 	{
@@ -64,6 +64,6 @@ func RegisterRoutesWithAllDeps(rg *gin.RouterGroup, db *gorm.DB, orderService *O
 	}
 }
 
-func RegisterRoutesWithProductAndVariant(rg *gin.RouterGroup, db *gorm.DB, orderService *OrderService, productRepo ProductPriceFinder, variantRepo *products.ProductVariantRepository) {
-	RegisterRoutesWithAllDeps(rg, db, orderService, productRepo, variantRepo, nil, nil)
+func RegisterRoutesWithProductAndVariant(rg *gin.RouterGroup, db *gorm.DB, orderService *OrderService, productRepo ProductPriceFinder, variantRepo *products.ProductVariantRepository, inventoryRepo InventoryHandler) {
+	RegisterRoutesWithAllDeps(rg, db, orderService, productRepo, variantRepo, inventoryRepo, nil, nil)
 }

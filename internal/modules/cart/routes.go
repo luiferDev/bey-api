@@ -4,13 +4,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes(router *gin.RouterGroup, cartRepo CartRepository, variantRepo VariantFinder) {
-	SetupRoutesWithDeps(router, cartRepo, variantRepo, nil)
+func SetupRoutes(router *gin.RouterGroup, cartRepo CartRepository, variantRepo VariantFinder, orderRepo OrderCreator, variantStockReserver VariantStockReserver, inventoryReserver InventoryReserver) {
+	SetupRoutesWithDeps(router, cartRepo, variantRepo, orderRepo, variantStockReserver, inventoryReserver, nil)
 }
 
-func SetupRoutesWithDeps(router *gin.RouterGroup, cartRepo CartRepository, variantRepo VariantFinder, authMiddleware gin.HandlerFunc) {
+func SetupRoutesWithDeps(router *gin.RouterGroup, cartRepo CartRepository, variantRepo VariantFinder, orderRepo OrderCreator, variantStockReserver VariantStockReserver, inventoryReserver InventoryReserver, authMiddleware gin.HandlerFunc) {
 	cartService := NewCartService(cartRepo, variantRepo)
-	handler := NewCartHandler(cartService)
+	handler := NewCartHandler(cartService, orderRepo, variantStockReserver, inventoryReserver)
 
 	cart := router.Group("/cart")
 	{

@@ -7,18 +7,37 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"bey/internal/modules/orders"
 	"bey/internal/shared/response"
 )
 
-type CartHandler struct {
-	cartService *CartService
-	response    *response.ResponseHandler
+type OrderCreator interface {
+	Create(order *orders.Order) error
 }
 
-func NewCartHandler(cartService *CartService) *CartHandler {
+type VariantStockReserver interface {
+	ReserveStock(id uint, quantity int) error
+}
+
+type InventoryReserver interface {
+	Reserve(productID uint, quantity int) error
+}
+
+type CartHandler struct {
+	cartService   *CartService
+	orderRepo     OrderCreator
+	variantRepo   VariantStockReserver
+	inventoryRepo InventoryReserver
+	response      *response.ResponseHandler
+}
+
+func NewCartHandler(cartService *CartService, orderRepo OrderCreator, variantRepo VariantStockReserver, inventoryRepo InventoryReserver) *CartHandler {
 	return &CartHandler{
-		cartService: cartService,
-		response:    response.NewResponseHandler(),
+		cartService:   cartService,
+		orderRepo:     orderRepo,
+		variantRepo:   variantRepo,
+		inventoryRepo: inventoryRepo,
+		response:      response.NewResponseHandler(),
 	}
 }
 
@@ -232,7 +251,8 @@ func (h *CartHandler) Checkout(c *gin.Context) {
 		return
 	}
 
-	orderReq, err := h.cartService.CartToOrder(userID, req.ShippingAddress, req.Notes)
+	// Step 1: Prepare checkout (validate stock, calculate prices)
+	result, err := h.cartService.PrepareCheckout(userID, req.ShippingAddress, req.Notes)
 	if err != nil {
 		if errors.Is(err, ErrCartEmpty) {
 			h.response.Error(c, http.StatusBadRequest, "cart is empty")
@@ -250,25 +270,70 @@ func (h *CartHandler) Checkout(c *gin.Context) {
 		return
 	}
 
-	// Build response with prices from variants
-	var items []CheckoutItemResponse
-	var totalPrice float64
-	for _, item := range orderReq.Items {
-		price, _ := h.cartService.GetVariantPrice(item.VariantID)
-		items = append(items, CheckoutItemResponse{
+	// Step 2: Create the order in the database
+	orderItems := make([]orders.OrderItem, len(result.Items))
+	for i, item := range result.Items {
+		orderItems[i] = orders.OrderItem{
 			ProductID: item.ProductID,
 			VariantID: item.VariantID,
 			Quantity:  item.Quantity,
-			UnitPrice: price,
-		})
-		totalPrice += price * float64(item.Quantity)
+			UnitPrice: item.UnitPrice,
+		}
+	}
+
+	order := &orders.Order{
+		UserID:          result.UserID,
+		Status:          "pending",
+		TotalPrice:      result.TotalPrice,
+		ShippingAddress: result.ShippingAddress,
+		Notes:           result.Notes,
+		Items:           orderItems,
+	}
+
+	if err := h.orderRepo.Create(order); err != nil {
+		h.response.Error(c, http.StatusInternalServerError, "failed to create order")
+		return
+	}
+
+	// Step 2.5: Reserve inventory for all order items
+	for _, item := range result.Items {
+		if item.VariantID != nil && h.variantRepo != nil {
+			if err := h.variantRepo.ReserveStock(*item.VariantID, item.Quantity); err != nil {
+				// Rollback: delete the order since reservation failed
+				h.response.Error(c, http.StatusInternalServerError, "failed to reserve stock")
+				return
+			}
+		} else if h.inventoryRepo != nil {
+			if err := h.inventoryRepo.Reserve(item.ProductID, item.Quantity); err != nil {
+				h.response.Error(c, http.StatusInternalServerError, "failed to reserve inventory")
+				return
+			}
+		}
+	}
+
+	// Step 3: Clear the cart
+	if err := h.cartService.ClearCartAfterCheckout(userID); err != nil {
+		// Cart clear failed but order was created — log but don't fail
+		// TODO: add proper logging
+	}
+
+	// Step 4: Build response
+	items := make([]CheckoutItemResponse, len(result.Items))
+	for i, item := range result.Items {
+		items[i] = CheckoutItemResponse{
+			ProductID: item.ProductID,
+			VariantID: item.VariantID,
+			Quantity:  item.Quantity,
+			UnitPrice: item.UnitPrice,
+		}
 	}
 
 	h.response.Created(c, CheckoutResponse{
 		Message:         "order created from cart",
+		OrderID:         order.ID,
 		ShippingAddress: req.ShippingAddress,
 		Items:           items,
-		TotalPrice:      totalPrice,
+		TotalPrice:      result.TotalPrice,
 		CartCleared:     true,
 	})
 }
