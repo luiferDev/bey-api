@@ -32,6 +32,7 @@ type CheckoutRequest struct {
 // CheckoutResponse - Response after creating order from cart
 type CheckoutResponse struct {
 	Message         string                 `json:"message"`
+	OrderID         uint                   `json:"order_id"`
 	ShippingAddress string                 `json:"shipping_address"`
 	Items           []CheckoutItemResponse `json:"items"`
 	TotalPrice      float64                `json:"total_price"`

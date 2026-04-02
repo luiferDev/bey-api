@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"bey/internal/modules/orders"
 	"bey/internal/modules/products"
 )
 
@@ -195,7 +194,23 @@ func (s *CartService) ClearCart(userID uint) error {
 	return s.cartRepo.DeleteCart(userID)
 }
 
-func (s *CartService) CartToOrder(userID uint, shippingAddress string, notes string) (*orders.CreateOrderRequest, error) {
+// CheckoutResult contains the order data ready to be persisted and the cart to clear
+type CheckoutResult struct {
+	UserID          uint
+	ShippingAddress string
+	Notes           string
+	Items           []CheckoutItem
+	TotalPrice      float64
+}
+
+type CheckoutItem struct {
+	ProductID uint
+	VariantID *uint
+	Quantity  int
+	UnitPrice float64
+}
+
+func (s *CartService) PrepareCheckout(userID uint, shippingAddress string, notes string) (*CheckoutResult, error) {
 	lock := s.getUserLock(userID)
 	lock.Lock()
 	defer lock.Unlock()
@@ -209,7 +224,7 @@ func (s *CartService) CartToOrder(userID uint, shippingAddress string, notes str
 		return nil, ErrCartEmpty
 	}
 
-	orderItems := make([]orders.CreateOrderItemRequest, 0, len(cart.Items))
+	var items []CheckoutItem
 	var totalPrice float64
 
 	for _, item := range cart.Items {
@@ -229,27 +244,26 @@ func (s *CartService) CartToOrder(userID uint, shippingAddress string, notes str
 			return nil, ErrVariantNotFound
 		}
 
-		orderItems = append(orderItems, orders.CreateOrderItemRequest{
+		items = append(items, CheckoutItem{
 			ProductID: variant.ProductID,
 			VariantID: &item.VariantID,
 			Quantity:  item.Quantity,
+			UnitPrice: price,
 		})
 		totalPrice += price * float64(item.Quantity)
 	}
 
-	req := &orders.CreateOrderRequest{
+	return &CheckoutResult{
+		UserID:          userID,
 		ShippingAddress: shippingAddress,
 		Notes:           notes,
-		Items:           orderItems,
-	}
+		Items:           items,
+		TotalPrice:      totalPrice,
+	}, nil
+}
 
-	if err := s.cartRepo.DeleteCart(userID); err != nil {
-		return nil, err
-	}
-
-	_ = totalPrice
-
-	return req, nil
+func (s *CartService) ClearCartAfterCheckout(userID uint) error {
+	return s.cartRepo.DeleteCart(userID)
 }
 
 func (s *CartService) ValidateCartOwnership(cartUserID, tokenUserID uint) error {

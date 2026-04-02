@@ -59,7 +59,7 @@ definitions:
       email:
         type: string
       password:
-        minLength: 6
+        minLength: 8
         type: string
     required:
     - email
@@ -93,7 +93,7 @@ definitions:
   internal_modules_auth.ResetPasswordRequest:
     properties:
       new_password:
-        minLength: 6
+        minLength: 8
         type: string
       token:
         type: string
@@ -201,6 +201,43 @@ definitions:
       user_id:
         type: integer
     type: object
+  internal_modules_cart.CheckoutItemResponse:
+    properties:
+      product_id:
+        type: integer
+      quantity:
+        type: integer
+      unit_price:
+        type: number
+      variant_id:
+        type: integer
+    type: object
+  internal_modules_cart.CheckoutRequest:
+    properties:
+      notes:
+        maxLength: 1000
+        type: string
+      shipping_address:
+        maxLength: 500
+        type: string
+    required:
+    - shipping_address
+    type: object
+  internal_modules_cart.CheckoutResponse:
+    properties:
+      cart_cleared:
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/internal_modules_cart.CheckoutItemResponse'
+        type: array
+      message:
+        type: string
+      shipping_address:
+        type: string
+      total_price:
+        type: number
+    type: object
   internal_modules_cart.UpdateCartItemRequest:
     properties:
       quantity:
@@ -247,18 +284,18 @@ definitions:
       items:
         items:
           $ref: '#/definitions/internal_modules_orders.CreateOrderItemRequest'
+        maxItems: 50
         minItems: 1
         type: array
       notes:
+        maxLength: 1000
         type: string
       shipping_address:
+        maxLength: 500
         type: string
-      user_id:
-        type: integer
     required:
     - items
     - shipping_address
-    - user_id
     type: object
   internal_modules_orders.OrderItemResponse:
     properties:
@@ -446,32 +483,78 @@ definitions:
         type: string
       id:
         type: integer
+      is_active:
+        type: boolean
+      level:
+        type: integer
       name:
         type: string
       parent_id:
         type: integer
+      path:
+        type: string
       products:
         items:
           $ref: '#/definitions/internal_modules_products.Product'
         type: array
       slug:
         type: string
+      sort_order:
+        type: integer
       subcategories:
-        description: Relaciones
         items:
           $ref: '#/definitions/internal_modules_products.Category'
         type: array
+      updated_at:
+        type: string
+    type: object
+  internal_modules_products.CategoryResponse:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      level:
+        type: integer
+      name:
+        type: string
+      parent_id:
+        type: integer
+      path:
+        type: string
+      product_count:
+        type: integer
+      slug:
+        type: string
+      sort_order:
+        type: integer
+      subcategories:
+        items:
+          $ref: '#/definitions/internal_modules_products.CategoryResponse'
+        type: array
+      updated_at:
+        type: string
     type: object
   internal_modules_products.CreateCategoryRequest:
     properties:
       description:
         type: string
+      is_active:
+        type: boolean
       name:
+        maxLength: 255
         type: string
       parent_id:
         type: integer
       slug:
+        maxLength: 255
         type: string
+      sort_order:
+        type: integer
     required:
     - name
     - slug
@@ -681,12 +764,16 @@ definitions:
     properties:
       description:
         type: string
+      is_active:
+        type: boolean
       name:
         type: string
       parent_id:
         type: integer
       slug:
         type: string
+      sort_order:
+        type: integer
     type: object
   internal_modules_products.UpdateProductImageRequest:
     properties:
@@ -736,7 +823,7 @@ definitions:
       name:
         type: string
       password:
-        minLength: 6
+        minLength: 8
         type: string
       phone:
         type: string
@@ -1187,6 +1274,52 @@ paths:
       summary: Get shopping cart
       tags:
       - Cart
+  /api/v1/cart/checkout:
+    post:
+      consumes:
+      - application/json
+      description: Converts the authenticated user's shopping cart into an order.
+        Validates stock, calculates prices, and clears the cart automatically.
+      parameters:
+      - description: Checkout data with shipping address
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_cart.CheckoutRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Order created successfully from cart
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_cart.CheckoutResponse'
+              type: object
+        "400":
+          description: Bad request - cart empty or insufficient stock
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "404":
+          description: Variant not found
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "500":
+          description: Internal server error - order creation failed
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Checkout cart to create an order
+      tags:
+      - Cart
   /api/v1/cart/items:
     post:
       consumes:
@@ -1327,18 +1460,26 @@ paths:
     get:
       consumes:
       - application/json
-      description: Retrieves a list of all categories
+      description: |-
+        Retrieves a list of all categories
+        Returns the complete category tree with parent-child relationships
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/internal_modules_products.Category'
-            type: array
-      summary: Get all categories
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/internal_modules_products.CategoryResponse'
+                  type: array
+              type: object
+      summary: Get all categories as nested tree
       tags:
+      - Categories
       - Categories
     post:
       consumes:
@@ -1426,6 +1567,74 @@ paths:
       summary: Update a category
       tags:
       - Categories
+  /api/v1/categories/{id}/breadcrumbs:
+    get:
+      description: Returns the path from root category to the specified category
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/internal_modules_products.CategoryResponse'
+                  type: array
+              type: object
+        "400":
+          description: Invalid category ID
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "404":
+          description: Category not found
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      summary: Get breadcrumbs for a category
+      tags:
+      - Categories
+  /api/v1/categories/{id}/children:
+    get:
+      description: Returns immediate subcategories of the specified category
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/internal_modules_products.CategoryResponse'
+                  type: array
+              type: object
+        "400":
+          description: Invalid category ID
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+        "404":
+          description: Category not found
+          schema:
+            $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+      summary: Get direct children of a category
+      tags:
+      - Categories
   /api/v1/categories/slug/{slug}:
     get:
       consumes:
@@ -1445,6 +1654,26 @@ paths:
           schema:
             $ref: '#/definitions/internal_modules_products.Category'
       summary: Get category by slug
+      tags:
+      - Categories
+  /api/v1/categories/tree:
+    get:
+      description: Returns the complete nested category tree with all levels
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/bey_internal_shared_response.ApiResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/internal_modules_products.CategoryResponse'
+                  type: array
+              type: object
+      summary: Get full category tree (alias for GET /categories)
       tags:
       - Categories
   /api/v1/images/{id}:

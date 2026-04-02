@@ -651,6 +651,81 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/cart/checkout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Converts the authenticated user's shopping cart into an order. Validates stock, calculates prices, and clears the cart automatically.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Checkout cart to create an order",
+                "parameters": [
+                    {
+                        "description": "Checkout data with shipping address",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_cart.CheckoutRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Order created successfully from cart",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/bey_internal_shared_response.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_modules_cart.CheckoutResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - cart empty or insufficient stock",
+                        "schema": {
+                            "$ref": "#/definitions/bey_internal_shared_response.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - invalid or missing token",
+                        "schema": {
+                            "$ref": "#/definitions/bey_internal_shared_response.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Variant not found",
+                        "schema": {
+                            "$ref": "#/definitions/bey_internal_shared_response.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error - order creation failed",
+                        "schema": {
+                            "$ref": "#/definitions/bey_internal_shared_response.ApiResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/cart/items": {
             "post": {
                 "security": [
@@ -875,7 +950,7 @@ const docTemplate = `{
         },
         "/api/v1/categories": {
             "get": {
-                "description": "Retrieves a list of all categories",
+                "description": "Retrieves a list of all categories\nReturns the complete category tree with parent-child relationships",
                 "consumes": [
                     "application/json"
                 ],
@@ -883,17 +958,30 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
+                    "Categories",
                     "Categories"
                 ],
-                "summary": "Get all categories",
+                "summary": "Get all categories as nested tree",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/internal_modules_products.Category"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/bey_internal_shared_response.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/internal_modules_products.CategoryResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -958,6 +1046,41 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/internal_modules_products.Category"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/categories/tree": {
+            "get": {
+                "description": "Returns the complete nested category tree with all levels",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Categories"
+                ],
+                "summary": "Get full category tree (alias for GET /categories)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/bey_internal_shared_response.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/internal_modules_products.CategoryResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1057,6 +1180,118 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "OK"
+                    }
+                }
+            }
+        },
+        "/api/v1/categories/{id}/breadcrumbs": {
+            "get": {
+                "description": "Returns the path from root category to the specified category",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Categories"
+                ],
+                "summary": "Get breadcrumbs for a category",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/bey_internal_shared_response.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/internal_modules_products.CategoryResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid category ID",
+                        "schema": {
+                            "$ref": "#/definitions/bey_internal_shared_response.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Category not found",
+                        "schema": {
+                            "$ref": "#/definitions/bey_internal_shared_response.ApiResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/categories/{id}/children": {
+            "get": {
+                "description": "Returns immediate subcategories of the specified category",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Categories"
+                ],
+                "summary": "Get direct children of a category",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/bey_internal_shared_response.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/internal_modules_products.CategoryResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid category ID",
+                        "schema": {
+                            "$ref": "#/definitions/bey_internal_shared_response.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Category not found",
+                        "schema": {
+                            "$ref": "#/definitions/bey_internal_shared_response.ApiResponse"
+                        }
                     }
                 }
             }
@@ -2982,7 +3217,7 @@ const docTemplate = `{
                 },
                 "password": {
                     "type": "string",
-                    "minLength": 6
+                    "minLength": 8
                 }
             }
         },
@@ -3034,7 +3269,7 @@ const docTemplate = `{
             "properties": {
                 "new_password": {
                     "type": "string",
-                    "minLength": 6
+                    "minLength": 8
                 },
                 "token": {
                     "type": "string"
@@ -3196,6 +3431,62 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_cart.CheckoutItemResponse": {
+            "type": "object",
+            "properties": {
+                "product_id": {
+                    "type": "integer"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "unit_price": {
+                    "type": "number"
+                },
+                "variant_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_modules_cart.CheckoutRequest": {
+            "type": "object",
+            "required": [
+                "shipping_address"
+            ],
+            "properties": {
+                "notes": {
+                    "type": "string",
+                    "maxLength": 1000
+                },
+                "shipping_address": {
+                    "type": "string",
+                    "maxLength": 500
+                }
+            }
+        },
+        "internal_modules_cart.CheckoutResponse": {
+            "type": "object",
+            "properties": {
+                "cart_cleared": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_modules_cart.CheckoutItemResponse"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "shipping_address": {
+                    "type": "string"
+                },
+                "total_price": {
+                    "type": "number"
+                }
+            }
+        },
         "internal_modules_cart.UpdateCartItemRequest": {
             "type": "object",
             "required": [
@@ -3262,25 +3553,24 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "items",
-                "shipping_address",
-                "user_id"
+                "shipping_address"
             ],
             "properties": {
                 "items": {
                     "type": "array",
+                    "maxItems": 50,
                     "minItems": 1,
                     "items": {
                         "$ref": "#/definitions/internal_modules_orders.CreateOrderItemRequest"
                     }
                 },
                 "notes": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1000
                 },
                 "shipping_address": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "integer"
+                    "type": "string",
+                    "maxLength": 500
                 }
             }
         },
@@ -3563,11 +3853,20 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "level": {
+                    "type": "integer"
+                },
                 "name": {
                     "type": "string"
                 },
                 "parent_id": {
                     "type": "integer"
+                },
+                "path": {
+                    "type": "string"
                 },
                 "products": {
                     "type": "array",
@@ -3578,12 +3877,64 @@ const docTemplate = `{
                 "slug": {
                     "type": "string"
                 },
+                "sort_order": {
+                    "type": "integer"
+                },
                 "subcategories": {
-                    "description": "Relaciones",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/internal_modules_products.Category"
                     }
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_products.CategoryResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_id": {
+                    "type": "integer"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "product_count": {
+                    "type": "integer"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "subcategories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_modules_products.CategoryResponse"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
@@ -3597,14 +3948,22 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "is_active": {
+                    "type": "boolean"
+                },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 255
                 },
                 "parent_id": {
                     "type": "integer"
                 },
                 "slug": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "sort_order": {
+                    "type": "integer"
                 }
             }
         },
@@ -3919,6 +4278,9 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "is_active": {
+                    "type": "boolean"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -3927,6 +4289,9 @@ const docTemplate = `{
                 },
                 "slug": {
                     "type": "string"
+                },
+                "sort_order": {
+                    "type": "integer"
                 }
             }
         },
@@ -4009,7 +4374,7 @@ const docTemplate = `{
                 },
                 "password": {
                     "type": "string",
-                    "minLength": 6
+                    "minLength": 8
                 },
                 "phone": {
                     "type": "string"
