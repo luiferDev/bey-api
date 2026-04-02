@@ -45,7 +45,6 @@ func TestAsyncOrderCreation_SubmitOrder(t *testing.T) {
 	router, _ := setupOrderTestRouter(t)
 
 	orderReq := CreateOrderRequest{
-		UserID:          1,
 		ShippingAddress: "123 Main St",
 		Notes:           "Test order",
 		Items: []CreateOrderItemRequest{
@@ -107,14 +106,13 @@ func TestAsyncOrderCreation_OrderProcessing(t *testing.T) {
 	orderService := NewOrderServiceWithTaskQueue(orderRepo, taskQueue)
 
 	orderReq := CreateOrderRequest{
-		UserID:          1,
 		ShippingAddress: "123 Main St",
 		Items: []CreateOrderItemRequest{
 			{ProductID: 1, Quantity: 2},
 		},
 	}
 
-	taskID, err := orderService.SubmitAsyncOrder(orderReq)
+	taskID, err := orderService.SubmitAsyncOrder(orderReq, 1)
 	if err != nil {
 		t.Fatalf("Failed to submit async order: %v", err)
 	}
@@ -146,7 +144,6 @@ func TestAsyncOrderCreation_WithoutTaskQueue(t *testing.T) {
 	RegisterRoutesWithService(api, db, orderService)
 
 	orderReq := CreateOrderRequest{
-		UserID:          1,
 		ShippingAddress: "123 Main St",
 		Items: []CreateOrderItemRequest{
 			{ProductID: 1, Quantity: 2},
@@ -172,7 +169,6 @@ func TestAsyncOrderCreation_MultipleOrders(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		orderReq := CreateOrderRequest{
-			UserID:          uint(i + 1),
 			ShippingAddress: "Address " + string(rune('0'+i)),
 			Items: []CreateOrderItemRequest{
 				{ProductID: 1, Quantity: i + 1},

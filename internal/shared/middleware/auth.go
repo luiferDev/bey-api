@@ -1,3 +1,7 @@
+// DEPRECATED: This middleware is a duplicate and is NOT used in production routes.
+// The canonical auth middleware is in internal/modules/auth/middleware.go.
+// This file is kept only for legacy integration tests.
+// TODO: Remove this file and update auth_integration_test.go to use the canonical middleware.
 package middleware
 
 import (

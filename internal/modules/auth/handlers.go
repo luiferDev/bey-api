@@ -28,7 +28,7 @@ func HandleLogin(authService AuthServiceInterface, cfg *config.Config, responseH
 
 		resp, err := authService.Login(c.Request.Context(), req.Email, req.Password)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 			return
 		}
 
@@ -62,7 +62,7 @@ func HandleRefresh(authService AuthServiceInterface, cfg *config.Config, respons
 		if err != nil {
 			DeleteRefreshTokenCookie(c.Writer, cfg)
 			DeleteAccessTokenCookie(c.Writer, cfg)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 			return
 		}
 
@@ -110,7 +110,7 @@ func HandleVerifyEmail(authService AuthServiceInterface, responseHandler *respon
 		}
 
 		if err := authService.VerifyEmail(c.Request.Context(), req.Token); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid verification token"})
 			return
 		}
 
@@ -135,7 +135,7 @@ func HandleResendVerification(authService AuthServiceInterface, responseHandler 
 		}
 
 		if err := authService.ResendVerification(c.Request.Context(), req.Email); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send verification email"})
 			return
 		}
 
@@ -160,7 +160,7 @@ func HandleForgotPassword(authService AuthServiceInterface, responseHandler *res
 		}
 
 		if err := authService.ForgotPassword(c.Request.Context(), req.Email); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to process request"})
 			return
 		}
 
@@ -185,7 +185,7 @@ func HandleResetPassword(authService AuthServiceInterface, responseHandler *resp
 		}
 
 		if err := authService.ResetPassword(c.Request.Context(), req.Token, req.NewPassword); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or expired reset token"})
 			return
 		}
 
@@ -216,7 +216,7 @@ func HandleSetup2FA(authService AuthServiceInterface, responseHandler *response.
 
 		resp, err := authService.SetupTwoFactor(c.Request.Context(), userIDUint)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to setup two-factor authentication"})
 			return
 		}
 
@@ -254,7 +254,7 @@ func HandleEnable2FA(authService AuthServiceInterface, responseHandler *response
 
 		resp, err := authService.EnableTwoFactor(c.Request.Context(), userIDUint, req.Code)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid verification code"})
 			return
 		}
 
@@ -291,7 +291,7 @@ func HandleDisable2FA(authService AuthServiceInterface, responseHandler *respons
 		}
 
 		if err := authService.DisableTwoFactor(c.Request.Context(), userIDUint, req.Code, req.BackupCode); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid verification code"})
 			return
 		}
 
@@ -329,7 +329,7 @@ func HandleVerify2FA(authService AuthServiceInterface, responseHandler *response
 
 		valid, err := authService.VerifyTwoFactor(c.Request.Context(), userIDUint, req.Code)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "verification failed"})
 			return
 		}
 
@@ -355,7 +355,7 @@ func HandleLoginWith2FA(authService AuthServiceInterface, cfg *config.Config, re
 
 		tokens, err := authService.LoginWith2FA(c.Request.Context(), req.TempToken, req.Code)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 			return
 		}
 
@@ -382,7 +382,8 @@ func HandleGoogleOAuth(cfg *config.Config, responseHandler *response.ResponseHan
 			return
 		}
 
-		c.SetCookie("oauth_state", state, 300, "/", "", false, true)
+		secure := cfg.App.Mode == "production"
+		c.SetCookie("oauth_state", state, 300, "/", "", secure, true)
 
 		authURL, err := oauthService.GenerateAuthURL(state)
 		if err != nil {
@@ -431,7 +432,7 @@ func HandleGoogleOAuthCallback(authService *AuthService, cfg *config.Config, res
 
 		resp, err := authService.LoginWithGoogle(c.Request.Context(), userInfo)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "authentication failed"})
 			return
 		}
 

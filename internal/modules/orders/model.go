@@ -33,10 +33,9 @@ type OrderItem struct {
 }
 
 type CreateOrderRequest struct {
-	UserID          uint                     `json:"user_id" binding:"required"`
-	ShippingAddress string                   `json:"shipping_address" binding:"required"`
-	Notes           string                   `json:"notes"`
-	Items           []CreateOrderItemRequest `json:"items" binding:"required,min=1"`
+	ShippingAddress string                   `json:"shipping_address" binding:"required,max=500"`
+	Notes           string                   `json:"notes" binding:"max=1000"`
+	Items           []CreateOrderItemRequest `json:"items" binding:"required,min=1,max=50"`
 }
 
 type CreateOrderItemRequest struct {

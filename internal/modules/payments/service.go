@@ -82,6 +82,13 @@ func (s *PaymentService) GetPayment(id uint) (*Payment, error) {
 	return payment, nil
 }
 
+func (s *PaymentService) GetOrderByPaymentID(orderID uint) (*orders.Order, error) {
+	if s.orderService == nil {
+		return nil, errors.New("order service not available")
+	}
+	return s.orderService.GetOrderByID(orderID)
+}
+
 func (s *PaymentService) GetPaymentStatus(wompiTransactionID string) (*Payment, error) {
 	resp, err := s.wompiClient.GetTransaction(wompiTransactionID)
 	if err != nil {

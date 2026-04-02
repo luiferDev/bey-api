@@ -57,6 +57,12 @@ func (h *InventoryHandler) GetByProductID(c *gin.Context) {
 // @Success 200 {object} InventoryResponse
 // @Router /api/v1/inventory/{product_id} [put]
 func (h *InventoryHandler) Update(c *gin.Context) {
+	userRole := c.GetString("user_role")
+	if userRole != "admin" {
+		h.resp.Error(c, 403, "admin access required")
+		return
+	}
+
 	productID, err := strconv.ParseUint(c.Param("product_id"), 10, 32)
 	if err != nil {
 		h.resp.ValidationError(c, "invalid product_id")
@@ -110,6 +116,12 @@ func (h *InventoryHandler) Update(c *gin.Context) {
 // @Success 200
 // @Router /api/v1/inventory/{product_id}/reserve [post]
 func (h *InventoryHandler) Reserve(c *gin.Context) {
+	userRole := c.GetString("user_role")
+	if userRole != "admin" {
+		h.resp.Error(c, 403, "admin access required")
+		return
+	}
+
 	productID, err := strconv.ParseUint(c.Param("product_id"), 10, 32)
 	if err != nil {
 		h.resp.ValidationError(c, "invalid product_id")
@@ -166,6 +178,12 @@ func (h *InventoryHandler) Reserve(c *gin.Context) {
 // @Success 200
 // @Router /api/v1/inventory/{product_id}/release [post]
 func (h *InventoryHandler) Release(c *gin.Context) {
+	userRole := c.GetString("user_role")
+	if userRole != "admin" {
+		h.resp.Error(c, 403, "admin access required")
+		return
+	}
+
 	productID, err := strconv.ParseUint(c.Param("product_id"), 10, 32)
 	if err != nil {
 		h.resp.ValidationError(c, "invalid product_id")

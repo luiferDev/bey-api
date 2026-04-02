@@ -28,8 +28,14 @@ type OrderService struct {
 	productRepo interface {
 		GetPriceByID(id uint) (float64, error)
 	}
-	inventoryRepo InventoryReserver
 	variantRepo   VariantStockManager
+	inventoryRepo InventoryReserver
+}
+
+// CreateOrderPayload wraps the request with authenticated user ID
+type CreateOrderPayload struct {
+	Request CreateOrderRequest
+	UserID  uint
 }
 
 func NewOrderService(repo *OrderRepository) *OrderService {
@@ -120,7 +126,7 @@ func NewOrderServiceWithAllDepsAndVariant(
 	}
 }
 
-func (s *OrderService) SubmitAsyncOrder(req CreateOrderRequest) (string, error) {
+func (s *OrderService) SubmitAsyncOrder(req CreateOrderRequest, userID uint) (string, error) {
 	if s.taskQueue == nil {
 		return "", errors.New("task queue not configured")
 	}
@@ -128,7 +134,7 @@ func (s *OrderService) SubmitAsyncOrder(req CreateOrderRequest) (string, error) 
 	task := &concurrency.Task{
 		Type:    concurrency.TaskTypeOrderProcessing,
 		Status:  concurrency.TaskStatusPending,
-		Payload: req,
+		Payload: CreateOrderPayload{Request: req, UserID: userID},
 	}
 
 	taskID, err := s.taskQueue.Submit(task)
@@ -145,13 +151,15 @@ func (s *OrderService) processOrderTask(task *concurrency.Task) {
 	task.Status = concurrency.TaskStatusRunning
 	task.UpdatedAt = time.Now()
 
-	req, ok := task.Payload.(CreateOrderRequest)
+	payload, ok := task.Payload.(CreateOrderPayload)
 	if !ok {
 		task.Status = concurrency.TaskStatusFailed
 		task.Error = "invalid payload type"
 		task.UpdatedAt = time.Now()
 		return
 	}
+	req := payload.Request
+	userID := payload.UserID
 
 	var totalPrice float64
 	items := make([]OrderItem, len(req.Items))
@@ -235,7 +243,7 @@ func (s *OrderService) processOrderTask(task *concurrency.Task) {
 	}
 
 	order := &Order{
-		UserID:          req.UserID,
+		UserID:          userID,
 		Status:          "pending",
 		TotalPrice:      totalPrice,
 		ShippingAddress: req.ShippingAddress,
@@ -265,6 +273,10 @@ func (s *OrderService) GetTaskStatus(taskID string) (*concurrency.Task, error) {
 	}
 
 	return s.taskQueue.GetStatus(taskID)
+}
+
+func (s *OrderService) GetOrderByID(id uint) (*Order, error) {
+	return s.repo.FindByID(id)
 }
 
 func (s *OrderService) UpdatePaymentStatus(orderID uint, paymentStatus, transactionID string) error {

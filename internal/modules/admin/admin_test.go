@@ -45,7 +45,7 @@ func TestAdminCreateUser_Success(t *testing.T) {
 
 	body := CreateUserRequest{
 		Email:    "newadmin@test.com",
-		Password: "password123",
+		Password: "Password123",
 		Name:     "New Admin",
 		Role:     "admin",
 	}
@@ -100,7 +100,7 @@ func TestAdminCreateUser_Unauthorized(t *testing.T) {
 
 	body := CreateUserRequest{
 		Email:    "test@test.com",
-		Password: "password123",
+		Password: "Password123",
 		Name:     "Test User",
 		Role:     "admin",
 	}
@@ -144,7 +144,7 @@ func TestAdminCreateUser_Forbidden(t *testing.T) {
 
 	body := CreateUserRequest{
 		Email:    "test@test.com",
-		Password: "password123",
+		Password: "Password123",
 		Name:     "Test User",
 		Role:     "admin",
 	}

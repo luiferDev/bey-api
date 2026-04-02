@@ -359,20 +359,47 @@ func TestProductHandler_GetProduct(t *testing.T) {
 
 ## Security Guidelines
 
+### Always Load the `go-gin-security` Skill
+Before implementing ANY new feature, API endpoint, or making security-related changes, load the `go-gin-security` skill from `~/.opencode/skills/go-gin-security/SKILL.md`. This skill covers:
+- OWASP Top 10:2025 mapped to Go/Gin
+- OWASP API Security Top 10:2025
+- Go/Gin specific CVEs and vulnerabilities
+- BOLA/IDOR prevention patterns
+- Authentication and authorization checklists
+- Input validation, rate limiting, and error handling rules
+
 ### Never Expose Secrets
 - Never log sensitive data (passwords, API keys, tokens)
 - Use environment variables or secrets management
 - Validate all input with binding tags
+- JWT secret must be at least 32 characters — validated at startup
 
 ### Authentication
 - All protected routes require valid JWT in cookie (`access_token`)
 - Use middleware for auth checks
-- Verify user ownership for sensitive operations
+- Verify user ownership for sensitive operations (BOLA prevention)
+- Derive user identity from JWT claims, NEVER from request body
+
+### Authorization
+- Every endpoint checks permissions (defense-in-depth: middleware + handler)
+- Users can only access their own resources
+- Admin endpoints protected with explicit role checks in handlers
+- No IDOR — validate user-controlled IDs against JWT claims
 
 ### Database
 - Use parameterized queries (GORM does this automatically)
 - Never concatenate user input into SQL
 - Use transactions for multi-step operations
+
+### Input Validation
+- All DTOs have `binding` tags with `max` length limits
+- Request body size limited to 10MB
+- Content-Type validated on webhook endpoints
+
+### Error Handling
+- Generic error messages to clients (no stack traces, no DB errors)
+- Full errors logged server-side
+- Sensitive data never returned in responses
 
 ---
 
@@ -393,6 +420,7 @@ func TestProductHandler_GetProduct(t *testing.T) {
 |-------|-------------|
 | sdd-* | SDD workflow (explore, propose, spec, design, tasks, apply, verify, archive) |
 | golang-gin-api | Gin REST API patterns |
+| **go-gin-security** | OWASP Top 10 + API Security for Go/Gin — MUST load before any security-related work |
 
 ---
 

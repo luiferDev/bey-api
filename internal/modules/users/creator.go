@@ -3,6 +3,7 @@ package users
 import (
 	"errors"
 	"fmt"
+	"unicode"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -10,10 +11,34 @@ import (
 
 type CreateUserRequest struct {
 	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
+	Password string `json:"password" binding:"required,min=8"`
 	Name     string `json:"name" binding:"required"`
 	Surname  string `json:"surname"`
 	Phone    string `json:"phone"`
+}
+
+func validatePasswordComplexity(password string) error {
+	if len(password) < 8 {
+		return errors.New("password must be at least 8 characters")
+	}
+	hasUpper := false
+	hasLower := false
+	hasDigit := false
+	for _, c := range password {
+		if unicode.IsUpper(c) {
+			hasUpper = true
+		}
+		if unicode.IsLower(c) {
+			hasLower = true
+		}
+		if unicode.IsDigit(c) {
+			hasDigit = true
+		}
+	}
+	if !hasUpper || !hasLower || !hasDigit {
+		return errors.New("password must contain uppercase, lowercase, and digit")
+	}
+	return nil
 }
 
 type UserCreator interface {
@@ -32,6 +57,10 @@ func NewRegularUserCreator(db *gorm.DB) *RegularUserCreator {
 func (c *RegularUserCreator) Create(req *CreateUserRequest) (*User, error) {
 	if req.Email == "" {
 		return nil, errors.New("email is required")
+	}
+
+	if err := validatePasswordComplexity(req.Password); err != nil {
+		return nil, err
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -71,6 +100,10 @@ func NewAdminUserCreator(db *gorm.DB) *AdminUserCreator {
 func (c *AdminUserCreator) Create(req *CreateUserRequest) (*User, error) {
 	if req.Email == "" {
 		return nil, errors.New("email is required")
+	}
+
+	if err := validatePasswordComplexity(req.Password); err != nil {
+		return nil, err
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)

@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
+	"unicode"
 
 	"bey/internal/config"
 	"bey/internal/modules/email"
@@ -39,6 +41,7 @@ type AuthService struct {
 	emailService   *email.EmailService
 	twoFAService   *TwoFAService
 	tempTokens     map[string]tempTokenData
+	tempTokensMu   sync.RWMutex
 	tokenGenerator *TokenGenerator
 }
 
@@ -103,9 +106,11 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*Login
 	}
 
 	if user.TwoFAEnabled {
+		s.tempTokensMu.Lock()
 		if s.tempTokens == nil {
 			s.tempTokens = make(map[string]tempTokenData)
 		}
+		s.tempTokensMu.Unlock()
 		tempToken := s.generateTempToken(user.ID)
 		return &LoginResponse{
 			Requires2FA: true,
@@ -299,7 +304,35 @@ func (s *AuthService) ForgotPassword(ctx context.Context, emailAddr string) erro
 	return nil
 }
 
+func validatePasswordComplexity(password string) error {
+	if len(password) < 8 {
+		return errors.New("password must be at least 8 characters")
+	}
+	hasUpper := false
+	hasLower := false
+	hasDigit := false
+	for _, c := range password {
+		if unicode.IsUpper(c) {
+			hasUpper = true
+		}
+		if unicode.IsLower(c) {
+			hasLower = true
+		}
+		if unicode.IsDigit(c) {
+			hasDigit = true
+		}
+	}
+	if !hasUpper || !hasLower || !hasDigit {
+		return errors.New("password must contain uppercase, lowercase, and digit")
+	}
+	return nil
+}
+
 func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword string) error {
+	if err := validatePasswordComplexity(newPassword); err != nil {
+		return err
+	}
+
 	userRepo := users.NewUserRepository(s.db)
 
 	hashedToken := email.HashToken(token)
@@ -324,7 +357,11 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	user.ResetToken = ""
 	user.ResetExpires = nil
 
-	return userRepo.Update(user)
+	if err := userRepo.Update(user); err != nil {
+		return err
+	}
+
+	return s.RevokeAllUserRefreshTokens(user.ID)
 }
 
 func (s *AuthService) SetupTwoFactor(ctx context.Context, userID uint) (*TwoFASetupResponse, error) {
@@ -504,34 +541,42 @@ func (s *AuthService) VerifyTwoFactor(ctx context.Context, userID uint, code str
 }
 
 func (s *AuthService) generateTempToken(userID uint) string {
-	if s.tempTokens == nil {
-		s.tempTokens = make(map[string]tempTokenData)
-	}
-
 	tokenBytes := make([]byte, 32)
 	_, _ = rand.Read(tokenBytes)
 	tempToken := base64.StdEncoding.EncodeToString(tokenBytes)
 
+	s.tempTokensMu.Lock()
+	if s.tempTokens == nil {
+		s.tempTokens = make(map[string]tempTokenData)
+	}
 	s.tempTokens[tempToken] = tempTokenData{
 		UserID:    userID,
 		ExpiresAt: time.Now().Add(5 * time.Minute),
 	}
+	s.tempTokensMu.Unlock()
 
 	return tempToken
 }
 
 func (s *AuthService) validateTempToken(tempToken string) (uint, error) {
+	s.tempTokensMu.RLock()
 	data, exists := s.tempTokens[tempToken]
+	s.tempTokensMu.RUnlock()
+
 	if !exists {
 		return 0, errors.New("invalid temp token")
 	}
 
 	if time.Now().After(data.ExpiresAt) {
+		s.tempTokensMu.Lock()
 		delete(s.tempTokens, tempToken)
+		s.tempTokensMu.Unlock()
 		return 0, errors.New("temp token expired")
 	}
 
+	s.tempTokensMu.Lock()
 	delete(s.tempTokens, tempToken)
+	s.tempTokensMu.Unlock()
 	return data.UserID, nil
 }
 
@@ -579,6 +624,10 @@ func (s *AuthService) LoginWith2FA(ctx context.Context, tempToken, code string) 
 		RefreshToken: refreshToken,
 		ExpiresIn:    expiresIn,
 	}, nil
+}
+
+func (s *AuthService) RevokeAllUserRefreshTokens(userID uint) error {
+	return s.db.Model(&RefreshToken{}).Where("user_id = ? AND revoked = ?", userID, false).Update("revoked", true).Error
 }
 
 // LoginWithGoogle handles OAuth2 Google login - creates or updates user

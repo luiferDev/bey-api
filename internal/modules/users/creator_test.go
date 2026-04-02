@@ -26,7 +26,7 @@ func TestRegularUserCreator_SetsCustomerRole(t *testing.T) {
 
 	req := &CreateUserRequest{
 		Email:    "customer@test.com",
-		Password: "password123",
+		Password: "Password123",
 		Name:     "Test Customer",
 	}
 
@@ -46,7 +46,7 @@ func TestAdminUserCreator_SetsAdminRole(t *testing.T) {
 
 	req := &CreateUserRequest{
 		Email:    "admin@test.com",
-		Password: "password123",
+		Password: "Password123",
 		Name:     "Test Admin",
 	}
 
@@ -85,7 +85,7 @@ func TestCreator_ValidatesEmail(t *testing.T) {
 
 			req := &CreateUserRequest{
 				Email:    tt.email,
-				Password: "password123",
+				Password: "Password123",
 				Name:     "Test User",
 			}
 
@@ -114,7 +114,7 @@ func TestCreator_HashesPassword(t *testing.T) {
 	db := setupCreatorTestDB(t)
 	creator := NewRegularUserCreator(db)
 
-	plainPassword := "password123"
+	plainPassword := "Password123"
 	req := &CreateUserRequest{
 		Email:    "hashtest@test.com",
 		Password: plainPassword,

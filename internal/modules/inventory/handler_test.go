@@ -29,6 +29,12 @@ func setupTestRouterWithInventory(t *testing.T) (*gin.Engine, *InventoryHandler)
 	handler := NewInventoryHandler(db)
 
 	router := gin.New()
+	// Simulate admin user context for tests
+	router.Use(func(c *gin.Context) {
+		c.Set("user_role", "admin")
+		c.Set("user_id", uint(1))
+		c.Next()
+	})
 	return router, handler
 }
 

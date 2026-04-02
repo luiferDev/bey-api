@@ -62,6 +62,7 @@ services:
             - vendor/
             - .idea/
             - .vscode/
+            - cmd/api/docs/
         - action: rebuild
           path: ./go.mod
         - action: rebuild
@@ -70,6 +71,10 @@ services:
           path: ./Dockerfile
         - action: rebuild
           path: ./docker-compose.yml
+        - action: rebuild
+          path: ./cmd/api/docs/
+        - action: rebuild
+          path: ./cmd/api/docs/
 
 volumes:
   postgres_data:

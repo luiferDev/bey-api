@@ -111,7 +111,7 @@ func TestCreateUser_Success(t *testing.T) {
 
 	router.POST("/api/v1/users", handler.Register)
 
-	body := `{"email":"test@example.com","password":"password123","name":"John Doe"}`
+	body := `{"email":"test@example.com","password":"Password123","name":"John Doe"}`
 	req, _ := http.NewRequest("POST", "/api/v1/users", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -127,7 +127,7 @@ func TestCreateUser_DuplicateEmail(t *testing.T) {
 
 	router.POST("/api/v1/users", handler.Register)
 
-	body := `{"email":"test@example.com","password":"password123","first_name":"John","last_name":"Doe"}`
+	body := `{"email":"test@example.com","password":"Password123","first_name":"John","last_name":"Doe"}`
 	req1, _ := http.NewRequest("POST", "/api/v1/users", bytes.NewBufferString(body))
 	req1.Header.Set("Content-Type", "application/json")
 	w1 := httptest.NewRecorder()
@@ -196,7 +196,11 @@ func TestUpdateUser_NotFound(t *testing.T) {
 func TestDeleteUser_NotFound(t *testing.T) {
 	router, handler := setupTestRouterWithUsers(t)
 
-	router.DELETE("/api/v1/users/:id", handler.Delete)
+	// Add admin middleware for delete endpoint
+	router.DELETE("/api/v1/users/:id", func(c *gin.Context) {
+		c.Set("user_role", "admin")
+		c.Next()
+	}, handler.Delete)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/users/999", nil)
 	w := httptest.NewRecorder()
@@ -212,7 +216,7 @@ func TestRegisterAdmin_Success(t *testing.T) {
 
 	router.POST("/api/v1/users/register-admin", handler.RegisterAdmin)
 
-	body := `{"email":"admin@example.com","password":"password123","name":"Admin","surname":"User"}`
+	body := `{"email":"admin@example.com","password":"Password123","name":"Admin","surname":"User"}`
 	req, _ := http.NewRequest("POST", "/api/v1/users/register-admin", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -242,7 +246,7 @@ func TestRegisterAdmin_DuplicateEmail(t *testing.T) {
 
 	router.POST("/api/v1/users/register-admin", handler.RegisterAdmin)
 
-	body := `{"email":"dupadmin@example.com","password":"password123","name":"Admin","surname":"User"}`
+	body := `{"email":"dupadmin@example.com","password":"Password123","name":"Admin","surname":"User"}`
 
 	req1, _ := http.NewRequest("POST", "/api/v1/users/register-admin", bytes.NewBufferString(body))
 	req1.Header.Set("Content-Type", "application/json")
@@ -274,7 +278,7 @@ func TestRegisterAdmin_MissingFields(t *testing.T) {
 	}{
 		{
 			name: "missing email",
-			body: `{"password":"password123","name":"Admin"}`,
+			body: `{"password":"Password123","name":"Admin"}`,
 		},
 		{
 			name: "missing password",
@@ -282,7 +286,7 @@ func TestRegisterAdmin_MissingFields(t *testing.T) {
 		},
 		{
 			name: "missing name",
-			body: `{"email":"admin@example.com","password":"password123"}`,
+			body: `{"email":"admin@example.com","password":"Password123"}`,
 		},
 		{
 			name: "empty body",
@@ -306,7 +310,7 @@ func TestRegisterAdmin_MissingFields(t *testing.T) {
 
 func createUserForAvatarTest(t *testing.T, router *gin.Engine, handler *UserHandler, email string) uint {
 	t.Helper()
-	body := `{"email":"` + email + `","password":"password123","name":"Avatar","surname":"User"}`
+	body := `{"email":"` + email + `","password":"Password123","name":"Avatar","surname":"User"}`
 	req, _ := http.NewRequest("POST", "/api/v1/users/register", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()

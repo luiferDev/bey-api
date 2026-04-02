@@ -202,6 +202,13 @@ func (h *UserHandler) Update(c *gin.Context) {
 // @Success 200 {object} gin.H
 // @Router /api/v1/users/{id} [delete]
 func (h *UserHandler) Delete(c *gin.Context) {
+	// Defense-in-depth: explicit admin role check
+	userRole := c.GetString("user_role")
+	if userRole != "admin" {
+		h.resp.Error(c, 403, "admin access required")
+		return
+	}
+
 	// Get ID from path parameter
 	idParam := c.Param("id")
 	var targetID uint

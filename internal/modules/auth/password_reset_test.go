@@ -113,7 +113,7 @@ func TestResetPassword_ValidToken(t *testing.T) {
 
 	token, user := createTestUserWithResetToken(t, db, "test@example.com")
 
-	newPassword := "newpassword123"
+	newPassword := "Newpassword123"
 	err := service.ResetPassword(context.Background(), token, newPassword)
 	if err != nil {
 		t.Fatalf("ResetPassword failed: %v", err)
@@ -162,7 +162,7 @@ func TestResetPassword_ExpiredToken(t *testing.T) {
 		t.Fatalf("failed to create user: %v", err)
 	}
 
-	err = service.ResetPassword(context.Background(), token, "newpassword123")
+	err = service.ResetPassword(context.Background(), token, "Newpassword123")
 	if err == nil {
 		t.Error("expected error for expired token, got nil")
 	}
@@ -173,7 +173,7 @@ func TestResetPassword_WrongToken(t *testing.T) {
 
 	_, user := createTestUserWithResetToken(t, db, "test@example.com")
 
-	err := service.ResetPassword(context.Background(), "wrong-token", "newpassword123")
+	err := service.ResetPassword(context.Background(), "wrong-token", "Newpassword123")
 	if err == nil {
 		t.Error("expected error for wrong token, got nil")
 	}

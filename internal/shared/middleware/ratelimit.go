@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"sync"
@@ -251,6 +252,10 @@ func (rl *RateLimiter) getClientBucket(clientID string) *TokenBucket {
 		return cb.bucket
 	}
 
+	if len(rl.clientBuckets) > maxClientBuckets {
+		return nil
+	}
+
 	newBucket := NewTokenBucket(rl.config.BurstCapacity, float64(rl.config.RequestsPerSecond))
 	rl.clientBuckets[clientID] = &clientBucket{bucket: newBucket}
 	return newBucket
@@ -267,9 +272,11 @@ func (rl *RateLimiter) getEndpointLimit(path string) (int, float64) {
 	return rl.config.RequestsPerSecond, float64(rl.config.RequestsPerSecond)
 }
 
+const maxClientBuckets = 10000
+
 func (rl *RateLimiter) getClientID(c *gin.Context) string {
-	if token := c.GetHeader("Authorization"); token != "" {
-		return token
+	if userID, exists := c.Get("user_id"); exists {
+		return fmt.Sprintf("user:%v", userID)
 	}
 	return c.ClientIP()
 }
@@ -298,7 +305,8 @@ func (rl *RateLimiter) AllowRequest(clientID string, path string) (allowed bool,
 		key := fmt.Sprintf("ratelimit:%s:%s", clientID, path)
 		count, err := rl.storage.Increment(context.Background(), key, window)
 		if err != nil {
-			return true, burst, time.Now().Add(window)
+			log.Printf("Rate limiter Redis error, falling back to memory: %v", err)
+			return rl.allowInMemory(clientID, requestsPerMinute, burst)
 		}
 
 		remaining = requestsPerMinute - count
@@ -311,6 +319,9 @@ func (rl *RateLimiter) AllowRequest(clientID string, path string) (allowed bool,
 	}
 
 	bucket := rl.getClientBucket(clientID)
+	if bucket == nil {
+		return true, 0, time.Now().Add(time.Second)
+	}
 	if requestsPerMinute != rl.config.RequestsPerSecond {
 		bucket = &TokenBucket{
 			tokens:     float64(burst),
@@ -325,6 +336,18 @@ func (rl *RateLimiter) AllowRequest(clientID string, path string) (allowed bool,
 	resetTime = time.Now().Add(time.Second)
 
 	return allowed, remaining, resetTime
+}
+
+func (rl *RateLimiter) allowInMemory(clientID string, requestsPerMinute, burst int) (allowed bool, remaining int, resetTime time.Time) {
+	bucket := rl.getClientBucket(clientID)
+	if bucket == nil {
+		return true, 0, time.Now().Add(time.Second)
+	}
+
+	allowed = bucket.TryConsume(1)
+	remaining = int(bucket.Tokens())
+	resetTime = time.Now().Add(time.Second)
+	return
 }
 
 func (rl *RateLimiter) SetHeaders(c *gin.Context, limit, remaining int, resetTime time.Time) {

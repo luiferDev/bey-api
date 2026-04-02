@@ -1,11 +1,13 @@
 app:
   host: "0.0.0.0"
   port: 8080
-  mode: "debug"
+  mode: "release"
   static_path: "./cmd/api/static"
   swagger_enabled: true
   admin_email: "admin@bey.com"
-  admin_password: "admin123"
+  # SECURITY: MUST be replaced with a strong password before deployment.
+  # Generate with: openssl rand -base64 24
+  admin_password: "REPLACE_WITH_STRONG_RANDOM_PASSWORD"
 
 database:
   host: "postgres"
@@ -32,7 +34,9 @@ security:
   allowed_origins:
     - "http://localhost:3000"
     - "http://localhost:8080"
-  jwt_secret: "your-secret-key-change-in-production"
+  # SECURITY: MUST be replaced with a strong secret (min 32 chars) before deployment.
+  # Generate with: openssl rand -hex 32
+  jwt_secret: "REPLACE_WITH_STRONG_SECRET_MIN_32_CHARS"
   jwt_expiry_hours: 2
   jwt_access_expiry: "15m"
   jwt_refresh_expiry: "168h"
@@ -69,6 +73,12 @@ rate_limit:
       # Admin endpoints have higher limits
       requests_per_minute: 60
       burst_capacity: 10
+    /api/v1/auth/forgot-password:
+      requests_per_minute: 3
+      burst_capacity: 1
+    /api/v1/auth/reset-password:
+      requests_per_minute: 5
+      burst_capacity: 2
 
 email:
   # Email sending configuration for password reset & verification
@@ -107,7 +117,7 @@ cart:
   # Shopping cart Redis configuration
   enabled: true
   redis:
-    host: "localhost"
+    host: "redis"
     port: 6379
     password: ""
     db: 1 # Separate DB from rate-limiter (DB 0)

@@ -1,8 +1,11 @@
 package payments
 
 import (
+	"encoding/json"
+	"io"
 	"log"
 	"net/http"
+	"strings"
 
 	"bey/internal/shared/response"
 
@@ -78,6 +81,17 @@ func (h *PaymentHandler) GetPayment(c *gin.Context) {
 		return
 	}
 
+	// Check ownership via order
+	userID := c.GetUint("user_id")
+	userRole := c.GetString("user_role")
+	if userRole != "admin" {
+		order, err := h.service.GetOrderByPaymentID(payment.OrderID)
+		if err != nil || order == nil || order.UserID != userID {
+			h.responseHandler.Error(c, http.StatusForbidden, "you don't have access to this payment")
+			return
+		}
+	}
+
 	h.responseHandler.Success(c, ToPaymentResponse(payment))
 }
 
@@ -131,7 +145,24 @@ func (h *PaymentHandler) VoidPayment(c *gin.Context) {
 		return
 	}
 
-	payment, err := h.service.CancelPayment(id)
+	payment, err := h.service.GetPayment(id)
+	if err != nil {
+		h.responseHandler.NotFound(c, "payment not found")
+		return
+	}
+
+	// Check ownership via order
+	userID := c.GetUint("user_id")
+	userRole := c.GetString("user_role")
+	if userRole != "admin" {
+		order, err := h.service.GetOrderByPaymentID(payment.OrderID)
+		if err != nil || order == nil || order.UserID != userID {
+			h.responseHandler.Error(c, http.StatusForbidden, "you don't have access to this payment")
+			return
+		}
+	}
+
+	payment, err = h.service.CancelPayment(id)
 	if err != nil {
 		log.Printf("ERROR: VoidPayment failed: %v", err)
 		h.responseHandler.Error(c, http.StatusBadRequest, err.Error())
@@ -198,6 +229,17 @@ func (h *PaymentHandler) GetPaymentLink(c *gin.Context) {
 		return
 	}
 
+	// Check ownership via order
+	userID := c.GetUint("user_id")
+	userRole := c.GetString("user_role")
+	if userRole != "admin" {
+		order, err := h.service.GetOrderByPaymentID(link.OrderID)
+		if err != nil || order == nil || order.UserID != userID {
+			h.responseHandler.Error(c, http.StatusForbidden, "you don't have access to this payment link")
+			return
+		}
+	}
+
 	h.responseHandler.Success(c, ToPaymentLinkResponse(link))
 }
 
@@ -222,7 +264,24 @@ func (h *PaymentHandler) ActivatePaymentLink(c *gin.Context) {
 		return
 	}
 
-	link, err := h.service.ActivatePaymentLink(id)
+	link, err := h.service.GetPaymentLink(id)
+	if err != nil {
+		h.responseHandler.NotFound(c, "payment link not found")
+		return
+	}
+
+	// Check ownership via order
+	userID := c.GetUint("user_id")
+	userRole := c.GetString("user_role")
+	if userRole != "admin" {
+		order, err := h.service.GetOrderByPaymentID(link.OrderID)
+		if err != nil || order == nil || order.UserID != userID {
+			h.responseHandler.Error(c, http.StatusForbidden, "you don't have access to this payment link")
+			return
+		}
+	}
+
+	link, err = h.service.ActivatePaymentLink(id)
 	if err != nil {
 		h.responseHandler.Error(c, http.StatusBadRequest, err.Error())
 		return
@@ -252,7 +311,24 @@ func (h *PaymentHandler) DeactivatePaymentLink(c *gin.Context) {
 		return
 	}
 
-	link, err := h.service.DeactivatePaymentLink(id)
+	link, err := h.service.GetPaymentLink(id)
+	if err != nil {
+		h.responseHandler.NotFound(c, "payment link not found")
+		return
+	}
+
+	// Check ownership via order
+	userID := c.GetUint("user_id")
+	userRole := c.GetString("user_role")
+	if userRole != "admin" {
+		order, err := h.service.GetOrderByPaymentID(link.OrderID)
+		if err != nil || order == nil || order.UserID != userID {
+			h.responseHandler.Error(c, http.StatusForbidden, "you don't have access to this payment link")
+			return
+		}
+	}
+
+	link, err = h.service.DeactivatePaymentLink(id)
 	if err != nil {
 		h.responseHandler.Error(c, http.StatusBadRequest, err.Error())
 		return
@@ -274,20 +350,25 @@ func (h *PaymentHandler) DeactivatePaymentLink(c *gin.Context) {
 // @Failure 500 {object} response.ApiResponse "Internal server error - webhook processing failed"
 // @Router /api/v1/payments/webhook [post]
 func (h *PaymentHandler) Webhook(c *gin.Context) {
-	signature := c.GetHeader("X-Wompi-Signature")
-
-	var event WebhookEvent
-	if err := c.ShouldBindJSON(&event); err != nil {
-		log.Printf("ERROR: Failed to parse webhook: %v", err)
-		h.responseHandler.Error(c, http.StatusBadRequest, "invalid webhook payload")
+	contentType := c.GetHeader("Content-Type")
+	if contentType != "" && !strings.Contains(contentType, "application/json") {
+		h.responseHandler.Error(c, http.StatusUnsupportedMediaType, "unsupported media type")
 		return
 	}
 
-	// Read body for signature verification
-	bodyBytes, err := c.GetRawData()
+	signature := c.GetHeader("X-Wompi-Signature")
+
+	bodyBytes, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		log.Printf("ERROR: Failed to read webhook body: %v", err)
-		h.responseHandler.Error(c, http.StatusInternalServerError, "failed to process webhook")
+		h.responseHandler.Error(c, http.StatusBadRequest, "failed to read request body")
+		return
+	}
+
+	var event WebhookEvent
+	if err := json.Unmarshal(bodyBytes, &event); err != nil {
+		log.Printf("ERROR: Failed to parse webhook: %v", err)
+		h.responseHandler.Error(c, http.StatusBadRequest, "invalid webhook payload")
 		return
 	}
 

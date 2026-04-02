@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -306,6 +307,10 @@ func Load(path string) (*Config, error) {
 	}
 
 	cfg.Security.JWTConfig = cfg.Security.GetJWTConfig()
+
+	if len(cfg.Security.JWTSecret) < 32 {
+		return nil, errors.New("security.jwt_secret must be at least 32 characters long")
+	}
 
 	if cfg.RateLimit.Defaults.RequestsPerMinute == 0 {
 		cfg.RateLimit.Defaults.RequestsPerMinute = 60
