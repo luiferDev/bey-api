@@ -238,7 +238,6 @@ func (s *CartService) CartToOrder(userID uint, shippingAddress string, notes str
 	}
 
 	req := &orders.CreateOrderRequest{
-		UserID:          userID,
 		ShippingAddress: shippingAddress,
 		Notes:           notes,
 		Items:           orderItems,
@@ -258,4 +257,13 @@ func (s *CartService) ValidateCartOwnership(cartUserID, tokenUserID uint) error 
 		return ErrUnauthorized
 	}
 	return nil
+}
+
+// GetVariantPrice returns the price for a variant (helper for checkout response)
+func (s *CartService) GetVariantPrice(variantID *uint) (float64, error) {
+	if variantID == nil {
+		return 0, nil
+	}
+	price, _, _, err := s.variantRepo.GetPriceAndStock(*variantID)
+	return price, err
 }

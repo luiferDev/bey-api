@@ -22,3 +22,26 @@ type CartItemResponse struct {
 	VariantID uint `json:"variant_id"`
 	Quantity  int  `json:"quantity"`
 }
+
+// CheckoutRequest - Request to convert cart to order
+type CheckoutRequest struct {
+	ShippingAddress string `json:"shipping_address" binding:"required,max=500"`
+	Notes           string `json:"notes" binding:"max=1000"`
+}
+
+// CheckoutResponse - Response after creating order from cart
+type CheckoutResponse struct {
+	Message         string                 `json:"message"`
+	ShippingAddress string                 `json:"shipping_address"`
+	Items           []CheckoutItemResponse `json:"items"`
+	TotalPrice      float64                `json:"total_price"`
+	CartCleared     bool                   `json:"cart_cleared"`
+}
+
+// CheckoutItemResponse - Individual item in checkout response
+type CheckoutItemResponse struct {
+	ProductID uint    `json:"product_id"`
+	VariantID *uint   `json:"variant_id,omitempty"`
+	Quantity  int     `json:"quantity"`
+	UnitPrice float64 `json:"unit_price"`
+}

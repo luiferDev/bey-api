@@ -19,6 +19,7 @@ func SetupRoutesWithDeps(router *gin.RouterGroup, cartRepo CartRepository, varia
 		}
 
 		cart.GET("", handler.GetCart)
+		cart.POST("/checkout", handler.Checkout)
 		cart.POST("/items", handler.AddItem)
 		cart.PUT("/items/:variant_id", handler.UpdateItem)
 		cart.DELETE("/items/:variant_id", handler.RemoveItem)
