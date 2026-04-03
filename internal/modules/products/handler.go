@@ -56,7 +56,7 @@ func productToResponse(product *Product) ProductResponse {
 		UpdatedAt:   product.UpdatedAt,
 	}
 	if product.Category.ID != uuid.Nil {
-		catResp := toCategoryResponse(product.Category)
+		catResp := toCategoryResponse(product.Category, "/"+product.Category.Slug, nil)
 		resp.Category = &catResp
 	}
 	if product.Variants != nil {
@@ -196,7 +196,9 @@ func (h *ProductHandler) CreateCategory(c *gin.Context) {
 
 	h.invalidateCategoryCache(category.ID)
 
-	h.response.Created(c, category)
+	path := h.buildCategoryPath(category)
+	counts, _ := h.categoryRepo.CountProductsByCategoryIDs([]uuid.UUID{category.ID})
+	h.response.Created(c, toCategoryResponse(*category, path, counts))
 }
 
 func (h *ProductHandler) GetCategory(c *gin.Context) {
@@ -216,7 +218,9 @@ func (h *ProductHandler) GetCategory(c *gin.Context) {
 		return
 	}
 
-	h.response.Success(c, category)
+	path := h.buildCategoryPath(category)
+	counts, _ := h.categoryRepo.CountProductsByCategoryIDs([]uuid.UUID{category.ID})
+	h.response.Success(c, toCategoryResponse(*category, path, counts))
 }
 
 func (h *ProductHandler) GetCategoryBySlug(c *gin.Context) {
@@ -232,7 +236,9 @@ func (h *ProductHandler) GetCategoryBySlug(c *gin.Context) {
 		return
 	}
 
-	h.response.Success(c, category)
+	path := h.buildCategoryPath(category)
+	counts, _ := h.categoryRepo.CountProductsByCategoryIDs([]uuid.UUID{category.ID})
+	h.response.Success(c, toCategoryResponse(*category, path, counts))
 }
 
 func (h *ProductHandler) UpdateCategory(c *gin.Context) {
@@ -287,7 +293,9 @@ func (h *ProductHandler) UpdateCategory(c *gin.Context) {
 
 	h.invalidateCategoryCache(id)
 
-	h.response.Success(c, category)
+	path := h.buildCategoryPath(category)
+	counts, _ := h.categoryRepo.CountProductsByCategoryIDs([]uuid.UUID{category.ID})
+	h.response.Success(c, toCategoryResponse(*category, path, counts))
 }
 
 func (h *ProductHandler) DeleteCategory(c *gin.Context) {
@@ -314,7 +322,8 @@ func (h *ProductHandler) GetCategories(c *gin.Context) {
 		return
 	}
 
-	h.response.Success(c, toCategoryResponseList(categories))
+	counts := h.getProductCounts(categories)
+	h.response.Success(c, toCategoryResponseList(categories, "", counts))
 }
 
 func (h *ProductHandler) GetCategoryTree(c *gin.Context) {
@@ -338,12 +347,20 @@ func (h *ProductHandler) GetCategoryChildren(c *gin.Context) {
 		return
 	}
 
+	parent, err := h.categoryRepo.FindByID(id)
+	if err != nil {
+		h.response.InternalError(c, "failed to fetch parent category")
+		return
+	}
+	basePath := h.buildCategoryPath(parent)
+
 	children, err := h.categoryRepo.FindChildren(id)
 	if err != nil {
 		h.response.InternalError(c, "failed to fetch children")
 		return
 	}
-	h.response.Success(c, toCategoryResponseList(children))
+	counts := h.getProductCounts(children)
+	h.response.Success(c, toCategoryResponseList(children, basePath, counts))
 }
 
 func (h *ProductHandler) GetCategoryBreadcrumbs(c *gin.Context) {
@@ -358,7 +375,21 @@ func (h *ProductHandler) GetCategoryBreadcrumbs(c *gin.Context) {
 		h.response.NotFound(c, "category not found")
 		return
 	}
-	h.response.Success(c, toCategoryResponseList(breadcrumbs))
+
+	ids := make([]uuid.UUID, len(breadcrumbs))
+	for i, bc := range breadcrumbs {
+		ids[i] = bc.ID
+	}
+	counts, _ := h.categoryRepo.CountProductsByCategoryIDs(ids)
+
+	// Build incremental path for each breadcrumb
+	resp := make([]CategoryResponse, len(breadcrumbs))
+	path := ""
+	for i, bc := range breadcrumbs {
+		path += "/" + bc.Slug
+		resp[i] = toCategoryResponse(bc, path, counts)
+	}
+	h.response.Success(c, resp)
 }
 
 func (h *ProductHandler) CreateProduct(c *gin.Context) {
@@ -1043,17 +1074,19 @@ func (h *ProductHandler) invalidateImageCache(imageID uuid.UUID, productID uuid.
 	}()
 }
 
-func toCategoryResponse(cat Category) CategoryResponse {
+func toCategoryResponse(cat Category, path string, productCounts map[uuid.UUID]int) CategoryResponse {
 	resp := CategoryResponse{
-		ID:          cat.ID.String(),
-		Name:        cat.Name,
-		Slug:        cat.Slug,
-		Description: cat.Description,
-		Level:       cat.Level,
-		IsActive:    cat.IsActive,
-		SortOrder:   cat.SortOrder,
-		CreatedAt:   cat.CreatedAt,
-		UpdatedAt:   cat.UpdatedAt,
+		ID:           cat.ID.String(),
+		Name:         cat.Name,
+		Slug:         cat.Slug,
+		Description:  cat.Description,
+		Path:         path,
+		Level:        cat.Level,
+		IsActive:     cat.IsActive,
+		SortOrder:    cat.SortOrder,
+		ProductCount: productCounts[cat.ID],
+		CreatedAt:    cat.CreatedAt,
+		UpdatedAt:    cat.UpdatedAt,
 	}
 	if cat.ParentID != nil {
 		s := cat.ParentID.String()
@@ -1062,16 +1095,60 @@ func toCategoryResponse(cat Category) CategoryResponse {
 	if cat.Subcategories != nil {
 		resp.Subcategories = make([]CategoryResponse, len(cat.Subcategories))
 		for i, sub := range cat.Subcategories {
-			resp.Subcategories[i] = toCategoryResponse(sub)
+			resp.Subcategories[i] = toCategoryResponse(sub, path+"/"+sub.Slug, productCounts)
 		}
 	}
 	return resp
 }
 
-func toCategoryResponseList(categories []Category) []CategoryResponse {
+func toCategoryResponseList(categories []Category, basePath string, productCounts map[uuid.UUID]int) []CategoryResponse {
 	responses := make([]CategoryResponse, len(categories))
 	for i, cat := range categories {
-		responses[i] = toCategoryResponse(cat)
+		path := basePath + "/" + cat.Slug
+		responses[i] = toCategoryResponse(cat, path, productCounts)
 	}
 	return responses
+}
+
+// buildCategoryPath constructs a URL-friendly path from root to the category.
+// Example: /electronics/computers/laptops
+func (h *ProductHandler) buildCategoryPath(category *Category) string {
+	if category.ParentID == nil || *category.ParentID == uuid.Nil {
+		return "/" + category.Slug
+	}
+
+	breadcrumbs, err := h.categoryRepo.FindBreadcrumbs(category.ID)
+	if err != nil || len(breadcrumbs) == 0 {
+		return "/" + category.Slug
+	}
+
+	path := ""
+	for _, bc := range breadcrumbs {
+		path += "/" + bc.Slug
+	}
+	return path
+}
+
+// collectCategoryIDs recursively collects all category IDs from a tree.
+func collectCategoryIDs(categories []Category) []uuid.UUID {
+	var ids []uuid.UUID
+	for _, cat := range categories {
+		ids = append(ids, cat.ID)
+		ids = append(ids, collectCategoryIDs(cat.Subcategories)...)
+	}
+	return ids
+}
+
+// getProductCounts fetches product counts for all categories in the tree.
+func (h *ProductHandler) getProductCounts(categories []Category) map[uuid.UUID]int {
+	ids := collectCategoryIDs(categories)
+	if len(ids) == 0 {
+		return make(map[uuid.UUID]int)
+	}
+	counts, err := h.categoryRepo.CountProductsByCategoryIDs(ids)
+	if err != nil {
+		log.Printf("Failed to get product counts: %v", err)
+		return make(map[uuid.UUID]int)
+	}
+	return counts
 }

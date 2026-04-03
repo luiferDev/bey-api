@@ -268,7 +268,7 @@ func (r *CategoryRepository) FindBreadcrumbs(categoryID uuid.UUID) ([]Category, 
 
 func (r *CategoryRepository) buildTree(categories []Category) []Category {
 	categoryMap := make(map[uuid.UUID]*Category)
-	var roots []Category
+	var rootIDs []uuid.UUID
 
 	for i := range categories {
 		categoryMap[categories[i].ID] = &categories[i]
@@ -281,8 +281,14 @@ func (r *CategoryRepository) buildTree(categories []Category) []Category {
 				parent.Subcategories = append(parent.Subcategories, *cat)
 			}
 		} else {
-			roots = append(roots, *cat)
+			rootIDs = append(rootIDs, cat.ID)
 		}
+	}
+
+	// Build roots AFTER all children have been assigned
+	roots := make([]Category, len(rootIDs))
+	for i, id := range rootIDs {
+		roots[i] = *categoryMap[id]
 	}
 
 	return roots
@@ -292,6 +298,42 @@ func (r *CategoryRepository) Exists(id uuid.UUID) (bool, error) {
 	var count int64
 	err := r.db.Model(&Category{}).Where("id = ? AND deleted_at IS NULL", id).Count(&count).Error
 	return count > 0, err
+}
+
+// CountProductsByCategoryIDs returns a map of categoryID -> product count
+// for all given category IDs in a single query.
+func (r *CategoryRepository) CountProductsByCategoryIDs(categoryIDs []uuid.UUID) (map[uuid.UUID]int, error) {
+	if len(categoryIDs) == 0 {
+		return make(map[uuid.UUID]int), nil
+	}
+
+	type categoryCount struct {
+		CategoryID uuid.UUID
+		Count      int
+	}
+
+	var results []categoryCount
+	if err := r.db.Raw(`
+		SELECT category_id, COUNT(*) as count
+		FROM products
+		WHERE category_id IN ? AND deleted_at IS NULL
+		GROUP BY category_id
+	`, categoryIDs).Scan(&results).Error; err != nil {
+		return nil, err
+	}
+
+	counts := make(map[uuid.UUID]int)
+	for _, r := range results {
+		counts[r.CategoryID] = r.Count
+	}
+	// Ensure all requested IDs are present (zero if no products)
+	for _, id := range categoryIDs {
+		if _, ok := counts[id]; !ok {
+			counts[id] = 0
+		}
+	}
+
+	return counts, nil
 }
 
 // ProductRepository
