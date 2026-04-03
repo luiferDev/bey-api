@@ -18,12 +18,12 @@ type CreatePaymentLinkRequest struct {
 	ExpiresAt     *time.Time `json:"expires_at"`
 	RedirectURL   string     `json:"redirect_url"`
 	Reference     string     `json:"reference" binding:"required"`
-	OrderID       uint       `json:"order_id"`
+	OrderID       string     `json:"order_id"`
 }
 
 type PaymentResponse struct {
-	ID                 uint      `json:"id"`
-	OrderID            uint      `json:"order_id"`
+	ID                 string    `json:"id"`
+	OrderID            string    `json:"order_id"`
 	WompiTransactionID string    `json:"wompi_transaction_id"`
 	Amount             int64     `json:"amount"`
 	Currency           string    `json:"currency"`
@@ -36,8 +36,8 @@ type PaymentResponse struct {
 }
 
 type PaymentLinkResponse struct {
-	ID          uint       `json:"id"`
-	OrderID     uint       `json:"order_id"`
+	ID          string     `json:"id"`
+	OrderID     string     `json:"order_id"`
 	WompiLinkID string     `json:"wompi_link_id"`
 	URL         string     `json:"url"`
 	Amount      int64      `json:"amount"`

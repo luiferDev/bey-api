@@ -56,9 +56,9 @@ type CreateOrderRequest struct {
 }
 
 type CreateOrderItemRequest struct {
-	ProductID uint  `json:"product_id" binding:"required"`
-	VariantID *uint `json:"variant_id"`
-	Quantity  int   `json:"quantity" binding:"required,gt=0"`
+	ProductID string  `json:"product_id" binding:"required"`
+	VariantID *string `json:"variant_id"`
+	Quantity  int     `json:"quantity" binding:"required,gt=0"`
 }
 
 type OrderResponse struct {
