@@ -663,7 +663,24 @@ func (r *ProductVariantRepository) Update(variant *ProductVariant) error {
 }
 
 func (r *ProductVariantRepository) Delete(id uint) error {
-	return r.db.Delete(&ProductVariant{}, id).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Delete variant attributes
+		if err := tx.Where("variant_id = ?", id).Delete(&ProductVariantAttribute{}).Error; err != nil {
+			return fmt.Errorf("failed to delete variant attributes: %w", err)
+		}
+
+		// Delete variant images
+		if err := tx.Where("variant_id = ?", id).Delete(&ProductImage{}).Error; err != nil {
+			return fmt.Errorf("failed to delete variant images: %w", err)
+		}
+
+		// Delete the variant itself
+		if err := tx.Delete(&ProductVariant{}, id).Error; err != nil {
+			return fmt.Errorf("failed to delete variant: %w", err)
+		}
+
+		return nil
+	})
 }
 
 func (r *ProductVariantRepository) FindByProductID(productID uint) ([]ProductVariant, error) {

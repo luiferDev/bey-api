@@ -844,6 +844,7 @@ func (h *ProductHandler) DeleteVariant(c *gin.Context) {
 	}
 
 	if err := h.variantRepo.Delete(uint(id)); err != nil {
+		log.Printf("ERROR: Failed to delete variant %d: %v", id, err)
 		h.response.InternalError(c, "Failed to delete variant")
 		return
 	}
