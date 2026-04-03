@@ -32,8 +32,6 @@ security:
   allowed_origins: []
   jwt_secret: ""
   jwt_expiry_hours: 0
-  jwt_access_expiry: ""
-  jwt_refresh_expiry: ""
   jwt_issuer: ""
   jwt_algorithm: ""
   csrf_enabled: true
