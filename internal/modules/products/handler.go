@@ -2,11 +2,11 @@ package products
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
 
 	"bey/internal/modules/inventory"
 	"bey/internal/shared/cache"
@@ -29,8 +29,8 @@ func variantToResponse(variant *ProductVariant) ProductVariantResponse {
 	}
 
 	return ProductVariantResponse{
-		ID:        variant.ID,
-		ProductID: variant.ProductID,
+		ID:        variant.ID.String(),
+		ProductID: variant.ProductID.String(),
 		SKU:       variant.SKU,
 		Price:     variant.Price,
 		Stock:     variant.Stock,
@@ -40,6 +40,53 @@ func variantToResponse(variant *ProductVariant) ProductVariantResponse {
 		CreatedAt: variant.CreatedAt,
 		Images:    nil,
 	}
+}
+
+func productToResponse(product *Product) ProductResponse {
+	resp := ProductResponse{
+		ID:          product.ID.String(),
+		CategoryID:  product.CategoryID.String(),
+		Name:        product.Name,
+		Slug:        product.Slug,
+		Brand:       product.Brand,
+		Description: product.Description,
+		BasePrice:   product.BasePrice,
+		IsActive:    product.IsActive,
+		CreatedAt:   product.CreatedAt,
+		UpdatedAt:   product.UpdatedAt,
+	}
+	if product.Category.ID != uuid.Nil {
+		catResp := toCategoryResponse(product.Category)
+		resp.Category = &catResp
+	}
+	if product.Variants != nil {
+		resp.Variants = make([]ProductVariantResponse, len(product.Variants))
+		for i, v := range product.Variants {
+			resp.Variants[i] = variantToResponse(&v)
+		}
+	}
+	if product.Images != nil {
+		resp.Images = make([]ProductImageResponse, len(product.Images))
+		for i, img := range product.Images {
+			resp.Images[i] = imageToResponse(&img)
+		}
+	}
+	return resp
+}
+
+func imageToResponse(img *ProductImage) ProductImageResponse {
+	resp := ProductImageResponse{
+		ID:        img.ID.String(),
+		ProductID: img.ProductID.String(),
+		URLImage:  img.URLImage,
+		IsMain:    img.IsMain,
+		SortOrder: img.SortOrder,
+	}
+	if img.VariantID != nil {
+		s := img.VariantID.String()
+		resp.VariantID = &s
+	}
+	return resp
 }
 
 type ProductHandler struct {
@@ -120,14 +167,6 @@ func NewProductHandlerWithInventoryAndCache(
 	}
 }
 
-// @Summary Create a new category
-// @Description Creates a new product category
-// @Tags Categories
-// @Accept json
-// @Produce json
-// @Param category body CreateCategoryRequest true "Category data"
-// @Success 201 {object} Category
-// @Router /api/v1/categories [post]
 func (h *ProductHandler) CreateCategory(c *gin.Context) {
 	var req CreateCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -136,10 +175,18 @@ func (h *ProductHandler) CreateCategory(c *gin.Context) {
 	}
 
 	category := &Category{
-		ParentID:    req.ParentID,
 		Name:        req.Name,
 		Slug:        req.Slug,
 		Description: req.Description,
+	}
+
+	if req.ParentID != nil && *req.ParentID != "" {
+		parentID, err := uuid.FromString(*req.ParentID)
+		if err != nil {
+			h.response.ValidationError(c, "Invalid parent_id format")
+			return
+		}
+		category.ParentID = &parentID
 	}
 
 	if err := h.categoryRepo.Create(category); err != nil {
@@ -152,22 +199,14 @@ func (h *ProductHandler) CreateCategory(c *gin.Context) {
 	h.response.Created(c, category)
 }
 
-// @Summary Get category by ID
-// @Description Retrieves a category by its ID
-// @Tags Categories
-// @Accept json
-// @Produce json
-// @Param id path int true "Category ID"
-// @Success 200 {object} Category
-// @Router /api/v1/categories/{id} [get]
 func (h *ProductHandler) GetCategory(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid category ID")
+		h.response.ValidationError(c, "Invalid category ID format")
 		return
 	}
 
-	category, err := h.categoryRepo.FindByID(uint(id))
+	category, err := h.categoryRepo.FindByID(id)
 	if err != nil {
 		h.response.InternalError(c, "Failed to get category")
 		return
@@ -180,14 +219,6 @@ func (h *ProductHandler) GetCategory(c *gin.Context) {
 	h.response.Success(c, category)
 }
 
-// @Summary Get category by slug
-// @Description Retrieves a category by its slug
-// @Tags Categories
-// @Accept json
-// @Produce json
-// @Param slug path string true "Category slug"
-// @Success 200 {object} Category
-// @Router /api/v1/categories/slug/{slug} [get]
 func (h *ProductHandler) GetCategoryBySlug(c *gin.Context) {
 	slug := c.Param("slug")
 
@@ -204,23 +235,14 @@ func (h *ProductHandler) GetCategoryBySlug(c *gin.Context) {
 	h.response.Success(c, category)
 }
 
-// @Summary Update a category
-// @Description Updates an existing category
-// @Tags Categories
-// @Accept json
-// @Produce json
-// @Param id path int true "Category ID"
-// @Param category body UpdateCategoryRequest true "Category data"
-// @Success 200 {object} Category
-// @Router /api/v1/categories/{id} [put]
 func (h *ProductHandler) UpdateCategory(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid category ID")
+		h.response.ValidationError(c, "Invalid category ID format")
 		return
 	}
 
-	category, err := h.categoryRepo.FindByID(uint(id))
+	category, err := h.categoryRepo.FindByID(id)
 	if err != nil {
 		h.response.InternalError(c, "Failed to get category")
 		return
@@ -237,7 +259,16 @@ func (h *ProductHandler) UpdateCategory(c *gin.Context) {
 	}
 
 	if req.ParentID != nil {
-		category.ParentID = req.ParentID
+		if *req.ParentID != "" {
+			parentID, parseErr := uuid.FromString(*req.ParentID)
+			if parseErr != nil {
+				h.response.ValidationError(c, "Invalid parent_id format")
+				return
+			}
+			category.ParentID = &parentID
+		} else {
+			category.ParentID = nil
+		}
 	}
 	if req.Name != nil {
 		category.Name = *req.Name
@@ -254,46 +285,28 @@ func (h *ProductHandler) UpdateCategory(c *gin.Context) {
 		return
 	}
 
-	h.invalidateCategoryCache(uint(id))
+	h.invalidateCategoryCache(id)
 
 	h.response.Success(c, category)
 }
 
-// @Summary Delete a category
-// @Description Deletes a category by ID
-// @Tags Categories
-// @Accept json
-// @Produce json
-// @Param id path int true "Category ID"
-// @Success 200
-// @Router /api/v1/categories/{id} [delete]
 func (h *ProductHandler) DeleteCategory(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid category ID")
+		h.response.ValidationError(c, "Invalid category ID format")
 		return
 	}
 
-	if err := h.categoryRepo.Delete(uint(id)); err != nil {
+	if err := h.categoryRepo.Delete(id); err != nil {
 		h.response.InternalError(c, "Failed to delete category")
 		return
 	}
 
-	h.invalidateCategoryCache(uint(id))
+	h.invalidateCategoryCache(id)
 
 	h.response.Success(c, gin.H{"message": "Category deleted successfully"})
 }
 
-// @Summary Get all categories
-// @Description Retrieves a list of all categories
-// @Tags Categories
-// @Summary Get all categories as nested tree
-// @Description Returns the complete category tree with parent-child relationships
-// @Tags Categories
-// @Accept json
-// @Produce json
-// @Success 200 {object} response.ApiResponse{data=[]CategoryResponse}
-// @Router /api/v1/categories [get]
 func (h *ProductHandler) GetCategories(c *gin.Context) {
 	categories, err := h.categoryRepo.FindTree()
 	if err != nil {
@@ -304,35 +317,18 @@ func (h *ProductHandler) GetCategories(c *gin.Context) {
 	h.response.Success(c, toCategoryResponseList(categories))
 }
 
-// GetCategoryTree godoc
-// @Summary Get full category tree (alias for GET /categories)
-// @Description Returns the complete nested category tree with all levels
-// @Tags Categories
-// @Produce json
-// @Success 200 {object} response.ApiResponse{data=[]CategoryResponse}
-// @Router /api/v1/categories/tree [get]
 func (h *ProductHandler) GetCategoryTree(c *gin.Context) {
 	h.GetCategories(c)
 }
 
-// GetCategoryChildren godoc
-// @Summary Get direct children of a category
-// @Description Returns immediate subcategories of the specified category
-// @Tags Categories
-// @Produce json
-// @Param id path int true "Category ID"
-// @Success 200 {object} response.ApiResponse{data=[]CategoryResponse}
-// @Failure 400 {object} response.ApiResponse "Invalid category ID"
-// @Failure 404 {object} response.ApiResponse "Category not found"
-// @Router /api/v1/categories/{id}/children [get]
 func (h *ProductHandler) GetCategoryChildren(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "invalid category ID")
+		h.response.ValidationError(c, "invalid category ID format")
 		return
 	}
 
-	exists, err := h.categoryRepo.Exists(uint(id))
+	exists, err := h.categoryRepo.Exists(id)
 	if err != nil {
 		h.response.InternalError(c, "failed to check category")
 		return
@@ -342,7 +338,7 @@ func (h *ProductHandler) GetCategoryChildren(c *gin.Context) {
 		return
 	}
 
-	children, err := h.categoryRepo.FindChildren(uint(id))
+	children, err := h.categoryRepo.FindChildren(id)
 	if err != nil {
 		h.response.InternalError(c, "failed to fetch children")
 		return
@@ -350,24 +346,14 @@ func (h *ProductHandler) GetCategoryChildren(c *gin.Context) {
 	h.response.Success(c, toCategoryResponseList(children))
 }
 
-// GetCategoryBreadcrumbs godoc
-// @Summary Get breadcrumbs for a category
-// @Description Returns the path from root category to the specified category
-// @Tags Categories
-// @Produce json
-// @Param id path int true "Category ID"
-// @Success 200 {object} response.ApiResponse{data=[]CategoryResponse}
-// @Failure 400 {object} response.ApiResponse "Invalid category ID"
-// @Failure 404 {object} response.ApiResponse "Category not found"
-// @Router /api/v1/categories/{id}/breadcrumbs [get]
 func (h *ProductHandler) GetCategoryBreadcrumbs(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "invalid category ID")
+		h.response.ValidationError(c, "invalid category ID format")
 		return
 	}
 
-	breadcrumbs, err := h.categoryRepo.FindBreadcrumbs(uint(id))
+	breadcrumbs, err := h.categoryRepo.FindBreadcrumbs(id)
 	if err != nil {
 		h.response.NotFound(c, "category not found")
 		return
@@ -375,19 +361,16 @@ func (h *ProductHandler) GetCategoryBreadcrumbs(c *gin.Context) {
 	h.response.Success(c, toCategoryResponseList(breadcrumbs))
 }
 
-// Product Handlers
-// @Summary Create a new product
-// @Description Creates a new product
-// @Tags Products
-// @Accept json
-// @Produce json
-// @Param product body CreateProductRequest true "Product data"
-// @Success 201 {object} Product
-// @Router /api/v1/products [post]
 func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	var req CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.response.ValidationError(c, err.Error())
+		return
+	}
+
+	categoryID, err := uuid.FromString(req.CategoryID)
+	if err != nil {
+		h.response.ValidationError(c, "Invalid category_id format")
 		return
 	}
 
@@ -397,7 +380,7 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	}
 
 	product := &Product{
-		CategoryID:  req.CategoryID,
+		CategoryID:  categoryID,
 		Name:        req.Name,
 		Slug:        req.Slug,
 		Brand:       req.Brand,
@@ -413,25 +396,17 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 
 	h.invalidateProductCache(product.ID)
 
-	h.response.Created(c, product)
+	h.response.Created(c, productToResponse(product))
 }
 
-// @Summary Get product by ID
-// @Description Retrieves a product by its ID
-// @Tags Products
-// @Accept json
-// @Produce json
-// @Param id path int true "Product ID"
-// @Success 200 {object} Product
-// @Router /api/v1/products/{id} [get]
 func (h *ProductHandler) GetProduct(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid product ID")
+		h.response.ValidationError(c, "Invalid product ID format")
 		return
 	}
 
-	product, err := h.productRepo.FindByID(uint(id))
+	product, err := h.productRepo.FindByID(id)
 	if err != nil {
 		h.response.InternalError(c, "Failed to get product")
 		return
@@ -441,17 +416,9 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 		return
 	}
 
-	h.response.Success(c, product)
+	h.response.Success(c, productToResponse(product))
 }
 
-// @Summary Get product by slug
-// @Description Retrieves a product by its slug
-// @Tags Products
-// @Accept json
-// @Produce json
-// @Param slug path string true "Product slug"
-// @Success 200 {object} Product
-// @Router /api/v1/products/slug/{slug} [get]
 func (h *ProductHandler) GetProductBySlug(c *gin.Context) {
 	slug := c.Param("slug")
 
@@ -465,26 +432,17 @@ func (h *ProductHandler) GetProductBySlug(c *gin.Context) {
 		return
 	}
 
-	h.response.Success(c, product)
+	h.response.Success(c, productToResponse(product))
 }
 
-// @Summary Update a product
-// @Description Updates an existing product
-// @Tags Products
-// @Accept json
-// @Produce json
-// @Param id path int true "Product ID"
-// @Param product body UpdateProductRequest true "Product data"
-// @Success 200 {object} Product
-// @Router /api/v1/products/{id} [put]
 func (h *ProductHandler) UpdateProduct(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid product ID")
+		h.response.ValidationError(c, "Invalid product ID format")
 		return
 	}
 
-	product, err := h.productRepo.FindByID(uint(id))
+	product, err := h.productRepo.FindByID(id)
 	if err != nil {
 		h.response.InternalError(c, "Failed to get product")
 		return
@@ -501,7 +459,12 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	}
 
 	if req.CategoryID != nil {
-		product.CategoryID = *req.CategoryID
+		categoryID, parseErr := uuid.FromString(*req.CategoryID)
+		if parseErr != nil {
+			h.response.ValidationError(c, "Invalid category_id format")
+			return
+		}
+		product.CategoryID = categoryID
 	}
 	if req.Name != nil {
 		product.Name = *req.Name
@@ -527,47 +490,28 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	h.invalidateProductCache(uint(id))
+	h.invalidateProductCache(id)
 
-	h.response.Success(c, product)
+	h.response.Success(c, productToResponse(product))
 }
 
-// @Summary Delete a product
-// @Description Deletes a product by ID
-// @Tags Products
-// @Accept json
-// @Produce json
-// @Param id path int true "Product ID"
-// @Success 200
-// @Router /api/v1/products/{id} [delete]
 func (h *ProductHandler) DeleteProduct(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid product ID")
+		h.response.ValidationError(c, "Invalid product ID format")
 		return
 	}
 
-	if err := h.productRepo.Delete(uint(id)); err != nil {
+	if err := h.productRepo.Delete(id); err != nil {
 		h.response.InternalError(c, "Failed to delete product")
 		return
 	}
 
-	h.invalidateProductCache(uint(id))
+	h.invalidateProductCache(id)
 
 	h.response.Success(c, gin.H{"message": "Product deleted successfully"})
 }
 
-// @Summary Get all products
-// @Description Retrieves a list of products with optional pagination and filtering
-// @Tags Products
-// @Accept json
-// @Produce json
-// @Param offset query int false "Offset for pagination"
-// @Param limit query int false "Limit for pagination"
-// @Param category_id query int false "Filter by category ID"
-// @Param active query bool false "Filter by active status"
-// @Success 200 {array} Product
-// @Router /api/v1/products [get]
 func (h *ProductHandler) GetProducts(c *gin.Context) {
 	offsetStr := c.DefaultQuery("offset", "0")
 	limitStr := c.DefaultQuery("limit", "10")
@@ -600,12 +544,12 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 	var err error
 
 	if categoryID != "" {
-		catID, parseErr := strconv.ParseUint(categoryID, 10, 32)
+		catID, parseErr := uuid.FromString(categoryID)
 		if parseErr != nil {
-			h.response.ValidationError(c, "Invalid category ID")
+			h.response.ValidationError(c, "Invalid category ID format")
 			return
 		}
-		products, err = h.productRepo.FindByCategoryID(uint(catID), offset, limit)
+		products, err = h.productRepo.FindByCategoryID(catID, offset, limit)
 	} else if active != "" {
 		isActive, parseErr := strconv.ParseBool(active)
 		if parseErr != nil {
@@ -622,19 +566,13 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 		return
 	}
 
-	h.response.Success(c, products)
+	responses := make([]ProductResponse, len(products))
+	for i := range products {
+		responses[i] = productToResponse(&products[i])
+	}
+	h.response.Success(c, responses)
 }
 
-// ProductVariant Handlers
-// @Summary Create a product variant
-// @Description Creates a new variant for a product and updates inventory
-// @Tags Variants
-// @Accept json
-// @Produce json
-// @Param id path int true "Product ID"
-// @Param variant body CreateProductVariantRequest true "Variant data"
-// @Success 201 {object} ProductVariantResponse
-// @Router /api/v1/products/{id}/variants [post]
 func (h *ProductHandler) CreateVariant(c *gin.Context) {
 	var req CreateProductVariantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -642,8 +580,14 @@ func (h *ProductHandler) CreateVariant(c *gin.Context) {
 		return
 	}
 
+	productID, err := uuid.FromString(req.ProductID)
+	if err != nil {
+		h.response.ValidationError(c, "Invalid product_id format")
+		return
+	}
+
 	variant := &ProductVariant{
-		ProductID: req.ProductID,
+		ProductID: productID,
 		SKU:       req.SKU,
 		Price:     req.Price,
 		Stock:     req.Stock,
@@ -655,7 +599,6 @@ func (h *ProductHandler) CreateVariant(c *gin.Context) {
 		return
 	}
 
-	// Create variant attributes
 	attribute := &ProductVariantAttribute{
 		VariantID: variant.ID,
 		Color:     req.Color,
@@ -668,19 +611,16 @@ func (h *ProductHandler) CreateVariant(c *gin.Context) {
 	}
 	variant.Attribute = attribute
 
-	// Update inventory with variant stock
 	if h.inventoryRepo != nil && req.Stock > 0 {
-		// Find existing inventory or create new one
-		inv, err := h.inventoryRepo.FindByProductID(req.ProductID)
+		inv, err := h.inventoryRepo.FindByProductID(productID)
 		if err != nil {
 			h.response.InternalError(c, "Failed to update inventory")
 			return
 		}
 
 		if inv == nil {
-			// Create new inventory
 			inv = &inventory.Inventory{
-				ProductID: req.ProductID,
+				ProductID: productID,
 				Quantity:  req.Stock,
 				Reserved:  0,
 			}
@@ -689,36 +629,27 @@ func (h *ProductHandler) CreateVariant(c *gin.Context) {
 				return
 			}
 		} else {
-			// Update existing inventory (add stock)
 			newQuantity := inv.Quantity + req.Stock
-			if err := h.inventoryRepo.UpdateQuantity(req.ProductID, newQuantity); err != nil {
+			if err := h.inventoryRepo.UpdateQuantity(productID, newQuantity); err != nil {
 				h.response.InternalError(c, "Failed to update inventory")
 				return
 			}
 		}
 	}
 
-	h.invalidateVariantCache(0, req.ProductID)
+	h.invalidateVariantCache(variant.ID, productID)
 
 	h.response.Created(c, variantToResponse(variant))
 }
 
-// @Summary Get variant by ID
-// @Description Retrieves a variant by its ID
-// @Tags Variants
-// @Accept json
-// @Produce json
-// @Param id path int true "Variant ID"
-// @Success 200 {object} ProductVariantResponse
-// @Router /api/v1/variants/{id} [get]
 func (h *ProductHandler) GetVariant(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid variant ID")
+		h.response.ValidationError(c, "Invalid variant ID format")
 		return
 	}
 
-	variant, err := h.variantRepo.FindByID(uint(id))
+	variant, err := h.variantRepo.FindByID(id)
 	if err != nil {
 		h.response.InternalError(c, "Failed to get variant")
 		return
@@ -731,23 +662,14 @@ func (h *ProductHandler) GetVariant(c *gin.Context) {
 	h.response.Success(c, variantToResponse(variant))
 }
 
-// @Summary Update a variant
-// @Description Updates an existing variant
-// @Tags Variants
-// @Accept json
-// @Produce json
-// @Param id path int true "Variant ID"
-// @Param variant body UpdateProductVariantRequest true "Variant data"
-// @Success 200 {object} ProductVariantResponse
-// @Router /api/v1/variants/{id} [put]
 func (h *ProductHandler) UpdateVariant(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid variant ID")
+		h.response.ValidationError(c, "Invalid variant ID format")
 		return
 	}
 
-	variant, err := h.variantRepo.FindByID(uint(id))
+	variant, err := h.variantRepo.FindByID(id)
 	if err != nil {
 		h.response.InternalError(c, "Failed to get variant")
 		return
@@ -778,7 +700,6 @@ func (h *ProductHandler) UpdateVariant(c *gin.Context) {
 		return
 	}
 
-	// Update attributes if provided
 	if req.Color != nil || req.Size != nil || req.Weight != nil {
 		attribute, err := h.variantRepo.FindAttributeByVariantID(variant.ID)
 		if err != nil {
@@ -787,7 +708,6 @@ func (h *ProductHandler) UpdateVariant(c *gin.Context) {
 		}
 
 		if attribute == nil {
-			// Create new attribute if doesn't exist
 			attribute = &ProductVariantAttribute{
 				VariantID: variant.ID,
 			}
@@ -803,7 +723,7 @@ func (h *ProductHandler) UpdateVariant(c *gin.Context) {
 			attribute.Weight = *req.Weight
 		}
 
-		if attribute.ID == 0 {
+		if attribute.ID == uuid.Nil {
 			if err := h.variantRepo.CreateAttribute(attribute); err != nil {
 				h.response.InternalError(c, "Failed to create variant attributes")
 				return
@@ -822,29 +742,21 @@ func (h *ProductHandler) UpdateVariant(c *gin.Context) {
 	h.response.Success(c, variantToResponse(variant))
 }
 
-// @Summary Delete a variant
-// @Description Deletes a variant by ID
-// @Tags Variants
-// @Accept json
-// @Produce json
-// @Param id path int true "Variant ID"
-// @Success 200
-// @Router /api/v1/variants/{id} [delete]
 func (h *ProductHandler) DeleteVariant(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid variant ID")
+		h.response.ValidationError(c, "Invalid variant ID format")
 		return
 	}
 
-	variant, err := h.variantRepo.FindByID(uint(id))
+	variant, err := h.variantRepo.FindByID(id)
 	if err != nil {
 		h.response.InternalError(c, "Failed to get variant")
 		return
 	}
 
-	if err := h.variantRepo.Delete(uint(id)); err != nil {
-		log.Printf("ERROR: Failed to delete variant %d: %v", id, err)
+	if err := h.variantRepo.Delete(id); err != nil {
+		log.Printf("ERROR: Failed to delete variant %s: %v", id, err)
 		h.response.InternalError(c, "Failed to delete variant")
 		return
 	}
@@ -856,22 +768,14 @@ func (h *ProductHandler) DeleteVariant(c *gin.Context) {
 	h.response.Success(c, gin.H{"message": "Variant deleted successfully"})
 }
 
-// @Summary Get variants by product
-// @Description Retrieves all variants for a specific product
-// @Tags Variants
-// @Accept json
-// @Produce json
-// @Param id path int true "Product ID"
-// @Success 200 {array} ProductVariantResponse
-// @Router /api/v1/products/{id}/variants [get]
 func (h *ProductHandler) GetVariantsByProduct(c *gin.Context) {
-	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	productID, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid product ID")
+		h.response.ValidationError(c, "Invalid product ID format")
 		return
 	}
 
-	variants, err := h.variantRepo.FindByProductID(uint(productID))
+	variants, err := h.variantRepo.FindByProductID(productID)
 	if err != nil {
 		h.response.InternalError(c, "Failed to get variants")
 		return
@@ -885,20 +789,16 @@ func (h *ProductHandler) GetVariantsByProduct(c *gin.Context) {
 	h.response.Success(c, responses)
 }
 
-// ProductImage Handlers
-// @Summary Create a product image
-// @Description Creates a new image for a product
-// @Tags Images
-// @Accept json
-// @Produce json
-// @Param id path int true "Product ID"
-// @Param image body CreateProductImageRequest true "Image data"
-// @Success 201 {object} ProductImage
-// @Router /api/v1/products/{id}/images [post]
 func (h *ProductHandler) CreateImage(c *gin.Context) {
 	var req CreateProductImageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.response.ValidationError(c, err.Error())
+		return
+	}
+
+	productID, err := uuid.FromString(req.ProductID)
+	if err != nil {
+		h.response.ValidationError(c, "Invalid product_id format")
 		return
 	}
 
@@ -908,11 +808,19 @@ func (h *ProductHandler) CreateImage(c *gin.Context) {
 	}
 
 	image := &ProductImage{
-		ProductID: req.ProductID,
-		VariantID: req.VariantID,
+		ProductID: productID,
 		URLImage:  req.URLImage,
 		IsMain:    isMain,
 		SortOrder: req.SortOrder,
+	}
+
+	if req.VariantID != nil && *req.VariantID != "" {
+		variantID, parseErr := uuid.FromString(*req.VariantID)
+		if parseErr != nil {
+			h.response.ValidationError(c, "Invalid variant_id format")
+			return
+		}
+		image.VariantID = &variantID
 	}
 
 	if err := h.imageRepo.Create(image); err != nil {
@@ -920,27 +828,19 @@ func (h *ProductHandler) CreateImage(c *gin.Context) {
 		return
 	}
 
-	h.invalidateImageCache(0, req.ProductID)
+	h.invalidateImageCache(image.ID, productID)
 
-	h.response.Created(c, image)
+	h.response.Created(c, imageToResponse(image))
 }
 
-// @Summary Get image by ID
-// @Description Retrieves an image by its ID
-// @Tags Images
-// @Accept json
-// @Produce json
-// @Param id path int true "Image ID"
-// @Success 200 {object} ProductImage
-// @Router /api/v1/images/{id} [get]
 func (h *ProductHandler) GetImage(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid image ID")
+		h.response.ValidationError(c, "Invalid image ID format")
 		return
 	}
 
-	image, err := h.imageRepo.FindByID(uint(id))
+	image, err := h.imageRepo.FindByID(id)
 	if err != nil {
 		h.response.InternalError(c, "Failed to get image")
 		return
@@ -950,26 +850,17 @@ func (h *ProductHandler) GetImage(c *gin.Context) {
 		return
 	}
 
-	h.response.Success(c, image)
+	h.response.Success(c, imageToResponse(image))
 }
 
-// @Summary Update an image
-// @Description Updates an existing image
-// @Tags Images
-// @Accept json
-// @Produce json
-// @Param id path int true "Image ID"
-// @Param image body UpdateProductImageRequest true "Image data"
-// @Success 200 {object} ProductImage
-// @Router /api/v1/images/{id} [put]
 func (h *ProductHandler) UpdateImage(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid image ID")
+		h.response.ValidationError(c, "Invalid image ID format")
 		return
 	}
 
-	image, err := h.imageRepo.FindByID(uint(id))
+	image, err := h.imageRepo.FindByID(id)
 	if err != nil {
 		h.response.InternalError(c, "Failed to get image")
 		return
@@ -1002,31 +893,23 @@ func (h *ProductHandler) UpdateImage(c *gin.Context) {
 
 	h.invalidateImageCache(image.ID, image.ProductID)
 
-	h.response.Success(c, image)
+	h.response.Success(c, imageToResponse(image))
 }
 
-// @Summary Delete an image
-// @Description Deletes an image by ID
-// @Tags Images
-// @Accept json
-// @Produce json
-// @Param id path int true "Image ID"
-// @Success 200
-// @Router /api/v1/images/{id} [delete]
 func (h *ProductHandler) DeleteImage(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid image ID")
+		h.response.ValidationError(c, "Invalid image ID format")
 		return
 	}
 
-	image, err := h.imageRepo.FindByID(uint(id))
+	image, err := h.imageRepo.FindByID(id)
 	if err != nil {
 		h.response.InternalError(c, "Failed to get image")
 		return
 	}
 
-	if err := h.imageRepo.Delete(uint(id)); err != nil {
+	if err := h.imageRepo.Delete(id); err != nil {
 		h.response.InternalError(c, "Failed to delete image")
 		return
 	}
@@ -1038,71 +921,57 @@ func (h *ProductHandler) DeleteImage(c *gin.Context) {
 	h.response.Success(c, gin.H{"message": "Image deleted successfully"})
 }
 
-// @Summary Get images by product
-// @Description Retrieves all images for a specific product
-// @Tags Images
-// @Accept json
-// @Produce json
-// @Param id path int true "Product ID"
-// @Success 200 {array} ProductImage
-// @Router /api/v1/products/{id}/images [get]
 func (h *ProductHandler) GetImagesByProduct(c *gin.Context) {
-	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	productID, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid product ID")
+		h.response.ValidationError(c, "Invalid product ID format")
 		return
 	}
 
-	images, err := h.imageRepo.FindByProductID(uint(productID))
+	images, err := h.imageRepo.FindByProductID(productID)
 	if err != nil {
 		h.response.InternalError(c, "Failed to get images")
 		return
 	}
 
-	h.response.Success(c, images)
+	responses := make([]ProductImageResponse, len(images))
+	for i, img := range images {
+		responses[i] = imageToResponse(&img)
+	}
+	h.response.Success(c, responses)
 }
 
-// @Summary Set main image
-// @Description Sets a product image as the main image
-// @Tags Images
-// @Accept json
-// @Produce json
-// @Param id path int true "Product ID"
-// @Param image_id path int true "Image ID"
-// @Success 200
-// @Router /api/v1/products/{id}/images/{image_id}/main [put]
 func (h *ProductHandler) SetMainImage(c *gin.Context) {
-	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	productID, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid product ID")
+		h.response.ValidationError(c, "Invalid product ID format")
 		return
 	}
 
-	imageID, err := strconv.ParseUint(c.Param("image_id"), 10, 32)
+	imageID, err := uuid.FromString(c.Param("image_id"))
 	if err != nil {
-		h.response.ValidationError(c, "Invalid image ID")
+		h.response.ValidationError(c, "Invalid image ID format")
 		return
 	}
 
-	if err := h.imageRepo.SetMainImage(uint(productID), uint(imageID)); err != nil {
+	if err := h.imageRepo.SetMainImage(productID, imageID); err != nil {
 		h.response.InternalError(c, "Failed to set main image")
 		return
 	}
 
-	h.invalidateProductCache(uint(productID))
+	h.invalidateProductCache(productID)
 
 	h.response.Success(c, gin.H{"message": "Main image set successfully"})
 }
 
-// invalidateProductCache invalidates all product-related cache entries (non-blocking)
-func (h *ProductHandler) invalidateProductCache(productID uint) {
+func (h *ProductHandler) invalidateProductCache(productID uuid.UUID) {
 	if h.cache == nil {
 		return
 	}
 	ctx := context.Background()
 	go func() {
-		if err := h.cache.Delete(ctx, h.cache.Key("cache", "product", fmt.Sprintf("%d", productID))); err != nil {
-			log.Printf("Failed to invalidate product cache %d: %v", productID, err)
+		if err := h.cache.Delete(ctx, h.cache.Key("cache", "product", productID.String())); err != nil {
+			log.Printf("Failed to invalidate product cache %s: %v", productID, err)
 		}
 		if err := h.cache.InvalidatePattern(ctx, "cache:product:list:*"); err != nil {
 			log.Printf("Failed to invalidate product list cache: %v", err)
@@ -1113,15 +982,14 @@ func (h *ProductHandler) invalidateProductCache(productID uint) {
 	}()
 }
 
-// invalidateCategoryCache invalidates all category-related cache entries (non-blocking)
-func (h *ProductHandler) invalidateCategoryCache(categoryID uint) {
+func (h *ProductHandler) invalidateCategoryCache(categoryID uuid.UUID) {
 	if h.cache == nil {
 		return
 	}
 	ctx := context.Background()
 	go func() {
-		if err := h.cache.Delete(ctx, h.cache.Key("cache", "category", fmt.Sprintf("%d", categoryID))); err != nil {
-			log.Printf("Failed to invalidate category cache %d: %v", categoryID, err)
+		if err := h.cache.Delete(ctx, h.cache.Key("cache", "category", categoryID.String())); err != nil {
+			log.Printf("Failed to invalidate category cache %s: %v", categoryID, err)
 		}
 		if err := h.cache.Delete(ctx, h.cache.Key("cache", "category", "list")); err != nil {
 			log.Printf("Failed to invalidate category list cache: %v", err)
@@ -1132,23 +1000,22 @@ func (h *ProductHandler) invalidateCategoryCache(categoryID uint) {
 	}()
 }
 
-// invalidateVariantCache invalidates variant-related cache entries (non-blocking)
-func (h *ProductHandler) invalidateVariantCache(variantID uint, productID uint) {
+func (h *ProductHandler) invalidateVariantCache(variantID uuid.UUID, productID uuid.UUID) {
 	if h.cache == nil {
 		return
 	}
 	ctx := context.Background()
 	go func() {
-		if variantID > 0 {
-			if err := h.cache.Delete(ctx, h.cache.Key("cache", "variant", fmt.Sprintf("%d", variantID))); err != nil {
-				log.Printf("Failed to invalidate variant cache %d: %v", variantID, err)
+		if variantID != uuid.Nil {
+			if err := h.cache.Delete(ctx, h.cache.Key("cache", "variant", variantID.String())); err != nil {
+				log.Printf("Failed to invalidate variant cache %s: %v", variantID, err)
 			}
 		}
-		if err := h.cache.Delete(ctx, h.cache.Key("cache", "variant", "product", fmt.Sprintf("%d", productID))); err != nil {
-			log.Printf("Failed to invalidate variant product cache %d: %v", productID, err)
+		if err := h.cache.Delete(ctx, h.cache.Key("cache", "variant", "product", productID.String())); err != nil {
+			log.Printf("Failed to invalidate variant product cache %s: %v", productID, err)
 		}
-		if err := h.cache.Delete(ctx, h.cache.Key("cache", "product", fmt.Sprintf("%d", productID))); err != nil {
-			log.Printf("Failed to invalidate product cache %d: %v", productID, err)
+		if err := h.cache.Delete(ctx, h.cache.Key("cache", "product", productID.String())); err != nil {
+			log.Printf("Failed to invalidate product cache %s: %v", productID, err)
 		}
 		if err := h.cache.InvalidatePattern(ctx, "cache:product:list:*"); err != nil {
 			log.Printf("Failed to invalidate product list cache after variant mutation: %v", err)
@@ -1156,41 +1023,41 @@ func (h *ProductHandler) invalidateVariantCache(variantID uint, productID uint) 
 	}()
 }
 
-// invalidateImageCache invalidates image-related cache entries (non-blocking)
-func (h *ProductHandler) invalidateImageCache(imageID uint, productID uint) {
+func (h *ProductHandler) invalidateImageCache(imageID uuid.UUID, productID uuid.UUID) {
 	if h.cache == nil {
 		return
 	}
 	ctx := context.Background()
 	go func() {
-		if imageID > 0 {
-			if err := h.cache.Delete(ctx, h.cache.Key("cache", "image", fmt.Sprintf("%d", imageID))); err != nil {
-				log.Printf("Failed to invalidate image cache %d: %v", imageID, err)
+		if imageID != uuid.Nil {
+			if err := h.cache.Delete(ctx, h.cache.Key("cache", "image", imageID.String())); err != nil {
+				log.Printf("Failed to invalidate image cache %s: %v", imageID, err)
 			}
 		}
-		if err := h.cache.Delete(ctx, h.cache.Key("cache", "image", "product", fmt.Sprintf("%d", productID))); err != nil {
-			log.Printf("Failed to invalidate image product cache %d: %v", productID, err)
+		if err := h.cache.Delete(ctx, h.cache.Key("cache", "image", "product", productID.String())); err != nil {
+			log.Printf("Failed to invalidate image product cache %s: %v", productID, err)
 		}
-		if err := h.cache.Delete(ctx, h.cache.Key("cache", "product", fmt.Sprintf("%d", productID))); err != nil {
-			log.Printf("Failed to invalidate product cache %d: %v", productID, err)
+		if err := h.cache.Delete(ctx, h.cache.Key("cache", "product", productID.String())); err != nil {
+			log.Printf("Failed to invalidate product cache %s: %v", productID, err)
 		}
 	}()
 }
 
-// toCategoryResponse converts a Category to CategoryResponse
 func toCategoryResponse(cat Category) CategoryResponse {
 	resp := CategoryResponse{
-		ID:          cat.ID,
+		ID:          cat.ID.String(),
 		Name:        cat.Name,
 		Slug:        cat.Slug,
 		Description: cat.Description,
-		ParentID:    cat.ParentID,
-		Path:        cat.Path,
 		Level:       cat.Level,
 		IsActive:    cat.IsActive,
 		SortOrder:   cat.SortOrder,
 		CreatedAt:   cat.CreatedAt,
 		UpdatedAt:   cat.UpdatedAt,
+	}
+	if cat.ParentID != nil {
+		s := cat.ParentID.String()
+		resp.ParentID = &s
 	}
 	if cat.Subcategories != nil {
 		resp.Subcategories = make([]CategoryResponse, len(cat.Subcategories))
@@ -1201,7 +1068,6 @@ func toCategoryResponse(cat Category) CategoryResponse {
 	return resp
 }
 
-// toCategoryResponseList converts a slice of Categories to CategoryResponses
 func toCategoryResponseList(categories []Category) []CategoryResponse {
 	responses := make([]CategoryResponse, len(categories))
 	for i, cat := range categories {
