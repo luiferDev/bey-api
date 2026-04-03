@@ -4,15 +4,15 @@ app:
   mode: "release"
   static_path: "./cmd/api/static"
   swagger_enabled: true
-  admin_email: "admin@bey.com"
-  admin_password: ""  # Override with ADMIN_PASSWORD env var
+  admin_email: ""
+  admin_password: ""
 
 database:
-  host: "postgres"
+  host: ""
   port: 5432
-  user: "bey_user"
-  password: ""  # Override with DB_PASSWORD env var
-  name: "bey_db"
+  user: ""
+  password: ""
+  name: ""
   sslmode: "disable"
   max_open_conns: 25
   max_idle_conns: 5
@@ -29,15 +29,13 @@ concurrency:
     endpoint_limits: {}
 
 security:
-  allowed_origins:
-    - "http://localhost:3000"
-    - "http://localhost:8080"
-  jwt_secret: ""  # Override with JWT_SECRET env var (min 32 chars)
-  jwt_expiry_hours: 2
-  jwt_access_expiry: "15m"
-  jwt_refresh_expiry: "168h"
-  jwt_issuer: "bey_api"
-  jwt_algorithm: "HS256"
+  allowed_origins: []
+  jwt_secret: ""
+  jwt_expiry_hours: 0
+  jwt_access_expiry: ""
+  jwt_refresh_expiry: ""
+  jwt_issuer: ""
+  jwt_algorithm: ""
   csrf_enabled: true
 
 rate_limit:
@@ -70,19 +68,19 @@ rate_limit:
 
 email:
   enabled: true
-  from_name: "Bey API"
-  from_email: "noreply@beyapi.com"
+  from_name: ""
+  from_email: ""
   smtp:
-    host: "smtp.gmail.com"
+    host: ""
     port: 587
-    username: ""  # Override with SMTP_USERNAME env var
-    password: ""  # Override with SMTP_PASSWORD env var
+    username: ""
+    password: ""
 
 oauth:
   google:
-    client_id: ""     # Override with GOOGLE_OAUTH_CLIENT_ID env var
-    client_secret: "" # Override with GOOGLE_OAUTH_CLIENT_SECRET env var
-    redirect_url: "http://localhost:8080/api/v1/auth/google/callback"
+    client_id: ""
+    client_secret: ""
+    redirect_url: ""
 
 cart:
   enabled: true
@@ -95,12 +93,12 @@ cart:
 
 wompi:
   enabled: true
-  environment: "sandbox"
-  public_key: ""    # Override with WOMPI_PUBLIC_KEY env var
-  private_key: ""   # Override with WOMPI_PRIVATE_KEY env var
-  event_key: ""     # Override with WOMPI_EVENT_KEY env var
-  integrity_key: "" # Override with WOMPI_INTEGRITY_KEY env var
-  base_url: "https://sandbox.wompi.co"
+  environment: ""
+  public_key: ""
+  private_key: ""
+  event_key: ""
+  integrity_key: ""
+  base_url: ""
 
 cache:
   enabled: true
