@@ -3,12 +3,13 @@ package products
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"time"
 
 	"bey/internal/concurrency"
 	"bey/internal/shared/cache"
+
+	"github.com/gofrs/uuid/v5"
 )
 
 type ProductService struct {
@@ -85,7 +86,7 @@ func NewProductServiceWithAllDeps(
 }
 
 // ValidateCategory verifica que una categoría existe y está activa
-func (s *ProductService) ValidateCategory(categoryID uint) error {
+func (s *ProductService) ValidateCategory(categoryID uuid.UUID) error {
 	category, err := s.categoryRepo.FindByID(categoryID)
 	if err != nil {
 		return err
@@ -102,8 +103,11 @@ func (s *ProductService) CreateProductWithVariants(
 	variants []CreateProductVariantRequest,
 	images []CreateProductImageRequest,
 ) (*Product, error) {
-	// Validar categoría
-	if err := s.ValidateCategory(productReq.CategoryID); err != nil {
+	categoryID, err := uuid.FromString(productReq.CategoryID)
+	if err != nil {
+		return nil, errors.New("invalid category ID")
+	}
+	if err := s.ValidateCategory(categoryID); err != nil {
 		return nil, err
 	}
 
@@ -114,7 +118,7 @@ func (s *ProductService) CreateProductWithVariants(
 	}
 
 	product := &Product{
-		CategoryID:  productReq.CategoryID,
+		CategoryID:  categoryID,
 		Name:        productReq.Name,
 		Slug:        productReq.Slug,
 		Brand:       productReq.Brand,
@@ -163,7 +167,7 @@ func (s *ProductService) CreateProductWithVariants(
 
 		image := &ProductImage{
 			ProductID: product.ID,
-			VariantID: imageReq.VariantID,
+			VariantID: parseVariantID(imageReq.VariantID),
 			URLImage:  imageReq.URLImage,
 			IsMain:    isMain,
 			SortOrder: imageReq.SortOrder,
@@ -181,12 +185,12 @@ func (s *ProductService) CreateProductWithVariants(
 }
 
 // GetProductWithDetails obtiene un producto con todas sus relaciones
-func (s *ProductService) GetProductWithDetails(productID uint) (*Product, error) {
+func (s *ProductService) GetProductWithDetails(productID uuid.UUID) (*Product, error) {
 	return s.productRepo.FindByID(productID)
 }
 
 // UpdateProductStock actualiza el stock de una variante específica
-func (s *ProductService) UpdateProductStock(variantID uint, newStock int) error {
+func (s *ProductService) UpdateProductStock(variantID uuid.UUID, newStock int) error {
 	variant, err := s.variantRepo.FindByID(variantID)
 	if err != nil {
 		return err
@@ -199,7 +203,7 @@ func (s *ProductService) UpdateProductStock(variantID uint, newStock int) error 
 }
 
 // CheckProductAvailability verifica si un producto tiene stock disponible
-func (s *ProductService) CheckProductAvailability(productID uint) (bool, int, error) {
+func (s *ProductService) CheckProductAvailability(productID uuid.UUID) (bool, int, error) {
 	variants, err := s.variantRepo.FindByProductID(productID)
 	if err != nil {
 		return false, 0, err
@@ -214,8 +218,7 @@ func (s *ProductService) CheckProductAvailability(productID uint) (bool, int, er
 }
 
 // GetProductsByCategory obtiene productos de una categoría específica con paginación
-func (s *ProductService) GetProductsByCategory(categoryID uint, offset, limit int) ([]Product, error) {
-	// Validar que la categoría existe
+func (s *ProductService) GetProductsByCategory(categoryID uuid.UUID, offset, limit int) ([]Product, error) {
 	if err := s.ValidateCategory(categoryID); err != nil {
 		return nil, err
 	}
@@ -231,7 +234,7 @@ func (s *ProductService) SearchProducts(query string, offset, limit int) ([]Prod
 }
 
 // DeactivateProduct desactiva un producto y todas sus variantes
-func (s *ProductService) DeactivateProduct(productID uint) error {
+func (s *ProductService) DeactivateProduct(productID uuid.UUID) error {
 	product, err := s.productRepo.FindByID(productID)
 	if err != nil {
 		return err
@@ -250,7 +253,7 @@ func (s *ProductService) GetCategoryHierarchy() ([]Category, error) {
 }
 
 // ValidateProductSlug verifica que un slug de producto sea único
-func (s *ProductService) ValidateProductSlug(slug string, excludeID *uint) error {
+func (s *ProductService) ValidateProductSlug(slug string, excludeID *uuid.UUID) error {
 	product, err := s.productRepo.FindBySlug(slug)
 	if err != nil {
 		return err
@@ -262,7 +265,7 @@ func (s *ProductService) ValidateProductSlug(slug string, excludeID *uint) error
 }
 
 // ValidateCategorySlug verifica que un slug de categoría sea único
-func (s *ProductService) ValidateCategorySlug(slug string, excludeID *uint) error {
+func (s *ProductService) ValidateCategorySlug(slug string, excludeID *uuid.UUID) error {
 	category, err := s.categoryRepo.FindBySlug(slug)
 	if err != nil {
 		return err
@@ -274,7 +277,7 @@ func (s *ProductService) ValidateCategorySlug(slug string, excludeID *uint) erro
 }
 
 // ValidateVariantSKU verifica que un SKU de variante sea único
-func (s *ProductService) ValidateVariantSKU(sku string, excludeID *uint) error {
+func (s *ProductService) ValidateVariantSKU(sku string, excludeID *uuid.UUID) error {
 	variant, err := s.variantRepo.FindBySKU(sku)
 	if err != nil {
 		return err
@@ -286,7 +289,7 @@ func (s *ProductService) ValidateVariantSKU(sku string, excludeID *uint) error {
 }
 
 // GetProductStats obtiene estadísticas de un producto
-func (s *ProductService) GetProductStats(productID uint) (map[string]interface{}, error) {
+func (s *ProductService) GetProductStats(productID uuid.UUID) (map[string]interface{}, error) {
 	product, err := s.productRepo.FindByID(productID)
 	if err != nil {
 		return nil, err
@@ -324,7 +327,7 @@ func (s *ProductService) GetProductStats(productID uint) (map[string]interface{}
 }
 
 type BulkUpdateProductsRequest struct {
-	ProductIDs []uint                 `json:"product_ids" binding:"required"`
+	ProductIDs []uuid.UUID            `json:"product_ids" binding:"required"`
 	Updates    []UpdateProductRequest `json:"updates" binding:"required"`
 }
 
@@ -333,7 +336,7 @@ type BulkCreateProductsRequest struct {
 }
 
 type BulkDeleteProductsRequest struct {
-	ProductIDs []uint `json:"product_ids" binding:"required"`
+	ProductIDs []uuid.UUID `json:"product_ids" binding:"required"`
 }
 
 type BulkTaskResult struct {
@@ -398,7 +401,7 @@ func (s *ProductService) processBulkUpdateTask(task *concurrency.Task) {
 	task.UpdatedAt = time.Now()
 }
 
-func (s *ProductService) applyProductUpdate(productID uint, update UpdateProductRequest) error {
+func (s *ProductService) applyProductUpdate(productID uuid.UUID, update UpdateProductRequest) error {
 	product, err := s.productRepo.FindByID(productID)
 	if err != nil {
 		return err
@@ -408,7 +411,8 @@ func (s *ProductService) applyProductUpdate(productID uint, update UpdateProduct
 	}
 
 	if update.CategoryID != nil {
-		product.CategoryID = *update.CategoryID
+		catID, _ := uuid.FromString(*update.CategoryID)
+		product.CategoryID = catID
 	}
 	if update.Name != nil {
 		product.Name = *update.Name
@@ -569,23 +573,34 @@ func (s *ProductService) invalidateCategoryCache() {
 }
 
 // InvalidateProductCache public method for handlers to call after mutations
-func (s *ProductService) InvalidateProductCache(productID uint) {
+func (s *ProductService) InvalidateProductCache(productID uuid.UUID) {
 	if s.cache == nil {
 		return
 	}
 
 	ctx := context.Background()
-	s.cache.Delete(ctx, s.cache.Key("cache", "product", fmt.Sprintf("%d", productID)))
+	s.cache.Delete(ctx, s.cache.Key("cache", "product", productID.String()))
 	s.invalidateProductCache()
 }
 
 // InvalidateCategoryCache public method for handlers to call after mutations
-func (s *ProductService) InvalidateCategoryCache(categoryID uint) {
+func (s *ProductService) InvalidateCategoryCache(categoryID uuid.UUID) {
 	if s.cache == nil {
 		return
 	}
 
 	ctx := context.Background()
-	s.cache.Delete(ctx, s.cache.Key("cache", "category", fmt.Sprintf("%d", categoryID)))
+	s.cache.Delete(ctx, s.cache.Key("cache", "category", categoryID.String()))
 	s.invalidateCategoryCache()
+}
+
+func parseVariantID(s *string) *uuid.UUID {
+	if s == nil || *s == "" {
+		return nil
+	}
+	id, err := uuid.FromString(*s)
+	if err != nil {
+		return nil
+	}
+	return &id
 }

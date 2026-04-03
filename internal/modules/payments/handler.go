@@ -55,7 +55,8 @@ func (h *PaymentHandler) GetPayment(c *gin.Context) {
 		return
 	}
 
-	userID := c.GetUint("user_id")
+	userIDStr := c.GetString("user_id")
+	userID, _ := uuid.FromString(userIDStr)
 	userRole := c.GetString("user_role")
 	if userRole != "admin" {
 		order, err := h.service.GetOrderByPaymentID(payment.OrderID)
@@ -97,7 +98,8 @@ func (h *PaymentHandler) VoidPayment(c *gin.Context) {
 		return
 	}
 
-	userID := c.GetUint("user_id")
+	userIDStr := c.GetString("user_id")
+	userID, _ := uuid.FromString(userIDStr)
 	userRole := c.GetString("user_role")
 	if userRole != "admin" {
 		order, err := h.service.GetOrderByPaymentID(payment.OrderID)
@@ -147,7 +149,8 @@ func (h *PaymentHandler) GetPaymentLink(c *gin.Context) {
 		return
 	}
 
-	userID := c.GetUint("user_id")
+	userIDStr := c.GetString("user_id")
+	userID, _ := uuid.FromString(userIDStr)
 	userRole := c.GetString("user_role")
 	if userRole != "admin" {
 		order, err := h.service.GetOrderByPaymentID(link.OrderID)
@@ -173,7 +176,8 @@ func (h *PaymentHandler) ActivatePaymentLink(c *gin.Context) {
 		return
 	}
 
-	userID := c.GetUint("user_id")
+	userIDStr := c.GetString("user_id")
+	userID, _ := uuid.FromString(userIDStr)
 	userRole := c.GetString("user_role")
 	if userRole != "admin" {
 		order, err := h.service.GetOrderByPaymentID(link.OrderID)
@@ -205,7 +209,8 @@ func (h *PaymentHandler) DeactivatePaymentLink(c *gin.Context) {
 		return
 	}
 
-	userID := c.GetUint("user_id")
+	userIDStr := c.GetString("user_id")
+	userID, _ := uuid.FromString(userIDStr)
 	userRole := c.GetString("user_role")
 	if userRole != "admin" {
 		order, err := h.service.GetOrderByPaymentID(link.OrderID)

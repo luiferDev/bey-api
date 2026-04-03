@@ -14,6 +14,7 @@ import (
 	"bey/internal/modules/email"
 	"bey/internal/modules/users"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -28,10 +29,10 @@ type AuthServiceInterface interface {
 	ResendVerification(ctx context.Context, email string) error
 	ForgotPassword(ctx context.Context, email string) error
 	ResetPassword(ctx context.Context, token, newPassword string) error
-	SetupTwoFactor(ctx context.Context, userID uint) (*TwoFASetupResponse, error)
-	EnableTwoFactor(ctx context.Context, userID uint, code string) (*TwoFAEnableResponse, error)
-	DisableTwoFactor(ctx context.Context, userID uint, code, backupCode string) error
-	VerifyTwoFactor(ctx context.Context, userID uint, code string) (bool, error)
+	SetupTwoFactor(ctx context.Context, userID uuid.UUID) (*TwoFASetupResponse, error)
+	EnableTwoFactor(ctx context.Context, userID uuid.UUID, code string) (*TwoFAEnableResponse, error)
+	DisableTwoFactor(ctx context.Context, userID uuid.UUID, code, backupCode string) error
+	VerifyTwoFactor(ctx context.Context, userID uuid.UUID, code string) (bool, error)
 	LoginWith2FA(ctx context.Context, tempToken, code string) (*TokenResponse, error)
 }
 
@@ -46,7 +47,7 @@ type AuthService struct {
 }
 
 type tempTokenData struct {
-	UserID    uint
+	UserID    uuid.UUID
 	ExpiresAt time.Time
 }
 
@@ -364,7 +365,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	return s.RevokeAllUserRefreshTokens(user.ID)
 }
 
-func (s *AuthService) SetupTwoFactor(ctx context.Context, userID uint) (*TwoFASetupResponse, error) {
+func (s *AuthService) SetupTwoFactor(ctx context.Context, userID uuid.UUID) (*TwoFASetupResponse, error) {
 	userRepo := users.NewUserRepository(s.db)
 	user, err := userRepo.FindByID(userID)
 	if err != nil {
@@ -409,7 +410,7 @@ func (s *AuthService) SetupTwoFactor(ctx context.Context, userID uint) (*TwoFASe
 	}, nil
 }
 
-func (s *AuthService) EnableTwoFactor(ctx context.Context, userID uint, code string) (*TwoFAEnableResponse, error) {
+func (s *AuthService) EnableTwoFactor(ctx context.Context, userID uuid.UUID, code string) (*TwoFAEnableResponse, error) {
 	userRepo := users.NewUserRepository(s.db)
 	user, err := userRepo.FindByID(userID)
 	if err != nil {
@@ -463,7 +464,7 @@ func (s *AuthService) EnableTwoFactor(ctx context.Context, userID uint, code str
 	}, nil
 }
 
-func (s *AuthService) DisableTwoFactor(ctx context.Context, userID uint, code, backupCode string) error {
+func (s *AuthService) DisableTwoFactor(ctx context.Context, userID uuid.UUID, code, backupCode string) error {
 	userRepo := users.NewUserRepository(s.db)
 	user, err := userRepo.FindByID(userID)
 	if err != nil {
@@ -506,7 +507,7 @@ func (s *AuthService) DisableTwoFactor(ctx context.Context, userID uint, code, b
 	return userRepo.Update(user)
 }
 
-func (s *AuthService) VerifyTwoFactor(ctx context.Context, userID uint, code string) (bool, error) {
+func (s *AuthService) VerifyTwoFactor(ctx context.Context, userID uuid.UUID, code string) (bool, error) {
 	userRepo := users.NewUserRepository(s.db)
 	user, err := userRepo.FindByID(userID)
 	if err != nil {
@@ -540,7 +541,7 @@ func (s *AuthService) VerifyTwoFactor(ctx context.Context, userID uint, code str
 	return validCode, nil
 }
 
-func (s *AuthService) generateTempToken(userID uint) string {
+func (s *AuthService) generateTempToken(userID uuid.UUID) string {
 	tokenBytes := make([]byte, 32)
 	_, _ = rand.Read(tokenBytes)
 	tempToken := base64.StdEncoding.EncodeToString(tokenBytes)
@@ -558,20 +559,20 @@ func (s *AuthService) generateTempToken(userID uint) string {
 	return tempToken
 }
 
-func (s *AuthService) validateTempToken(tempToken string) (uint, error) {
+func (s *AuthService) validateTempToken(tempToken string) (uuid.UUID, error) {
 	s.tempTokensMu.RLock()
 	data, exists := s.tempTokens[tempToken]
 	s.tempTokensMu.RUnlock()
 
 	if !exists {
-		return 0, errors.New("invalid temp token")
+		return uuid.Nil, errors.New("invalid temp token")
 	}
 
 	if time.Now().After(data.ExpiresAt) {
 		s.tempTokensMu.Lock()
 		delete(s.tempTokens, tempToken)
 		s.tempTokensMu.Unlock()
-		return 0, errors.New("temp token expired")
+		return uuid.Nil, errors.New("temp token expired")
 	}
 
 	s.tempTokensMu.Lock()
@@ -626,7 +627,7 @@ func (s *AuthService) LoginWith2FA(ctx context.Context, tempToken, code string) 
 	}, nil
 }
 
-func (s *AuthService) RevokeAllUserRefreshTokens(userID uint) error {
+func (s *AuthService) RevokeAllUserRefreshTokens(userID uuid.UUID) error {
 	return s.db.Model(&RefreshToken{}).Where("user_id = ? AND revoked = ?", userID, false).Update("revoked", true).Error
 }
 

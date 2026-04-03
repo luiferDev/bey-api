@@ -8,25 +8,27 @@ import (
 
 	"bey/internal/concurrency"
 	inventory "bey/internal/modules/inventory"
+
+	"github.com/gofrs/uuid/v5"
 )
 
 type InventoryReserver interface {
-	Reserve(productID uint, quantity int) error
-	FindByProductID(productID uint) (*inventory.Inventory, error)
+	Reserve(productID uuid.UUID, quantity int) error
+	FindByProductID(productID uuid.UUID) (*inventory.Inventory, error)
 }
 
 type VariantStockManager interface {
-	GetPriceAndStock(id uint) (float64, int, int, error) // price, stock, reserved, error
-	ReserveStock(id uint, quantity int) error
-	ReleaseStock(id uint, quantity int) error
-	ConfirmSale(id uint, quantity int) error
+	GetPriceAndStock(id uuid.UUID) (float64, int, int, error)
+	ReserveStock(id uuid.UUID, quantity int) error
+	ReleaseStock(id uuid.UUID, quantity int) error
+	ConfirmSale(id uuid.UUID, quantity int) error
 }
 
 type OrderService struct {
 	repo        *OrderRepository
 	taskQueue   concurrency.TaskQueue
 	productRepo interface {
-		GetPriceByID(id uint) (float64, error)
+		GetPriceByID(id uuid.UUID) (float64, error)
 	}
 	variantRepo   VariantStockManager
 	inventoryRepo InventoryReserver
@@ -35,7 +37,7 @@ type OrderService struct {
 // CreateOrderPayload wraps the request with authenticated user ID
 type CreateOrderPayload struct {
 	Request CreateOrderRequest
-	UserID  uint
+	UserID  uuid.UUID
 }
 
 func NewOrderService(repo *OrderRepository) *OrderService {
@@ -52,7 +54,7 @@ func NewOrderServiceWithTaskQueue(repo *OrderRepository, taskQueue concurrency.T
 }
 
 func NewOrderServiceWithProductRepo(repo *OrderRepository, productRepo interface {
-	GetPriceByID(id uint) (float64, error)
+	GetPriceByID(id uuid.UUID) (float64, error)
 }) *OrderService {
 	return &OrderService{
 		repo:        repo,
@@ -61,7 +63,7 @@ func NewOrderServiceWithProductRepo(repo *OrderRepository, productRepo interface
 }
 
 func NewOrderServiceWithAll(repo *OrderRepository, taskQueue concurrency.TaskQueue, productRepo interface {
-	GetPriceByID(id uint) (float64, error)
+	GetPriceByID(id uuid.UUID) (float64, error)
 }) *OrderService {
 	return &OrderService{
 		repo:        repo,
@@ -80,7 +82,7 @@ func NewOrderServiceWithInventory(repo *OrderRepository, inventoryRepo Inventory
 func NewOrderServiceWithProductAndInventory(
 	repo *OrderRepository,
 	productRepo interface {
-		GetPriceByID(id uint) (float64, error)
+		GetPriceByID(id uuid.UUID) (float64, error)
 	},
 	inventoryRepo InventoryReserver,
 ) *OrderService {
@@ -95,7 +97,7 @@ func NewOrderServiceWithAllDeps(
 	repo *OrderRepository,
 	taskQueue concurrency.TaskQueue,
 	productRepo interface {
-		GetPriceByID(id uint) (float64, error)
+		GetPriceByID(id uuid.UUID) (float64, error)
 	},
 	inventoryRepo InventoryReserver,
 ) *OrderService {
@@ -112,7 +114,7 @@ func NewOrderServiceWithAllDepsAndVariant(
 	repo *OrderRepository,
 	taskQueue concurrency.TaskQueue,
 	productRepo interface {
-		GetPriceByID(id uint) (float64, error)
+		GetPriceByID(id uuid.UUID) (float64, error)
 	},
 	inventoryRepo InventoryReserver,
 	variantRepo VariantStockManager,
@@ -126,7 +128,7 @@ func NewOrderServiceWithAllDepsAndVariant(
 	}
 }
 
-func (s *OrderService) SubmitAsyncOrder(req CreateOrderRequest, userID uint) (string, error) {
+func (s *OrderService) SubmitAsyncOrder(req CreateOrderRequest, userID uuid.UUID) (string, error) {
 	if s.taskQueue == nil {
 		return "", errors.New("task queue not configured")
 	}
@@ -167,9 +169,16 @@ func (s *OrderService) processOrderTask(task *concurrency.Task) {
 	for i, item := range req.Items {
 		var unitPrice float64
 
-		// If variant_id is specified, use variant price and stock
 		if item.VariantID != nil && s.variantRepo != nil {
-			price, stock, reserved, err := s.variantRepo.GetPriceAndStock(*item.VariantID)
+			variantID, err := uuid.FromString(*item.VariantID)
+			if err != nil {
+				task.Status = concurrency.TaskStatusFailed
+				task.Error = "invalid variant_id format"
+				task.UpdatedAt = time.Now()
+				return
+			}
+
+			price, stock, reserved, err := s.variantRepo.GetPriceAndStock(variantID)
 			if err != nil {
 				task.Status = concurrency.TaskStatusFailed
 				task.Error = "failed to get variant info"
@@ -177,7 +186,6 @@ func (s *OrderService) processOrderTask(task *concurrency.Task) {
 				return
 			}
 
-			// Check available stock (stock - reserved)
 			available := stock - reserved
 			if available < item.Quantity {
 				task.Status = concurrency.TaskStatusFailed
@@ -186,8 +194,7 @@ func (s *OrderService) processOrderTask(task *concurrency.Task) {
 				return
 			}
 
-			// Reserve stock in variant only (inventory is sum of variants)
-			if err := s.variantRepo.ReserveStock(*item.VariantID, item.Quantity); err != nil {
+			if err := s.variantRepo.ReserveStock(variantID, item.Quantity); err != nil {
 				task.Status = concurrency.TaskStatusFailed
 				task.Error = "failed to reserve variant stock"
 				task.UpdatedAt = time.Now()
@@ -196,9 +203,16 @@ func (s *OrderService) processOrderTask(task *concurrency.Task) {
 
 			unitPrice = price
 		} else {
-			// Use product price if no variant
+			productID, err := uuid.FromString(item.ProductID)
+			if err != nil {
+				task.Status = concurrency.TaskStatusFailed
+				task.Error = "invalid product_id format"
+				task.UpdatedAt = time.Now()
+				return
+			}
+
 			if s.productRepo != nil {
-				price, err := s.productRepo.GetPriceByID(item.ProductID)
+				price, err := s.productRepo.GetPriceByID(productID)
 				if err != nil {
 					task.Status = concurrency.TaskStatusFailed
 					task.Error = "failed to get product price"
@@ -208,9 +222,8 @@ func (s *OrderService) processOrderTask(task *concurrency.Task) {
 				unitPrice = price
 			}
 
-			// Reserve inventory if available (for products without variants)
 			if s.inventoryRepo != nil {
-				inv, err := s.inventoryRepo.FindByProductID(item.ProductID)
+				inv, err := s.inventoryRepo.FindByProductID(productID)
 				if err != nil {
 					task.Status = concurrency.TaskStatusFailed
 					task.Error = "failed to check inventory"
@@ -224,7 +237,7 @@ func (s *OrderService) processOrderTask(task *concurrency.Task) {
 					return
 				}
 
-				if err := s.inventoryRepo.Reserve(item.ProductID, item.Quantity); err != nil {
+				if err := s.inventoryRepo.Reserve(productID, item.Quantity); err != nil {
 					task.Status = concurrency.TaskStatusFailed
 					task.Error = "failed to reserve inventory"
 					task.UpdatedAt = time.Now()
@@ -233,12 +246,19 @@ func (s *OrderService) processOrderTask(task *concurrency.Task) {
 			}
 		}
 
-		items[i] = OrderItem{
-			ProductID: item.ProductID,
-			VariantID: item.VariantID,
+		orderItem := OrderItem{
 			Quantity:  item.Quantity,
 			UnitPrice: unitPrice,
 		}
+		if productID, err := uuid.FromString(item.ProductID); err == nil {
+			orderItem.ProductID = productID
+		}
+		if item.VariantID != nil && *item.VariantID != "" {
+			if variantID, err := uuid.FromString(*item.VariantID); err == nil {
+				orderItem.VariantID = &variantID
+			}
+		}
+		items[i] = orderItem
 		totalPrice += float64(item.Quantity) * unitPrice
 	}
 
@@ -275,11 +295,11 @@ func (s *OrderService) GetTaskStatus(taskID string) (*concurrency.Task, error) {
 	return s.taskQueue.GetStatus(taskID)
 }
 
-func (s *OrderService) GetOrderByID(id uint) (*Order, error) {
+func (s *OrderService) GetOrderByID(id uuid.UUID) (*Order, error) {
 	return s.repo.FindByID(id)
 }
 
-func (s *OrderService) UpdatePaymentStatus(orderID uint, paymentStatus, transactionID string) error {
+func (s *OrderService) UpdatePaymentStatus(orderID uuid.UUID, paymentStatus, transactionID string) error {
 	order, err := s.repo.FindByID(orderID)
 	if err != nil {
 		return fmt.Errorf("find order: %w", err)

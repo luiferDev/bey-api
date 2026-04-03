@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"bey/internal/modules/products"
+
+	"github.com/gofrs/uuid/v5"
 )
 
 var (
@@ -16,42 +18,43 @@ var (
 )
 
 type VariantFinder interface {
-	FindByID(id uint) (*products.ProductVariant, error)
-	GetPriceAndStock(id uint) (float64, int, int, error)
+	FindByID(id uuid.UUID) (*products.ProductVariant, error)
+	GetPriceAndStock(id uuid.UUID) (float64, int, int, error)
 }
 
 type CartService struct {
 	cartRepo    CartRepository
 	variantRepo VariantFinder
 	mu          sync.RWMutex
-	userLocks   map[uint]*sync.Mutex
+	userLocks   map[string]*sync.Mutex
 }
 
 func NewCartService(cartRepo CartRepository, variantRepo VariantFinder) *CartService {
 	return &CartService{
 		cartRepo:    cartRepo,
 		variantRepo: variantRepo,
-		userLocks:   make(map[uint]*sync.Mutex),
+		userLocks:   make(map[string]*sync.Mutex),
 	}
 }
 
-func (s *CartService) getUserLock(userID uint) *sync.Mutex {
+func (s *CartService) getUserLock(userID uuid.UUID) *sync.Mutex {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	lock, exists := s.userLocks[userID]
+	key := userID.String()
+	lock, exists := s.userLocks[key]
 	if !exists {
 		lock = &sync.Mutex{}
-		s.userLocks[userID] = lock
+		s.userLocks[key] = lock
 	}
 	return lock
 }
 
-func (s *CartService) GetCart(userID uint) (*Cart, error) {
+func (s *CartService) GetCart(userID uuid.UUID) (*Cart, error) {
 	return s.cartRepo.GetCart(userID)
 }
 
-func (s *CartService) AddItem(userID uint, variantID uint, quantity int) (*Cart, error) {
+func (s *CartService) AddItem(userID uuid.UUID, variantID uuid.UUID, quantity int) (*Cart, error) {
 	lock := s.getUserLock(userID)
 	lock.Lock()
 	defer lock.Unlock()
@@ -77,9 +80,10 @@ func (s *CartService) AddItem(userID uint, variantID uint, quantity int) (*Cart,
 		return nil, err
 	}
 
+	variantIDStr := variantID.String()
 	existingIdx := -1
 	for i, item := range cart.Items {
-		if item.VariantID == variantID {
+		if item.VariantID == variantIDStr {
 			existingIdx = i
 			break
 		}
@@ -94,7 +98,7 @@ func (s *CartService) AddItem(userID uint, variantID uint, quantity int) (*Cart,
 		cart.Items[existingIdx].Quantity = newQuantity
 	} else {
 		cart.Items = append(cart.Items, CartItem{
-			VariantID: variantID,
+			VariantID: variantIDStr,
 			Quantity:  quantity,
 		})
 	}
@@ -108,7 +112,7 @@ func (s *CartService) AddItem(userID uint, variantID uint, quantity int) (*Cart,
 	return cart, nil
 }
 
-func (s *CartService) RemoveItem(userID uint, variantID uint) (*Cart, error) {
+func (s *CartService) RemoveItem(userID uuid.UUID, variantID uuid.UUID) (*Cart, error) {
 	lock := s.getUserLock(userID)
 	lock.Lock()
 	defer lock.Unlock()
@@ -118,10 +122,11 @@ func (s *CartService) RemoveItem(userID uint, variantID uint) (*Cart, error) {
 		return nil, err
 	}
 
+	variantIDStr := variantID.String()
 	found := false
 	newItems := make([]CartItem, 0, len(cart.Items))
 	for _, item := range cart.Items {
-		if item.VariantID == variantID {
+		if item.VariantID == variantIDStr {
 			found = true
 			continue
 		}
@@ -142,7 +147,7 @@ func (s *CartService) RemoveItem(userID uint, variantID uint) (*Cart, error) {
 	return cart, nil
 }
 
-func (s *CartService) UpdateQuantity(userID uint, variantID uint, quantity int) (*Cart, error) {
+func (s *CartService) UpdateQuantity(userID uuid.UUID, variantID uuid.UUID, quantity int) (*Cart, error) {
 	lock := s.getUserLock(userID)
 	lock.Lock()
 	defer lock.Unlock()
@@ -164,9 +169,10 @@ func (s *CartService) UpdateQuantity(userID uint, variantID uint, quantity int) 
 		return nil, err
 	}
 
+	variantIDStr := variantID.String()
 	found := false
 	for i, item := range cart.Items {
-		if item.VariantID == variantID {
+		if item.VariantID == variantIDStr {
 			cart.Items[i].Quantity = quantity
 			found = true
 			break
@@ -186,7 +192,7 @@ func (s *CartService) UpdateQuantity(userID uint, variantID uint, quantity int) 
 	return cart, nil
 }
 
-func (s *CartService) ClearCart(userID uint) error {
+func (s *CartService) ClearCart(userID uuid.UUID) error {
 	lock := s.getUserLock(userID)
 	lock.Lock()
 	defer lock.Unlock()
@@ -196,7 +202,7 @@ func (s *CartService) ClearCart(userID uint) error {
 
 // CheckoutResult contains the order data ready to be persisted and the cart to clear
 type CheckoutResult struct {
-	UserID          uint
+	UserID          uuid.UUID
 	ShippingAddress string
 	Notes           string
 	Items           []CheckoutItem
@@ -204,13 +210,13 @@ type CheckoutResult struct {
 }
 
 type CheckoutItem struct {
-	ProductID uint
-	VariantID *uint
+	ProductID uuid.UUID
+	VariantID *uuid.UUID
 	Quantity  int
 	UnitPrice float64
 }
 
-func (s *CartService) PrepareCheckout(userID uint, shippingAddress string, notes string) (*CheckoutResult, error) {
+func (s *CartService) PrepareCheckout(userID uuid.UUID, shippingAddress string, notes string) (*CheckoutResult, error) {
 	lock := s.getUserLock(userID)
 	lock.Lock()
 	defer lock.Unlock()
@@ -228,7 +234,12 @@ func (s *CartService) PrepareCheckout(userID uint, shippingAddress string, notes
 	var totalPrice float64
 
 	for _, item := range cart.Items {
-		price, stock, _, err := s.variantRepo.GetPriceAndStock(item.VariantID)
+		variantID, err := uuid.FromString(item.VariantID)
+		if err != nil {
+			return nil, err
+		}
+
+		price, stock, _, err := s.variantRepo.GetPriceAndStock(variantID)
 		if err != nil {
 			return nil, err
 		}
@@ -236,7 +247,7 @@ func (s *CartService) PrepareCheckout(userID uint, shippingAddress string, notes
 			return nil, ErrInsufficientStock
 		}
 
-		variant, err := s.variantRepo.FindByID(item.VariantID)
+		variant, err := s.variantRepo.FindByID(variantID)
 		if err != nil {
 			return nil, err
 		}
@@ -246,7 +257,7 @@ func (s *CartService) PrepareCheckout(userID uint, shippingAddress string, notes
 
 		items = append(items, CheckoutItem{
 			ProductID: variant.ProductID,
-			VariantID: &item.VariantID,
+			VariantID: &variantID,
 			Quantity:  item.Quantity,
 			UnitPrice: price,
 		})
@@ -262,11 +273,11 @@ func (s *CartService) PrepareCheckout(userID uint, shippingAddress string, notes
 	}, nil
 }
 
-func (s *CartService) ClearCartAfterCheckout(userID uint) error {
+func (s *CartService) ClearCartAfterCheckout(userID uuid.UUID) error {
 	return s.cartRepo.DeleteCart(userID)
 }
 
-func (s *CartService) ValidateCartOwnership(cartUserID, tokenUserID uint) error {
+func (s *CartService) ValidateCartOwnership(cartUserID, tokenUserID uuid.UUID) error {
 	if cartUserID != tokenUserID {
 		return ErrUnauthorized
 	}
@@ -274,10 +285,7 @@ func (s *CartService) ValidateCartOwnership(cartUserID, tokenUserID uint) error 
 }
 
 // GetVariantPrice returns the price for a variant (helper for checkout response)
-func (s *CartService) GetVariantPrice(variantID *uint) (float64, error) {
-	if variantID == nil {
-		return 0, nil
-	}
-	price, _, _, err := s.variantRepo.GetPriceAndStock(*variantID)
+func (s *CartService) GetVariantPrice(variantID uuid.UUID) (float64, error) {
+	price, _, _, err := s.variantRepo.GetPriceAndStock(variantID)
 	return price, err
 }

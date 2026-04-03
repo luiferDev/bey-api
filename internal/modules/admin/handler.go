@@ -70,7 +70,7 @@ func (h *AdminHandler) CreateUser(c *gin.Context) {
 
 func toUserResponse(user *users.User) UserResponse {
 	return UserResponse{
-		ID:        user.ID,
+		ID:        user.ID.String(),
 		Email:     user.Email,
 		Name:      user.FirstName,
 		Role:      user.Role,

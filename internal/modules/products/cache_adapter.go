@@ -2,6 +2,8 @@ package products
 
 import (
 	"context"
+
+	"github.com/gofrs/uuid/v5"
 )
 
 // categoryWarmerAdapter adapts CategoryRepository to cache.CategoryWarmer interface
@@ -60,7 +62,7 @@ func NewVariantWarmerAdapter(repo *ProductVariantRepository) *variantWarmerAdapt
 	return &variantWarmerAdapter{repo: repo}
 }
 
-func (a *variantWarmerAdapter) FindByProduct(ctx context.Context, productID uint) ([]interface{}, error) {
+func (a *variantWarmerAdapter) FindByProduct(ctx context.Context, productID uuid.UUID) ([]interface{}, error) {
 	variants, err := a.repo.FindByProductID(productID)
 	if err != nil {
 		return nil, err

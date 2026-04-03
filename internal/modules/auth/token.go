@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -38,12 +39,12 @@ func NewTokenGeneratorWithRedis(db *gorm.DB, config *config.Config, redisClient 
 	}
 }
 
-func (g *TokenGenerator) GenerateAccessToken(userID uint, email, role string) (string, int64, error) {
+func (g *TokenGenerator) GenerateAccessToken(userID uuid.UUID, email, role string) (string, int64, error) {
 	jwtConfig := g.config.Security.GetJWTConfig()
 	expiry := jwtConfig.AccessExpiry
 
 	claims := TokenClaims{
-		UserID: userID,
+		UserID: userID.String(),
 		Email:  email,
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -167,15 +168,19 @@ func (g *TokenGenerator) rotateRefreshTokenRedis(oldTokenHash string) (string, e
 		return "", err
 	}
 
-	userID, _ := tokenData["user_id"].(float64)
-	if err := g.StoreRefreshToken(newToken, uint(userID)); err != nil {
+	userIDStr, _ := tokenData["user_id"].(string)
+	userID, err := uuid.FromString(userIDStr)
+	if err != nil {
+		return "", errors.New("invalid user ID in token")
+	}
+	if err := g.StoreRefreshToken(newToken, userID); err != nil {
 		return "", err
 	}
 
 	return newToken, nil
 }
 
-func (g *TokenGenerator) StoreRefreshToken(token string, userID uint) error {
+func (g *TokenGenerator) StoreRefreshToken(token string, userID uuid.UUID) error {
 	jwtConfig := g.config.Security.GetJWTConfig()
 	tokenHash := g.HashToken(token)
 	expiresAt := time.Now().Add(jwtConfig.RefreshExpiry)
@@ -187,7 +192,7 @@ func (g *TokenGenerator) StoreRefreshToken(token string, userID uint) error {
 	return g.storeRefreshTokenDB(tokenHash, userID, expiresAt)
 }
 
-func (g *TokenGenerator) storeRefreshTokenDB(tokenHash string, userID uint, expiresAt time.Time) error {
+func (g *TokenGenerator) storeRefreshTokenDB(tokenHash string, userID uuid.UUID, expiresAt time.Time) error {
 	refreshToken := &RefreshToken{
 		Token:     tokenHash,
 		UserID:    userID,
@@ -198,10 +203,10 @@ func (g *TokenGenerator) storeRefreshTokenDB(tokenHash string, userID uint, expi
 	return g.db.Create(refreshToken).Error
 }
 
-func (g *TokenGenerator) storeRefreshTokenRedis(tokenHash string, userID uint, expiresAt time.Time) error {
+func (g *TokenGenerator) storeRefreshTokenRedis(tokenHash string, userID uuid.UUID, expiresAt time.Time) error {
 	key := "auth:refresh:" + tokenHash
 	tokenData := map[string]interface{}{
-		"user_id":    userID,
+		"user_id":    userID.String(),
 		"expires_at": expiresAt.Format(time.RFC3339),
 		"revoked":    false,
 	}
@@ -287,10 +292,11 @@ func (g *TokenGenerator) validateRefreshTokenRedis(tokenHash string, rawToken st
 		return nil, errors.New("refresh token expired")
 	}
 
-	userID, _ := tokenData["user_id"].(float64)
+	userIDStr, _ := tokenData["user_id"].(string)
+	userID, _ := uuid.FromString(userIDStr)
 	return &RefreshToken{
 		Token:     tokenHash,
-		UserID:    uint(userID),
+		UserID:    userID,
 		ExpiresAt: expTime,
 	}, nil
 }

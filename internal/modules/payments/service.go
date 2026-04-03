@@ -11,6 +11,8 @@ import (
 
 	"bey/internal/config"
 	"bey/internal/modules/orders"
+
+	"github.com/gofrs/uuid/v5"
 )
 
 type PaymentService struct {
@@ -51,7 +53,7 @@ func (s *PaymentService) CreatePayment(req *CreatePaymentRequest) (*Payment, err
 	}
 
 	payment := &Payment{
-		OrderID:            0,
+		OrderID:            uuid.Nil,
 		WompiTransactionID: resp.Transaction.ID,
 		Amount:             resp.Transaction.AmountInCents,
 		Currency:           resp.Transaction.Currency,
@@ -71,7 +73,7 @@ func (s *PaymentService) CreatePayment(req *CreatePaymentRequest) (*Payment, err
 	return payment, nil
 }
 
-func (s *PaymentService) GetPayment(id uint) (*Payment, error) {
+func (s *PaymentService) GetPayment(id uuid.UUID) (*Payment, error) {
 	payment, err := s.paymentRepo.FindByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("find payment: %w", err)
@@ -82,7 +84,7 @@ func (s *PaymentService) GetPayment(id uint) (*Payment, error) {
 	return payment, nil
 }
 
-func (s *PaymentService) GetOrderByPaymentID(orderID uint) (*orders.Order, error) {
+func (s *PaymentService) GetOrderByPaymentID(orderID uuid.UUID) (*orders.Order, error) {
 	if s.orderService == nil {
 		return nil, errors.New("order service not available")
 	}
@@ -111,7 +113,7 @@ func (s *PaymentService) GetPaymentStatus(wompiTransactionID string) (*Payment, 
 	return payment, nil
 }
 
-func (s *PaymentService) CancelPayment(id uint) (*Payment, error) {
+func (s *PaymentService) CancelPayment(id uuid.UUID) (*Payment, error) {
 	payment, err := s.paymentRepo.FindByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("find payment: %w", err)
@@ -140,12 +142,16 @@ func (s *PaymentService) CancelPayment(id uint) (*Payment, error) {
 }
 
 func (s *PaymentService) CreatePaymentLink(req *CreatePaymentLinkRequest) (*PaymentLink, error) {
-	activeLink, err := s.paymentLinkRepo.FindActiveByOrderID(req.OrderID)
+	orderID, err := uuid.FromString(req.OrderID)
+	if err != nil {
+		return nil, errors.New("invalid order ID")
+	}
+	activeLink, err := s.paymentLinkRepo.FindActiveByOrderID(orderID)
 	if err != nil {
 		log.Printf("Warning: failed to check existing payment link: %v", err)
 	}
 	if activeLink != nil {
-		log.Printf("Active payment link already exists for order %d: %s", req.OrderID, activeLink.WompiLinkID)
+		log.Printf("Active payment link already exists for order %s: %s", req.OrderID, activeLink.WompiLinkID)
 		return activeLink, nil
 	}
 
@@ -170,7 +176,7 @@ func (s *PaymentService) CreatePaymentLink(req *CreatePaymentLinkRequest) (*Paym
 	expiresAt := parseWompiTime(resp.PaymentLink.ExpiresAt)
 
 	link := &PaymentLink{
-		OrderID:     req.OrderID,
+		OrderID:     orderID,
 		WompiLinkID: resp.PaymentLink.ID,
 		URL:         resp.PaymentLink.URL,
 		Amount:      resp.PaymentLink.AmountInCents,
@@ -192,7 +198,7 @@ func (s *PaymentService) CreatePaymentLink(req *CreatePaymentLinkRequest) (*Paym
 	return link, nil
 }
 
-func (s *PaymentService) GetPaymentLink(id uint) (*PaymentLink, error) {
+func (s *PaymentService) GetPaymentLink(id uuid.UUID) (*PaymentLink, error) {
 	link, err := s.paymentLinkRepo.FindByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("find payment link: %w", err)
@@ -214,7 +220,7 @@ func (s *PaymentService) GetPaymentLinkByWompiID(wompiID string) (*PaymentLink, 
 	return link, nil
 }
 
-func (s *PaymentService) ActivatePaymentLink(id uint) (*PaymentLink, error) {
+func (s *PaymentService) ActivatePaymentLink(id uuid.UUID) (*PaymentLink, error) {
 	link, err := s.paymentLinkRepo.FindByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("find payment link: %w", err)
@@ -242,7 +248,7 @@ func (s *PaymentService) ActivatePaymentLink(id uint) (*PaymentLink, error) {
 	return link, nil
 }
 
-func (s *PaymentService) DeactivatePaymentLink(id uint) (*PaymentLink, error) {
+func (s *PaymentService) DeactivatePaymentLink(id uuid.UUID) (*PaymentLink, error) {
 	link, err := s.paymentLinkRepo.FindByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("find payment link: %w", err)
@@ -312,7 +318,7 @@ func (s *PaymentService) ProcessWebhook(event *WebhookEvent) error {
 			}
 			log.Printf("Updated payment link %d status from %s to %s", link.ID, oldStatus, link.Status)
 
-			if s.orderService != nil && link.OrderID > 0 {
+			if s.orderService != nil && link.OrderID != uuid.Nil {
 				if link.Status == StatusApproved {
 					if err := s.orderService.UpdatePaymentStatus(link.OrderID, "paid", transaction.ID); err != nil {
 						log.Printf("Failed to update order payment status: %v", err)
@@ -338,7 +344,7 @@ func (s *PaymentService) ProcessWebhook(event *WebhookEvent) error {
 		}
 		log.Printf("Updated payment %d status from %s to %s", payment.ID, oldStatus, payment.Status)
 
-		if s.orderService != nil && payment.OrderID > 0 {
+		if s.orderService != nil && payment.OrderID != uuid.Nil {
 			if payment.Status == StatusApproved {
 				if err := s.orderService.UpdatePaymentStatus(payment.OrderID, "paid", transaction.ID); err != nil {
 					log.Printf("Failed to update order payment status: %v", err)

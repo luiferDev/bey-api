@@ -54,7 +54,12 @@ func NewOrderHandlerWithAllDeps(db *gorm.DB, orderService *OrderService, product
 }
 
 func (h *OrderHandler) Create(c *gin.Context) {
-	userID := c.GetUint("user_id")
+	userIDStr := c.GetString("user_id")
+	userID, err := uuid.FromString(userIDStr)
+	if err != nil {
+		h.resp.ValidationError(c, "invalid user ID")
+		return
+	}
 
 	var req CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

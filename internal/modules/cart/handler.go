@@ -42,8 +42,8 @@ func NewCartHandler(cartService *CartService, orderRepo OrderCreator, variantRep
 }
 
 func (h *CartHandler) GetCart(c *gin.Context) {
-	userID := c.GetUint("user_id")
-	if userID == 0 {
+	userID, err := h.parseUserID(c)
+	if err != nil {
 		h.response.Error(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
@@ -58,8 +58,8 @@ func (h *CartHandler) GetCart(c *gin.Context) {
 }
 
 func (h *CartHandler) AddItem(c *gin.Context) {
-	userID := c.GetUint("user_id")
-	if userID == 0 {
+	userID, err := h.parseUserID(c)
+	if err != nil {
 		h.response.Error(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
@@ -94,8 +94,8 @@ func (h *CartHandler) AddItem(c *gin.Context) {
 }
 
 func (h *CartHandler) UpdateItem(c *gin.Context) {
-	userID := c.GetUint("user_id")
-	if userID == 0 {
+	userID, err := h.parseUserID(c)
+	if err != nil {
 		h.response.Error(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
@@ -130,8 +130,8 @@ func (h *CartHandler) UpdateItem(c *gin.Context) {
 }
 
 func (h *CartHandler) RemoveItem(c *gin.Context) {
-	userID := c.GetUint("user_id")
-	if userID == 0 {
+	userID, err := h.parseUserID(c)
+	if err != nil {
 		h.response.Error(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
@@ -152,8 +152,8 @@ func (h *CartHandler) RemoveItem(c *gin.Context) {
 }
 
 func (h *CartHandler) ClearCart(c *gin.Context) {
-	userID := c.GetUint("user_id")
-	if userID == 0 {
+	userID, err := h.parseUserID(c)
+	if err != nil {
 		h.response.Error(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
@@ -167,8 +167,8 @@ func (h *CartHandler) ClearCart(c *gin.Context) {
 }
 
 func (h *CartHandler) Checkout(c *gin.Context) {
-	userID := c.GetUint("user_id")
-	if userID == 0 {
+	userID, err := h.parseUserID(c)
+	if err != nil {
 		h.response.Error(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
@@ -277,7 +277,7 @@ func ToCartResponse(cart *Cart) CartResponse {
 	items := make([]CartItemResponse, len(cart.Items))
 	for i, item := range cart.Items {
 		items[i] = CartItemResponse{
-			VariantID: item.VariantID.String(),
+			VariantID: item.VariantID,
 			Quantity:  item.Quantity,
 		}
 	}
@@ -287,4 +287,12 @@ func ToCartResponse(cart *Cart) CartResponse {
 		CreatedAt: cart.CreatedAt,
 		UpdatedAt: cart.UpdatedAt,
 	}
+}
+
+func (h *CartHandler) parseUserID(c *gin.Context) (uuid.UUID, error) {
+	userIDStr := c.GetString("user_id")
+	if userIDStr == "" {
+		return uuid.Nil, errors.New("unauthorized")
+	}
+	return uuid.FromString(userIDStr)
 }
