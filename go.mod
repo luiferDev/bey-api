@@ -40,6 +40,7 @@ require (
 	github.com/go-openapi/swag/typeutils v0.25.4 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
 	github.com/go-sql-driver/mysql v1.9.3 // indirect
+	github.com/gofrs/uuid/v5 v5.4.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
