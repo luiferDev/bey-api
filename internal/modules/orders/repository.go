@@ -3,6 +3,7 @@ package orders
 import (
 	"errors"
 
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/gorm"
 )
 
@@ -18,7 +19,7 @@ func (r *OrderRepository) Create(order *Order) error {
 	return r.db.Create(order).Error
 }
 
-func (r *OrderRepository) FindByID(id uint) (*Order, error) {
+func (r *OrderRepository) FindByID(id uuid.UUID) (*Order, error) {
 	var order Order
 	if err := r.db.Preload("Items").First(&order, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -33,11 +34,11 @@ func (r *OrderRepository) Update(order *Order) error {
 	return r.db.Save(order).Error
 }
 
-func (r *OrderRepository) Delete(id uint) error {
+func (r *OrderRepository) Delete(id uuid.UUID) error {
 	return r.db.Delete(&Order{}, id).Error
 }
 
-func (r *OrderRepository) FindByUserID(userID uint) ([]Order, error) {
+func (r *OrderRepository) FindByUserID(userID uuid.UUID) ([]Order, error) {
 	var orders []Order
 	if err := r.db.Preload("Items").Where("user_id = ?", userID).Find(&orders).Error; err != nil {
 		return nil, err

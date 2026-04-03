@@ -1,9 +1,13 @@
 package cart
 
-import "time"
+import (
+	"time"
+
+	"github.com/gofrs/uuid/v5"
+)
 
 type Cart struct {
-	UserID    string     `json:"user_id"`
+	UserID    uuid.UUID  `json:"user_id"`
 	Items     []CartItem `json:"items"`
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`

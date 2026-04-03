@@ -1,7 +1,9 @@
 package cart
 
+import "github.com/gofrs/uuid/v5"
+
 type CartRepository interface {
-	GetCart(userID uint) (*Cart, error)
+	GetCart(userID uuid.UUID) (*Cart, error)
 	SaveCart(cart *Cart) error
-	DeleteCart(userID uint) error
+	DeleteCart(userID uuid.UUID) error
 }

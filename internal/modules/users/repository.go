@@ -3,6 +3,7 @@ package users
 import (
 	"errors"
 
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/gorm"
 )
 
@@ -18,7 +19,7 @@ func (r *UserRepository) Create(user *User) error {
 	return r.db.Create(user).Error
 }
 
-func (r *UserRepository) FindByID(id uint) (*User, error) {
+func (r *UserRepository) FindByID(id uuid.UUID) (*User, error) {
 	var user User
 	if err := r.db.First(&user, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -44,7 +45,7 @@ func (r *UserRepository) Update(user *User) error {
 	return r.db.Save(user).Error
 }
 
-func (r *UserRepository) Delete(id uint) error {
+func (r *UserRepository) Delete(id uuid.UUID) error {
 	return r.db.Delete(&User{}, id).Error
 }
 
