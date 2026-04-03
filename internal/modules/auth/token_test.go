@@ -57,7 +57,8 @@ func TestGenerateAccessToken(t *testing.T) {
 func TestGenerateAccessToken_Expiry(t *testing.T) {
 	tokenGen, _ := setupTokenTest(t)
 
-	token, expiresIn, err := tokenGen.GenerateAccessToken(uuid.Must(uuid.NewV7()), "test@example.com", "admin")
+	testUUID := uuid.Must(uuid.NewV7())
+	token, expiresIn, err := tokenGen.GenerateAccessToken(testUUID, "test@example.com", "admin")
 	if err != nil {
 		t.Fatalf("GenerateAccessToken failed: %v", err)
 	}
@@ -72,8 +73,8 @@ func TestGenerateAccessToken_Expiry(t *testing.T) {
 		t.Fatalf("ValidateToken failed: %v", err)
 	}
 
-	if claims.UserID != "1" {
-		t.Errorf("claims.UserID = %s; want 1", claims.UserID)
+	if claims.UserID != testUUID.String() {
+		t.Errorf("claims.UserID = %s; want %s", claims.UserID, testUUID.String())
 	}
 	if claims.Email != "test@example.com" {
 		t.Errorf("claims.Email = %s; want test@example.com", claims.Email)
@@ -119,7 +120,8 @@ func TestGenerateRefreshToken(t *testing.T) {
 func TestValidateToken(t *testing.T) {
 	tokenGen, _ := setupTokenTest(t)
 
-	token, _, err := tokenGen.GenerateAccessToken(uuid.Must(uuid.NewV7()), "user@test.com", "customer")
+	testUUID := uuid.Must(uuid.NewV7())
+	token, _, err := tokenGen.GenerateAccessToken(testUUID, "user@test.com", "customer")
 	if err != nil {
 		t.Fatalf("GenerateAccessToken failed: %v", err)
 	}
@@ -129,8 +131,8 @@ func TestValidateToken(t *testing.T) {
 		t.Fatalf("ValidateToken failed: %v", err)
 	}
 
-	if claims.UserID != "42" {
-		t.Errorf("UserID = %s; want 42", claims.UserID)
+	if claims.UserID != testUUID.String() {
+		t.Errorf("UserID = %s; want %s", claims.UserID, testUUID.String())
 	}
 	if claims.Email != "user@test.com" {
 		t.Errorf("Email = %s; want user@test.com", claims.Email)

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 
 	"bey/internal/config"
@@ -16,6 +15,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gofrs/uuid/v5"
 )
+
+var testUserID = uuid.Must(uuid.NewV7()).String()
 
 type MockAuthService struct {
 	loginFunc              func(ctx context.Context, email, password string) (*LoginResponse, error)
@@ -129,10 +130,7 @@ func setupAuthTestRouter(mockSvc *MockAuthService, cfg *config.Config) *gin.Engi
 
 	router.Use(func(c *gin.Context) {
 		if userIDStr := c.GetHeader("X-User-ID"); userIDStr != "" {
-			userID, err := strconv.ParseUint(userIDStr, 10, 32)
-			if err == nil {
-				c.Set("user_id", uint(userID))
-			}
+			c.Set("user_id", userIDStr)
 		}
 		c.Next()
 	})
@@ -163,8 +161,8 @@ func makeAuthRequest(router *gin.Engine, method, path, body string, userID *uint
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if userID != nil {
-		req.Header.Set("X-User-ID", "1")
-		w.Header().Set("X-User-ID", "1")
+		req.Header.Set("X-User-ID", uuid.Must(uuid.NewV7()).String())
+		w.Header().Set("X-User-ID", uuid.Must(uuid.NewV7()).String())
 	}
 	router.ServeHTTP(w, req)
 	return w
@@ -811,7 +809,7 @@ func TestHandleSetup2FA_Success(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/setup", nil)
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -854,7 +852,7 @@ func TestHandleEnable2FA_Success(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/enable",
 		bytes.NewBufferString(`{"code":"123456"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -896,7 +894,7 @@ func TestHandleEnable2FA_InvalidCode(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/enable",
 		bytes.NewBufferString(`{"code":"wrongcode"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
@@ -915,7 +913,7 @@ func TestHandleEnable2FA_MissingCode(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/enable",
 		bytes.NewBufferString(`{}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
@@ -939,7 +937,7 @@ func TestHandleDisable2FA_Success(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/disable",
 		bytes.NewBufferString(`{"code":"123456"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -981,7 +979,7 @@ func TestHandleDisable2FA_InvalidCode(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/disable",
 		bytes.NewBufferString(`{"code":"wrongcode"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
@@ -1005,7 +1003,7 @@ func TestHandleVerify2FA_Success(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/verify",
 		bytes.NewBufferString(`{"code":"123456"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -1043,7 +1041,7 @@ func TestHandleVerify2FA_InvalidCode(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/verify",
 		bytes.NewBufferString(`{"code":"wrongcode"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -1080,7 +1078,7 @@ func TestHandleVerify2FA_MissingCode(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/verify",
 		bytes.NewBufferString(`{}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {

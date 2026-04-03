@@ -776,7 +776,7 @@ func TestPaymentLinkRepository_FindActiveByOrderID(t *testing.T) {
 			name:      "no active link for order",
 			orderID:   orderID2,
 			wantErr:   false,
-			expectNil: false,
+			expectNil: true,
 		},
 		{
 			name:      "no link at all",

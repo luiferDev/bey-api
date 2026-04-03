@@ -118,7 +118,7 @@ func setupIntegrationTest(t *testing.T) (*gin.Engine, *gorm.DB) {
 	return r, db
 }
 
-func createTestUserForIntegration(t *testing.T, db *gorm.DB) {
+func createTestUserForIntegration(t *testing.T, db *gorm.DB) *users.User {
 	t.Helper()
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
@@ -138,6 +138,8 @@ func createTestUserForIntegration(t *testing.T, db *gorm.DB) {
 	if err := db.Create(user).Error; err != nil {
 		t.Fatalf("failed to create user: %v", err)
 	}
+
+	return user
 }
 
 func makeAuthenticatedRequest(t *testing.T, r *gin.Engine, method, path, email, password string) (*httptest.ResponseRecorder, string) {
@@ -279,7 +281,7 @@ func TestAuthFlow_LoginWithInvalidEmail(t *testing.T) {
 
 func TestAuthFlow_RefreshToken(t *testing.T) {
 	r, db := setupIntegrationTest(t)
-	createTestUserForIntegration(t, db)
+	testUser := createTestUserForIntegration(t, db)
 
 	_, _ = makeAuthenticatedRequest(t, r, http.MethodGet, "/api/v1/protected", "test@example.com", "password123")
 
@@ -315,7 +317,7 @@ func TestAuthFlow_RefreshToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate refresh token: %v", err)
 	}
-	if err := tokenGenerator.StoreRefreshToken(refreshToken, uuid.Must(uuid.NewV7())); err != nil {
+	if err := tokenGenerator.StoreRefreshToken(refreshToken, testUser.ID); err != nil {
 		t.Fatalf("Failed to store refresh token: %v", err)
 	}
 

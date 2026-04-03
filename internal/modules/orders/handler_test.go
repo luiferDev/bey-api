@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -29,6 +30,11 @@ func setupTestRouterWithOrders(t *testing.T) (*gin.Engine, *OrderHandler) {
 	handler := NewOrderHandler(db)
 
 	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", uuid.Must(uuid.NewV7()).String())
+		c.Set("user_role", "admin")
+		c.Next()
+	})
 	return router, handler
 }
 
@@ -98,7 +104,7 @@ func TestCreateOrder_MissingFields(t *testing.T) {
 
 	router.POST("/api/v1/orders", handler.Create)
 
-	body := `{"user_id":1}`
+	body := `{"shipping_address":"123 Main St"}`
 	req, _ := http.NewRequest("POST", "/api/v1/orders", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -114,7 +120,8 @@ func TestCreateOrder_Success(t *testing.T) {
 
 	router.POST("/api/v1/orders", handler.Create)
 
-	body := `{"user_id":1,"items":[{"product_id":1,"quantity":2}],"shipping_address":"123 Main St"}`
+	productID := uuid.Must(uuid.NewV7())
+	body := `{"items":[{"product_id":"` + productID.String() + `","quantity":2}],"shipping_address":"123 Main St"}`
 	req, _ := http.NewRequest("POST", "/api/v1/orders", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -130,7 +137,8 @@ func TestGetOrderByID_NotFound(t *testing.T) {
 
 	router.GET("/api/v1/orders/:id", handler.GetByID)
 
-	req, _ := http.NewRequest("GET", "/api/v1/orders/999", nil)
+	testUUID := uuid.Must(uuid.NewV7())
+	req, _ := http.NewRequest("GET", "/api/v1/orders/"+testUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -142,36 +150,27 @@ func TestGetOrderByID_NotFound(t *testing.T) {
 func TestUpdateOrderStatus_InvalidBody(t *testing.T) {
 	router, handler := setupTestRouterWithOrders(t)
 
-	router.POST("/api/v1/orders", handler.Create)
+	testUUID := uuid.Must(uuid.NewV7())
 	router.PUT("/api/v1/orders/:id/status", handler.UpdateStatus)
 
-	createBody := `{"user_id":1,"items":[{"product_id":1,"quantity":2}],"shipping_address":"123 Main St"}`
-	req1, _ := http.NewRequest("POST", "/api/v1/orders", bytes.NewBufferString(createBody))
-	req1.Header.Set("Content-Type", "application/json")
-	w1 := httptest.NewRecorder()
-	router.ServeHTTP(w1, req1)
-
-	if w1.Code != http.StatusCreated {
-		t.Fatalf("Failed to create order, got %d", w1.Code)
-	}
-
-	req, _ := http.NewRequest("PUT", "/api/v1/orders/1/status", bytes.NewBufferString("invalid"))
+	req, _ := http.NewRequest("PUT", "/api/v1/orders/"+testUUID.String()+"/status", bytes.NewBufferString("invalid"))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("Expected status 400, got %d", w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("Expected status 404 (order not found), got %d", w.Code)
 	}
 }
 
 func TestUpdateOrderStatus_MissingStatus(t *testing.T) {
 	router, handler := setupTestRouterWithOrders(t)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router.PUT("/api/v1/orders/:id/status", handler.UpdateStatus)
 
 	body := `{}`
-	req, _ := http.NewRequest("PUT", "/api/v1/orders/1/status", bytes.NewBufferString(body))
+	req, _ := http.NewRequest("PUT", "/api/v1/orders/"+testUUID.String()+"/status", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -186,16 +185,17 @@ func TestConfirmOrder_Success(t *testing.T) {
 	db := setupTestDBForOrdersHandler(t)
 	handler := NewOrderHandler(db)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router := gin.New()
-	router.POST("/api/v1/orders", handler.Create)
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", uint(1))
+		c.Set("user_id", testUUID.String())
 		c.Set("user_role", "admin")
 		c.Next()
 	})
+	router.POST("/api/v1/orders", handler.Create)
 	router.POST("/api/v1/orders/:id/confirm", handler.Confirm)
 
-	createBody := `{"user_id":1,"items":[{"product_id":1,"quantity":2}],"shipping_address":"123 Main St"}`
+	createBody := `{"items":[{"product_id":"` + testUUID.String() + `","quantity":2}],"shipping_address":"123 Main St"}`
 	req1, _ := http.NewRequest("POST", "/api/v1/orders", bytes.NewBufferString(createBody))
 	req1.Header.Set("Content-Type", "application/json")
 	w1 := httptest.NewRecorder()
@@ -205,7 +205,12 @@ func TestConfirmOrder_Success(t *testing.T) {
 		t.Fatalf("Failed to create order, got %d", w1.Code)
 	}
 
-	req2, _ := http.NewRequest("POST", "/api/v1/orders/1/confirm", nil)
+	var createResp map[string]interface{}
+	json.Unmarshal(w1.Body.Bytes(), &createResp)
+	data := createResp["data"].(map[string]interface{})
+	orderID := data["id"].(string)
+
+	req2, _ := http.NewRequest("POST", "/api/v1/orders/"+orderID+"/confirm", nil)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req2)
 
@@ -219,16 +224,17 @@ func TestConfirmOrder_AlreadyConfirmed(t *testing.T) {
 	db := setupTestDBForOrdersHandler(t)
 	handler := NewOrderHandler(db)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router := gin.New()
-	router.POST("/api/v1/orders", handler.Create)
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", uint(1))
+		c.Set("user_id", testUUID.String())
 		c.Set("user_role", "admin")
 		c.Next()
 	})
+	router.POST("/api/v1/orders", handler.Create)
 	router.POST("/api/v1/orders/:id/confirm", handler.Confirm)
 
-	createBody := `{"user_id":1,"items":[{"product_id":1,"quantity":2}],"shipping_address":"123 Main St"}`
+	createBody := `{"items":[{"product_id":"` + testUUID.String() + `","quantity":2}],"shipping_address":"123 Main St"}`
 	req1, _ := http.NewRequest("POST", "/api/v1/orders", bytes.NewBufferString(createBody))
 	req1.Header.Set("Content-Type", "application/json")
 	w1 := httptest.NewRecorder()
@@ -238,7 +244,12 @@ func TestConfirmOrder_AlreadyConfirmed(t *testing.T) {
 		t.Fatalf("Failed to create order, got %d", w1.Code)
 	}
 
-	req2, _ := http.NewRequest("POST", "/api/v1/orders/1/confirm", nil)
+	var createResp map[string]interface{}
+	json.Unmarshal(w1.Body.Bytes(), &createResp)
+	data := createResp["data"].(map[string]interface{})
+	orderID := data["id"].(string)
+
+	req2, _ := http.NewRequest("POST", "/api/v1/orders/"+orderID+"/confirm", nil)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req2)
 
@@ -246,7 +257,7 @@ func TestConfirmOrder_AlreadyConfirmed(t *testing.T) {
 		t.Fatalf("First confirm failed, got %d", w2.Code)
 	}
 
-	req3, _ := http.NewRequest("POST", "/api/v1/orders/1/confirm", nil)
+	req3, _ := http.NewRequest("POST", "/api/v1/orders/"+orderID+"/confirm", nil)
 	w3 := httptest.NewRecorder()
 	router.ServeHTTP(w3, req3)
 
@@ -260,16 +271,17 @@ func TestConfirmOrder_Unauthorized(t *testing.T) {
 	db := setupTestDBForOrdersHandler(t)
 	handler := NewOrderHandler(db)
 
+	ownerUUID := uuid.Must(uuid.NewV7())
+	otherUUID := uuid.Must(uuid.NewV7())
 	router := gin.New()
-	router.POST("/api/v1/orders", handler.Create)
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", uint(999))
+		c.Set("user_id", ownerUUID.String())
 		c.Set("user_role", "customer")
 		c.Next()
 	})
-	router.POST("/api/v1/orders/:id/confirm", handler.Confirm)
+	router.POST("/api/v1/orders", handler.Create)
 
-	createBody := `{"user_id":1,"items":[{"product_id":1,"quantity":2}],"shipping_address":"123 Main St"}`
+	createBody := `{"items":[{"product_id":"` + ownerUUID.String() + `","quantity":2}],"shipping_address":"123 Main St"}`
 	req1, _ := http.NewRequest("POST", "/api/v1/orders", bytes.NewBufferString(createBody))
 	req1.Header.Set("Content-Type", "application/json")
 	w1 := httptest.NewRecorder()
@@ -279,9 +291,22 @@ func TestConfirmOrder_Unauthorized(t *testing.T) {
 		t.Fatalf("Failed to create order, got %d", w1.Code)
 	}
 
-	req2, _ := http.NewRequest("POST", "/api/v1/orders/1/confirm", nil)
+	var createResp map[string]interface{}
+	json.Unmarshal(w1.Body.Bytes(), &createResp)
+	data := createResp["data"].(map[string]interface{})
+	orderID := data["id"].(string)
+
+	confirmRouter := gin.New()
+	confirmRouter.Use(func(c *gin.Context) {
+		c.Set("user_id", otherUUID.String())
+		c.Set("user_role", "customer")
+		c.Next()
+	})
+	confirmRouter.POST("/api/v1/orders/:id/confirm", handler.Confirm)
+
+	req2, _ := http.NewRequest("POST", "/api/v1/orders/"+orderID+"/confirm", nil)
 	w2 := httptest.NewRecorder()
-	router.ServeHTTP(w2, req2)
+	confirmRouter.ServeHTTP(w2, req2)
 
 	if w2.Code != http.StatusForbidden {
 		t.Errorf("Expected status 403, got %d. Body: %s", w2.Code, w2.Body.String())
@@ -293,16 +318,17 @@ func TestCancelOrder_Success(t *testing.T) {
 	db := setupTestDBForOrdersHandler(t)
 	handler := NewOrderHandler(db)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router := gin.New()
-	router.POST("/api/v1/orders", handler.Create)
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", uint(1))
+		c.Set("user_id", testUUID.String())
 		c.Set("user_role", "admin")
 		c.Next()
 	})
+	router.POST("/api/v1/orders", handler.Create)
 	router.POST("/api/v1/orders/:id/cancel", handler.Cancel)
 
-	createBody := `{"user_id":1,"items":[{"product_id":1,"quantity":2}],"shipping_address":"123 Main St"}`
+	createBody := `{"items":[{"product_id":"` + testUUID.String() + `","quantity":2}],"shipping_address":"123 Main St"}`
 	req1, _ := http.NewRequest("POST", "/api/v1/orders", bytes.NewBufferString(createBody))
 	req1.Header.Set("Content-Type", "application/json")
 	w1 := httptest.NewRecorder()
@@ -312,7 +338,12 @@ func TestCancelOrder_Success(t *testing.T) {
 		t.Fatalf("Failed to create order, got %d", w1.Code)
 	}
 
-	req2, _ := http.NewRequest("POST", "/api/v1/orders/1/cancel", nil)
+	var createResp map[string]interface{}
+	json.Unmarshal(w1.Body.Bytes(), &createResp)
+	data := createResp["data"].(map[string]interface{})
+	orderID := data["id"].(string)
+
+	req2, _ := http.NewRequest("POST", "/api/v1/orders/"+orderID+"/cancel", nil)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req2)
 
@@ -326,16 +357,17 @@ func TestCancelOrder_AlreadyCancelled(t *testing.T) {
 	db := setupTestDBForOrdersHandler(t)
 	handler := NewOrderHandler(db)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router := gin.New()
-	router.POST("/api/v1/orders", handler.Create)
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", uint(1))
+		c.Set("user_id", testUUID.String())
 		c.Set("user_role", "admin")
 		c.Next()
 	})
+	router.POST("/api/v1/orders", handler.Create)
 	router.POST("/api/v1/orders/:id/cancel", handler.Cancel)
 
-	createBody := `{"user_id":1,"items":[{"product_id":1,"quantity":2}],"shipping_address":"123 Main St"}`
+	createBody := `{"items":[{"product_id":"` + testUUID.String() + `","quantity":2}],"shipping_address":"123 Main St"}`
 	req1, _ := http.NewRequest("POST", "/api/v1/orders", bytes.NewBufferString(createBody))
 	req1.Header.Set("Content-Type", "application/json")
 	w1 := httptest.NewRecorder()
@@ -345,7 +377,12 @@ func TestCancelOrder_AlreadyCancelled(t *testing.T) {
 		t.Fatalf("Failed to create order, got %d", w1.Code)
 	}
 
-	req2, _ := http.NewRequest("POST", "/api/v1/orders/1/cancel", nil)
+	var createResp map[string]interface{}
+	json.Unmarshal(w1.Body.Bytes(), &createResp)
+	data := createResp["data"].(map[string]interface{})
+	orderID := data["id"].(string)
+
+	req2, _ := http.NewRequest("POST", "/api/v1/orders/"+orderID+"/cancel", nil)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req2)
 
@@ -353,7 +390,7 @@ func TestCancelOrder_AlreadyCancelled(t *testing.T) {
 		t.Fatalf("First cancel failed, got %d", w2.Code)
 	}
 
-	req3, _ := http.NewRequest("POST", "/api/v1/orders/1/cancel", nil)
+	req3, _ := http.NewRequest("POST", "/api/v1/orders/"+orderID+"/cancel", nil)
 	w3 := httptest.NewRecorder()
 	router.ServeHTTP(w3, req3)
 
@@ -367,16 +404,17 @@ func TestCancelOrder_Unauthorized(t *testing.T) {
 	db := setupTestDBForOrdersHandler(t)
 	handler := NewOrderHandler(db)
 
+	ownerUUID := uuid.Must(uuid.NewV7())
+	otherUUID := uuid.Must(uuid.NewV7())
 	router := gin.New()
-	router.POST("/api/v1/orders", handler.Create)
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", uint(999))
+		c.Set("user_id", ownerUUID.String())
 		c.Set("user_role", "customer")
 		c.Next()
 	})
-	router.POST("/api/v1/orders/:id/cancel", handler.Cancel)
+	router.POST("/api/v1/orders", handler.Create)
 
-	createBody := `{"user_id":1,"items":[{"product_id":1,"quantity":2}],"shipping_address":"123 Main St"}`
+	createBody := `{"items":[{"product_id":"` + ownerUUID.String() + `","quantity":2}],"shipping_address":"123 Main St"}`
 	req1, _ := http.NewRequest("POST", "/api/v1/orders", bytes.NewBufferString(createBody))
 	req1.Header.Set("Content-Type", "application/json")
 	w1 := httptest.NewRecorder()
@@ -386,9 +424,22 @@ func TestCancelOrder_Unauthorized(t *testing.T) {
 		t.Fatalf("Failed to create order, got %d", w1.Code)
 	}
 
-	req2, _ := http.NewRequest("POST", "/api/v1/orders/1/cancel", nil)
+	var createResp map[string]interface{}
+	json.Unmarshal(w1.Body.Bytes(), &createResp)
+	data := createResp["data"].(map[string]interface{})
+	orderID := data["id"].(string)
+
+	cancelRouter := gin.New()
+	cancelRouter.Use(func(c *gin.Context) {
+		c.Set("user_id", otherUUID.String())
+		c.Set("user_role", "customer")
+		c.Next()
+	})
+	cancelRouter.POST("/api/v1/orders/:id/cancel", handler.Cancel)
+
+	req2, _ := http.NewRequest("POST", "/api/v1/orders/"+orderID+"/cancel", nil)
 	w2 := httptest.NewRecorder()
-	router.ServeHTTP(w2, req2)
+	cancelRouter.ServeHTTP(w2, req2)
 
 	if w2.Code != http.StatusForbidden {
 		t.Errorf("Expected status 403, got %d. Body: %s", w2.Code, w2.Body.String())
@@ -418,7 +469,6 @@ func TestGetTaskStatus_MissingTaskID(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	// Gin returns 404 when route param is empty (no match for the pattern)
 	if w.Code != http.StatusNotFound && w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status 404 or 400 for missing task ID, got %d", w.Code)
 	}

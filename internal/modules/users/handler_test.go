@@ -154,14 +154,15 @@ func TestGetUserByID_NotFound(t *testing.T) {
 	handler := NewUserHandler(db)
 
 	router := gin.New()
+	nonExistentUUID := uuid.Must(uuid.NewV7())
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", uint(999))
+		c.Set("user_id", nonExistentUUID.String())
 		c.Set("user_role", "admin")
 		c.Next()
 	})
 	router.GET("/api/v1/users/:id", handler.GetByID)
 
-	req, _ := http.NewRequest("GET", "/api/v1/users/999", nil)
+	req, _ := http.NewRequest("GET", "/api/v1/users/"+nonExistentUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -176,15 +177,16 @@ func TestUpdateUser_NotFound(t *testing.T) {
 	handler := NewUserHandler(db)
 
 	router := gin.New()
+	nonExistentUUID := uuid.Must(uuid.NewV7())
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", uint(999))
+		c.Set("user_id", nonExistentUUID.String())
 		c.Set("user_role", "admin")
 		c.Next()
 	})
 	router.PUT("/api/v1/users/:id", handler.Update)
 
 	body := `{"first_name":"John"}`
-	req, _ := http.NewRequest("PUT", "/api/v1/users/999", bytes.NewBufferString(body))
+	req, _ := http.NewRequest("PUT", "/api/v1/users/"+nonExistentUUID.String(), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -197,13 +199,13 @@ func TestUpdateUser_NotFound(t *testing.T) {
 func TestDeleteUser_NotFound(t *testing.T) {
 	router, handler := setupTestRouterWithUsers(t)
 
-	// Add admin middleware for delete endpoint
+	nonExistentUUID := uuid.Must(uuid.NewV7())
 	router.DELETE("/api/v1/users/:id", func(c *gin.Context) {
 		c.Set("user_role", "admin")
 		c.Next()
 	}, handler.Delete)
 
-	req, _ := http.NewRequest("DELETE", "/api/v1/users/999", nil)
+	req, _ := http.NewRequest("DELETE", "/api/v1/users/"+nonExistentUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

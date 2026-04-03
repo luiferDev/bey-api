@@ -217,7 +217,7 @@ func TestRefresh_RevokedToken(t *testing.T) {
 func TestLogout_Success(t *testing.T) {
 	service, db := setupServiceTest(t)
 
-	createTestUser(t, db, "test@example.com", "customer", true)
+	user := createTestUser(t, db, "test@example.com", "customer", true)
 
 	loginResp, err := service.Login(context.Background(), "test@example.com", "password123")
 	if err != nil {
@@ -230,7 +230,7 @@ func TestLogout_Success(t *testing.T) {
 	}
 
 	var token RefreshToken
-	if err := db.Where("user_id = ?", 1).First(&token).Error; err != nil {
+	if err := db.Where("user_id = ?", user.ID).First(&token).Error; err != nil {
 		t.Fatalf("failed to find refresh token: %v", err)
 	}
 	if !token.Revoked {

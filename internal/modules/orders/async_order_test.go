@@ -36,6 +36,10 @@ func setupOrderTestRouter(t *testing.T) (*gin.Engine, *OrderService) {
 	orderService := NewOrderServiceWithTaskQueue(orderRepo, taskQueue)
 
 	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", uuid.Must(uuid.NewV7()).String())
+		c.Next()
+	})
 	api := router.Group("/api/v1")
 	RegisterRoutesWithService(api, db, orderService)
 
@@ -141,6 +145,10 @@ func TestAsyncOrderCreation_WithoutTaskQueue(t *testing.T) {
 	orderService := NewOrderService(nil)
 
 	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", uuid.Must(uuid.NewV7()).String())
+		c.Next()
+	})
 	api := router.Group("/api/v1")
 	RegisterRoutesWithService(api, db, orderService)
 
@@ -159,7 +167,7 @@ func TestAsyncOrderCreation_WithoutTaskQueue(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusInternalServerError {
-		t.Errorf("Expected status 500 when task queue not configured, got %d", w.Code)
+		t.Errorf("Expected status 500 when task queue not configured, got %d. Body: %s", w.Code, w.Body.String())
 	}
 }
 
