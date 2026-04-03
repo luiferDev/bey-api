@@ -358,13 +358,11 @@ func TestProductService_ValidateProductSlug(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:      "duplicate slug but same ID (update)",
-			slug:      "existing-product",
-			excludeID: func() *uuid.UUID { id := uuid.Must(uuid.NewV7()); return &id }(),
-			mockFindBySlug: func(slug string) (*Product, error) {
-				return &Product{ID: uuid.Must(uuid.NewV7()), Name: "Existing"}, nil
-			},
-			wantErr: false,
+			name:           "duplicate slug but same ID (update)",
+			slug:           "existing-product",
+			excludeID:      func() *uuid.UUID { id := uuid.Must(uuid.NewV7()); return &id }(),
+			mockFindBySlug: nil, // will be set below
+			wantErr:        false,
 		},
 		{
 			name:      "duplicate slug different ID (update)",
@@ -375,6 +373,13 @@ func TestProductService_ValidateProductSlug(t *testing.T) {
 			},
 			wantErr: true,
 		},
+	}
+
+	// Fix the "same ID" test: make mock return the same ID as excludeID
+	sameIDTest := &tests[2]
+	sameID := *sameIDTest.excludeID
+	sameIDTest.mockFindBySlug = func(slug string) (*Product, error) {
+		return &Product{ID: sameID, Name: "Existing"}, nil
 	}
 
 	for _, tt := range tests {
@@ -423,14 +428,19 @@ func TestProductService_ValidateVariantSKU(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:      "duplicate SKU but same ID (update)",
-			sku:       "EXISTING-SKU",
-			excludeID: func() *uuid.UUID { id := uuid.Must(uuid.NewV7()); return &id }(),
-			mockFindBySKU: func(sku string) (*ProductVariant, error) {
-				return &ProductVariant{ID: uuid.Must(uuid.NewV7()), SKU: "EXISTING-SKU"}, nil
-			},
-			wantErr: false,
+			name:          "duplicate SKU but same ID (update)",
+			sku:           "EXISTING-SKU",
+			excludeID:     func() *uuid.UUID { id := uuid.Must(uuid.NewV7()); return &id }(),
+			mockFindBySKU: nil, // will be set below
+			wantErr:       false,
 		},
+	}
+
+	// Fix the "same SKU" test: make mock return the same ID as excludeID
+	sameSKUTest := &tests[2]
+	sameSKU := *sameSKUTest.excludeID
+	sameSKUTest.mockFindBySKU = func(sku string) (*ProductVariant, error) {
+		return &ProductVariant{ID: sameSKU, SKU: "EXISTING-SKU"}, nil
 	}
 
 	for _, tt := range tests {
