@@ -168,7 +168,10 @@ func (g *TokenGenerator) rotateRefreshTokenRedis(oldTokenHash string) (string, e
 		return "", err
 	}
 
-	userIDStr, _ := tokenData["user_id"].(string)
+	userIDStr, ok := tokenData["user_id"].(string)
+	if !ok {
+		return "", errors.New("invalid user ID in token")
+	}
 	userID, err := uuid.FromString(userIDStr)
 	if err != nil {
 		return "", errors.New("invalid user ID in token")
@@ -292,8 +295,14 @@ func (g *TokenGenerator) validateRefreshTokenRedis(tokenHash string, rawToken st
 		return nil, errors.New("refresh token expired")
 	}
 
-	userIDStr, _ := tokenData["user_id"].(string)
-	userID, _ := uuid.FromString(userIDStr)
+	userIDStr, ok := tokenData["user_id"].(string)
+	if !ok {
+		return nil, errors.New("invalid user ID in token")
+	}
+	userID, err := uuid.FromString(userIDStr)
+	if err != nil {
+		return nil, errors.New("invalid user ID in token")
+	}
 	return &RefreshToken{
 		Token:     tokenHash,
 		UserID:    userID,

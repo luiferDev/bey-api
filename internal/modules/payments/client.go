@@ -2,6 +2,7 @@ package payments
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -48,7 +49,7 @@ func (c *WompiClient) CreateTransaction(amount int64, currency, token, reference
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", c.baseURL+"/transactions", bytes.NewReader(jsonBody))
+	req, err := http.NewRequestWithContext(context.Background(), "POST", c.baseURL+"/transactions", bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -79,7 +80,7 @@ func (c *WompiClient) CreateTransaction(amount int64, currency, token, reference
 }
 
 func (c *WompiClient) GetTransaction(transactionID string) (*WompiTransactionResponse, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/transactions/"+transactionID, nil)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", c.baseURL+"/transactions/"+transactionID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -118,7 +119,7 @@ func (c *WompiClient) VoidTransaction(transactionID string) (*WompiTransactionRe
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("PATCH", c.baseURL+"/transactions/"+transactionID, bytes.NewReader(jsonBody))
+	req, err := http.NewRequestWithContext(context.Background(), "PATCH", c.baseURL+"/transactions/"+transactionID, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -171,7 +172,7 @@ func (c *WompiClient) CreatePaymentLink(amount int64, currency, description, ref
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", c.baseURL+"/payment_links", bytes.NewReader(jsonBody))
+	req, err := http.NewRequestWithContext(context.Background(), "POST", c.baseURL+"/payment_links", bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -204,7 +205,7 @@ func (c *WompiClient) CreatePaymentLink(amount int64, currency, description, ref
 }
 
 func (c *WompiClient) GetPaymentLink(linkID string) (*WompiPaymentLinkResponse, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/payment_links/"+linkID, nil)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", c.baseURL+"/payment_links/"+linkID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -243,7 +244,7 @@ func (c *WompiClient) UpdatePaymentLink(linkID string, status string) (*WompiPay
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("PATCH", c.baseURL+"/payment_links/"+linkID, bytes.NewReader(jsonBody))
+	req, err := http.NewRequestWithContext(context.Background(), "PATCH", c.baseURL+"/payment_links/"+linkID, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}

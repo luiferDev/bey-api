@@ -276,10 +276,7 @@ func parseUUIDParam(c *gin.Context, param string) (uuid.UUID, error) {
 func ToCartResponse(cart *Cart) CartResponse {
 	items := make([]CartItemResponse, len(cart.Items))
 	for i, item := range cart.Items {
-		items[i] = CartItemResponse{
-			VariantID: item.VariantID,
-			Quantity:  item.Quantity,
-		}
+		items[i] = CartItemResponse(item)
 	}
 	return CartResponse{
 		UserID:    cart.UserID.String(),

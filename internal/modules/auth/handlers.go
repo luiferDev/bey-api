@@ -209,7 +209,12 @@ func HandleSetup2FA(authService AuthServiceInterface, responseHandler *response.
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
-		userID, err := uuid.FromString(userIDStr.(string))
+		rawID, ok := userIDStr.(string)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID type"})
+			return
+		}
+		userID, err := uuid.FromString(rawID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID"})
 			return
@@ -241,7 +246,12 @@ func HandleEnable2FA(authService AuthServiceInterface, responseHandler *response
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
-		userID, err := uuid.FromString(userIDStr.(string))
+		rawID, ok := userIDStr.(string)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID type"})
+			return
+		}
+		userID, err := uuid.FromString(rawID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID"})
 			return
@@ -279,7 +289,12 @@ func HandleDisable2FA(authService AuthServiceInterface, responseHandler *respons
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
-		userID, err := uuid.FromString(userIDStr.(string))
+		rawID, ok := userIDStr.(string)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID type"})
+			return
+		}
+		userID, err := uuid.FromString(rawID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID"})
 			return
@@ -316,7 +331,12 @@ func HandleVerify2FA(authService AuthServiceInterface, responseHandler *response
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
-		userID, err := uuid.FromString(userIDStr.(string))
+		rawID, ok := userIDStr.(string)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID type"})
+			return
+		}
+		userID, err := uuid.FromString(rawID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID"})
 			return

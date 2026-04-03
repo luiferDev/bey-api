@@ -89,9 +89,8 @@ func (s *CartService) AddItem(userID uuid.UUID, variantID uuid.UUID, quantity in
 		}
 	}
 
-	newQuantity := quantity
 	if existingIdx >= 0 {
-		newQuantity = cart.Items[existingIdx].Quantity + quantity
+		newQuantity := cart.Items[existingIdx].Quantity + quantity
 		if stock < newQuantity {
 			return nil, ErrInsufficientStock
 		}
