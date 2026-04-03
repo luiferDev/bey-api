@@ -45,6 +45,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"embed"
 	"encoding/base64"
 	"fmt"
 	"log"
@@ -79,6 +80,37 @@ import (
 
 	_ "bey/cmd/api/docs"
 )
+
+//go:embed migrations/001_migrate_to_uuid.sql
+var migrationFS embed.FS
+
+func runUUIDMigration(db *gorm.DB) error {
+	var hasUUIDColumn bool
+	err := db.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_name = 'users' AND column_name = 'id' AND data_type = 'uuid'
+		)
+	`).Scan(&hasUUIDColumn).Error
+	if err != nil {
+		return fmt.Errorf("failed to check migration status: %w", err)
+	}
+	if hasUUIDColumn {
+		log.Println("UUID migration already applied, skipping")
+		return nil
+	}
+
+	sqlBytes, err := migrationFS.ReadFile("migrations/001_migrate_to_uuid.sql")
+	if err != nil {
+		return fmt.Errorf("failed to read migration file: %w", err)
+	}
+
+	if err := db.Exec(string(sqlBytes)).Error; err != nil {
+		return fmt.Errorf("failed to run UUID migration: %w", err)
+	}
+	log.Println("UUID migration applied successfully")
+	return nil
+}
 
 func generateRandomPassword(length int) string {
 	b := make([]byte, length)
@@ -149,6 +181,10 @@ func main() {
 			log.Printf("Error closing database: %v", err)
 		}
 	}()
+
+	if err := runUUIDMigration(db.GetDB()); err != nil {
+		log.Fatalf("Failed to run UUID migration: %v", err)
+	}
 
 	if err := db.AutoMigrate(
 		&users.User{},
