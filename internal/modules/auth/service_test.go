@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -88,8 +89,8 @@ func TestLogin_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to validate access token: %v", err)
 	}
-	if claims.UserID != user.ID {
-		t.Errorf("claims.UserID = %d; want %d", claims.UserID, user.ID)
+	if claims.UserID != user.ID.String() {
+		t.Errorf("claims.UserID = %s; want %s", claims.UserID, user.ID)
 	}
 }
 
@@ -160,8 +161,8 @@ func TestRefresh_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to validate new access token: %v", err)
 	}
-	if claims.UserID != user.ID {
-		t.Errorf("claims.UserID = %d; want %d", claims.UserID, user.ID)
+	if claims.UserID != user.ID.String() {
+		t.Errorf("claims.UserID = %s; want %s", claims.UserID, user.ID)
 	}
 	if claims.Email != user.Email {
 		t.Errorf("claims.Email = %s; want %s", claims.Email, user.Email)
@@ -181,7 +182,7 @@ func TestRefresh_ExpiredToken(t *testing.T) {
 
 	expiredToken := &RefreshToken{
 		Token:     tokenGen.HashToken(refreshToken),
-		UserID:    1,
+		UserID:    uuid.Must(uuid.NewV7()),
 		ExpiresAt: time.Now().Add(-1 * time.Hour),
 		Revoked:   false,
 	}

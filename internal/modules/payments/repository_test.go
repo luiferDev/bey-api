@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -31,7 +32,7 @@ func TestPaymentRepository_Create(t *testing.T) {
 		{
 			name: "valid payment",
 			payment: &Payment{
-				OrderID:            1,
+				OrderID:            uuid.Must(uuid.NewV7()),
 				WompiTransactionID: "tx_123",
 				Amount:             100000,
 				Currency:           "COP",
@@ -52,7 +53,7 @@ func TestPaymentRepository_Create(t *testing.T) {
 		{
 			name: "payment with payment method",
 			payment: &Payment{
-				OrderID:            2,
+				OrderID:            uuid.Must(uuid.NewV7()),
 				WompiTransactionID: "tx_456",
 				Amount:             150000,
 				Currency:           "COP",
@@ -70,7 +71,7 @@ func TestPaymentRepository_Create(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !tt.wantErr && tt.payment.ID == 0 {
+			if !tt.wantErr && tt.payment.ID == uuid.Nil {
 				t.Error("Expected payment ID to be set")
 			}
 		})
@@ -82,7 +83,7 @@ func TestPaymentRepository_FindByID(t *testing.T) {
 	repo := NewPaymentRepository(db)
 
 	existingPayment := &Payment{
-		OrderID:            1,
+		OrderID:            uuid.Must(uuid.NewV7()),
 		WompiTransactionID: "tx_123",
 		Amount:             100000,
 		Currency:           "COP",
@@ -93,7 +94,7 @@ func TestPaymentRepository_FindByID(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		id        uint
+		id        uuid.UUID
 		wantErr   bool
 		expectNil bool
 	}{
@@ -105,13 +106,13 @@ func TestPaymentRepository_FindByID(t *testing.T) {
 		},
 		{
 			name:      "payment not found",
-			id:        9999,
+			id:        uuid.Must(uuid.NewV7()),
 			wantErr:   false,
 			expectNil: true,
 		},
 		{
 			name:      "zero id",
-			id:        0,
+			id:        uuid.Nil,
 			wantErr:   false,
 			expectNil: true,
 		},
@@ -140,31 +141,35 @@ func TestPaymentRepository_FindByOrderID(t *testing.T) {
 	db := setupPaymentTestDB(t)
 	repo := NewPaymentRepository(db)
 
-	repo.Create(&Payment{OrderID: 1, WompiTransactionID: "tx_001", Amount: 100000, Currency: "COP", Reference: "order-001"})
-	repo.Create(&Payment{OrderID: 1, WompiTransactionID: "tx_002", Amount: 50000, Currency: "COP", Reference: "order-002"})
-	repo.Create(&Payment{OrderID: 2, WompiTransactionID: "tx_003", Amount: 75000, Currency: "COP", Reference: "order-003"})
+	orderID1 := uuid.Must(uuid.NewV7())
+	orderID2 := uuid.Must(uuid.NewV7())
+	orderID3 := uuid.Must(uuid.NewV7())
+
+	repo.Create(&Payment{OrderID: orderID1, WompiTransactionID: "tx_001", Amount: 100000, Currency: "COP", Reference: "order-001"})
+	repo.Create(&Payment{OrderID: orderID1, WompiTransactionID: "tx_002", Amount: 50000, Currency: "COP", Reference: "order-002"})
+	repo.Create(&Payment{OrderID: orderID2, WompiTransactionID: "tx_003", Amount: 75000, Currency: "COP", Reference: "order-003"})
 
 	tests := []struct {
 		name      string
-		orderID   uint
+		orderID   uuid.UUID
 		wantCount int
 		wantErr   bool
 	}{
 		{
 			name:      "find payments for order 1",
-			orderID:   1,
+			orderID:   orderID1,
 			wantCount: 2,
 			wantErr:   false,
 		},
 		{
 			name:      "find payments for order 2",
-			orderID:   2,
+			orderID:   orderID2,
 			wantCount: 1,
 			wantErr:   false,
 		},
 		{
 			name:      "no payments for order",
-			orderID:   999,
+			orderID:   orderID3,
 			wantCount: 0,
 			wantErr:   false,
 		},
@@ -188,7 +193,7 @@ func TestPaymentRepository_Update(t *testing.T) {
 	repo := NewPaymentRepository(db)
 
 	payment := &Payment{
-		OrderID:            1,
+		OrderID:            uuid.Must(uuid.NewV7()),
 		WompiTransactionID: "tx_123",
 		Amount:             100000,
 		Currency:           "COP",
@@ -252,7 +257,7 @@ func TestPaymentRepository_Delete(t *testing.T) {
 	repo := NewPaymentRepository(db)
 
 	payment := &Payment{
-		OrderID:  1,
+		OrderID:  uuid.Must(uuid.NewV7()),
 		Amount:   100000,
 		Currency: "COP",
 	}
@@ -395,7 +400,7 @@ func TestPaymentRepository_ErrorHandling(t *testing.T) {
 
 	repo := NewPaymentRepository(db)
 
-	_, err = repo.FindByID(1)
+	_, err = repo.FindByID(uuid.Must(uuid.NewV7()))
 	if err == nil {
 		t.Error("Expected error when finding in non-migrated table")
 	}
@@ -418,7 +423,7 @@ func TestPaymentLinkRepository_Create(t *testing.T) {
 		{
 			name: "valid payment link",
 			link: &PaymentLink{
-				OrderID:     1,
+				OrderID:     uuid.Must(uuid.NewV7()),
 				WompiLinkID: "link_123",
 				URL:         "https://wompi.co/pay/link_123",
 				Amount:      100000,
@@ -431,7 +436,7 @@ func TestPaymentLinkRepository_Create(t *testing.T) {
 		{
 			name: "payment link with single use",
 			link: &PaymentLink{
-				OrderID:     2,
+				OrderID:     uuid.Must(uuid.NewV7()),
 				WompiLinkID: "link_456",
 				Amount:      50000,
 				Currency:    "COP",
@@ -448,7 +453,7 @@ func TestPaymentLinkRepository_Create(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !tt.wantErr && tt.link.ID == 0 {
+			if !tt.wantErr && tt.link.ID == uuid.Nil {
 				t.Error("Expected link ID to be set")
 			}
 		})
@@ -460,7 +465,7 @@ func TestPaymentLinkRepository_FindByID(t *testing.T) {
 	repo := NewPaymentLinkRepository(db)
 
 	existingLink := &PaymentLink{
-		OrderID:     1,
+		OrderID:     uuid.Must(uuid.NewV7()),
 		WompiLinkID: "link_123",
 		Amount:      100000,
 		Currency:    "COP",
@@ -470,7 +475,7 @@ func TestPaymentLinkRepository_FindByID(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		id        uint
+		id        uuid.UUID
 		wantErr   bool
 		expectNil bool
 	}{
@@ -482,7 +487,7 @@ func TestPaymentLinkRepository_FindByID(t *testing.T) {
 		},
 		{
 			name:      "link not found",
-			id:        9999,
+			id:        uuid.Must(uuid.NewV7()),
 			wantErr:   false,
 			expectNil: true,
 		},
@@ -508,24 +513,27 @@ func TestPaymentLinkRepository_FindByOrderID(t *testing.T) {
 	db := setupPaymentTestDB(t)
 	repo := NewPaymentLinkRepository(db)
 
-	repo.Create(&PaymentLink{OrderID: 1, WompiLinkID: "link_1", Amount: 100000, Status: StatusActive})
-	repo.Create(&PaymentLink{OrderID: 2, WompiLinkID: "link_2", Amount: 50000, Status: StatusActive})
+	orderID1 := uuid.Must(uuid.NewV7())
+	orderID2 := uuid.Must(uuid.NewV7())
+
+	repo.Create(&PaymentLink{OrderID: orderID1, WompiLinkID: "link_1", Amount: 100000, Status: StatusActive})
+	repo.Create(&PaymentLink{OrderID: orderID2, WompiLinkID: "link_2", Amount: 50000, Status: StatusActive})
 
 	tests := []struct {
 		name      string
-		orderID   uint
+		orderID   uuid.UUID
 		wantErr   bool
 		expectNil bool
 	}{
 		{
 			name:      "found link for order",
-			orderID:   1,
+			orderID:   orderID1,
 			wantErr:   false,
 			expectNil: false,
 		},
 		{
 			name:      "no link for order",
-			orderID:   999,
+			orderID:   uuid.Must(uuid.NewV7()),
 			wantErr:   false,
 			expectNil: true,
 		},
@@ -648,7 +656,7 @@ func TestPaymentLinkRepository_Update(t *testing.T) {
 	repo := NewPaymentLinkRepository(db)
 
 	link := &PaymentLink{
-		OrderID:     1,
+		OrderID:     uuid.Must(uuid.NewV7()),
 		WompiLinkID: "link_123",
 		Amount:      100000,
 		Currency:    "COP",
@@ -700,7 +708,7 @@ func TestPaymentLinkRepository_Delete(t *testing.T) {
 	repo := NewPaymentLinkRepository(db)
 
 	link := &PaymentLink{
-		OrderID:  1,
+		OrderID:  uuid.Must(uuid.NewV7()),
 		Amount:   100000,
 		Currency: "COP",
 	}
@@ -744,31 +752,35 @@ func TestPaymentLinkRepository_FindActiveByOrderID(t *testing.T) {
 	db := setupPaymentTestDB(t)
 	repo := NewPaymentLinkRepository(db)
 
-	repo.Create(&PaymentLink{OrderID: 1, WompiLinkID: "link_1", Amount: 100000, Status: StatusActive})
-	repo.Create(&PaymentLink{OrderID: 1, WompiLinkID: "link_2", Amount: 50000, Status: StatusUsed})
-	repo.Create(&PaymentLink{OrderID: 2, WompiLinkID: "link_3", Amount: 75000, Status: StatusActive})
+	orderID1 := uuid.Must(uuid.NewV7())
+	orderID2 := uuid.Must(uuid.NewV7())
+	orderID3 := uuid.Must(uuid.NewV7())
+
+	repo.Create(&PaymentLink{OrderID: orderID1, WompiLinkID: "link_1", Amount: 100000, Status: StatusActive})
+	repo.Create(&PaymentLink{OrderID: orderID2, WompiLinkID: "link_2", Amount: 50000, Status: StatusUsed})
+	repo.Create(&PaymentLink{OrderID: orderID3, WompiLinkID: "link_3", Amount: 75000, Status: StatusActive})
 
 	tests := []struct {
 		name      string
-		orderID   uint
+		orderID   uuid.UUID
 		wantErr   bool
 		expectNil bool
 	}{
 		{
 			name:      "find active link for order",
-			orderID:   1,
+			orderID:   orderID1,
 			wantErr:   false,
 			expectNil: false,
 		},
 		{
 			name:      "no active link for order",
-			orderID:   2,
+			orderID:   orderID2,
 			wantErr:   false,
 			expectNil: false,
 		},
 		{
 			name:      "no link at all",
-			orderID:   999,
+			orderID:   uuid.Must(uuid.NewV7()),
 			wantErr:   false,
 			expectNil: true,
 		},
@@ -824,7 +836,7 @@ func TestPaymentLinkRepository_ErrorHandling(t *testing.T) {
 
 	repo := NewPaymentLinkRepository(db)
 
-	_, err = repo.FindByID(1)
+	_, err = repo.FindByID(uuid.Must(uuid.NewV7()))
 	if err == nil {
 		t.Error("Expected error when finding in non-migrated table")
 	}

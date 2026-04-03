@@ -3,6 +3,7 @@ package users
 import (
 	"testing"
 
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -38,7 +39,7 @@ func TestUserRepository_Create(t *testing.T) {
 		t.Fatalf("Failed to create user: %v", err)
 	}
 
-	if user.ID == 0 {
+	if user.ID == uuid.Nil {
 		t.Error("Expected user ID to be set")
 	}
 }
@@ -75,7 +76,7 @@ func TestUserRepository_FindByID_NotFound(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewUserRepository(db)
 
-	found, err := repo.FindByID(999)
+	found, err := repo.FindByID(uuid.Nil)
 	if err != nil {
 		t.Fatalf("Failed to find user: %v", err)
 	}

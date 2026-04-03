@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -17,7 +17,7 @@ func setupParallelTestDB(t *testing.T) *gorm.DB {
 	dbCounter++
 	dbMu.Unlock()
 
-	dbName := t.Name() + "_" + uuid.New().String() + ".db"
+	dbName := t.Name() + "_" + uuid.Must(uuid.NewV7()).String() + ".db"
 	db, err := gorm.Open(sqlite.Open(dbName), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
@@ -99,7 +99,7 @@ func TestProductRepository_FindByIDWithRelationsParallel_NotFound(t *testing.T) 
 	imageRepo := NewProductImageRepository(db)
 	repo := NewProductRepositoryWithRelations(db, variantRepo, imageRepo)
 
-	result, err := repo.FindByIDWithRelationsParallel(999)
+	result, err := repo.FindByIDWithRelationsParallel(uuid.Must(uuid.NewV7()))
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}

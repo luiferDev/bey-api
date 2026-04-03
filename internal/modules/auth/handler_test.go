@@ -14,6 +14,7 @@ import (
 	"bey/internal/shared/response"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
 )
 
 type MockAuthService struct {
@@ -24,10 +25,10 @@ type MockAuthService struct {
 	resendVerificationFunc func(ctx context.Context, email string) error
 	forgotPasswordFunc     func(ctx context.Context, email string) error
 	resetPasswordFunc      func(ctx context.Context, token, newPassword string) error
-	setupTwoFactorFunc     func(ctx context.Context, userID uint) (*TwoFASetupResponse, error)
-	enableTwoFactorFunc    func(ctx context.Context, userID uint, code string) (*TwoFAEnableResponse, error)
-	disableTwoFactorFunc   func(ctx context.Context, userID uint, code, backupCode string) error
-	verifyTwoFactorFunc    func(ctx context.Context, userID uint, code string) (bool, error)
+	setupTwoFactorFunc     func(ctx context.Context, userID uuid.UUID) (*TwoFASetupResponse, error)
+	enableTwoFactorFunc    func(ctx context.Context, userID uuid.UUID, code string) (*TwoFAEnableResponse, error)
+	disableTwoFactorFunc   func(ctx context.Context, userID uuid.UUID, code, backupCode string) error
+	verifyTwoFactorFunc    func(ctx context.Context, userID uuid.UUID, code string) (bool, error)
 	loginWith2FAFunc       func(ctx context.Context, tempToken, code string) (*TokenResponse, error)
 }
 
@@ -84,28 +85,28 @@ func (m *MockAuthService) ResetPassword(ctx context.Context, token, newPassword 
 	return nil
 }
 
-func (m *MockAuthService) SetupTwoFactor(ctx context.Context, userID uint) (*TwoFASetupResponse, error) {
+func (m *MockAuthService) SetupTwoFactor(ctx context.Context, userID uuid.UUID) (*TwoFASetupResponse, error) {
 	if m.setupTwoFactorFunc != nil {
 		return m.setupTwoFactorFunc(ctx, userID)
 	}
 	return nil, nil
 }
 
-func (m *MockAuthService) EnableTwoFactor(ctx context.Context, userID uint, code string) (*TwoFAEnableResponse, error) {
+func (m *MockAuthService) EnableTwoFactor(ctx context.Context, userID uuid.UUID, code string) (*TwoFAEnableResponse, error) {
 	if m.enableTwoFactorFunc != nil {
 		return m.enableTwoFactorFunc(ctx, userID, code)
 	}
 	return nil, nil
 }
 
-func (m *MockAuthService) DisableTwoFactor(ctx context.Context, userID uint, code, backupCode string) error {
+func (m *MockAuthService) DisableTwoFactor(ctx context.Context, userID uuid.UUID, code, backupCode string) error {
 	if m.disableTwoFactorFunc != nil {
 		return m.disableTwoFactorFunc(ctx, userID, code, backupCode)
 	}
 	return nil
 }
 
-func (m *MockAuthService) VerifyTwoFactor(ctx context.Context, userID uint, code string) (bool, error) {
+func (m *MockAuthService) VerifyTwoFactor(ctx context.Context, userID uuid.UUID, code string) (bool, error) {
 	if m.verifyTwoFactorFunc != nil {
 		return m.verifyTwoFactorFunc(ctx, userID, code)
 	}
@@ -796,7 +797,7 @@ func TestHandleSetup2FA_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &MockAuthService{
-		setupTwoFactorFunc: func(ctx context.Context, userID uint) (*TwoFASetupResponse, error) {
+		setupTwoFactorFunc: func(ctx context.Context, userID uuid.UUID) (*TwoFASetupResponse, error) {
 			return &TwoFASetupResponse{
 				Secret:          "TESTSECRET",
 				QRCode:          "base64qrcode",
@@ -838,7 +839,7 @@ func TestHandleEnable2FA_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &MockAuthService{
-		enableTwoFactorFunc: func(ctx context.Context, userID uint, code string) (*TwoFAEnableResponse, error) {
+		enableTwoFactorFunc: func(ctx context.Context, userID uuid.UUID, code string) (*TwoFAEnableResponse, error) {
 			return &TwoFAEnableResponse{
 				Success:     true,
 				BackupCodes: []string{"code1", "code2"},
@@ -883,7 +884,7 @@ func TestHandleEnable2FA_InvalidCode(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &MockAuthService{
-		enableTwoFactorFunc: func(ctx context.Context, userID uint, code string) (*TwoFAEnableResponse, error) {
+		enableTwoFactorFunc: func(ctx context.Context, userID uuid.UUID, code string) (*TwoFAEnableResponse, error) {
 			return nil, errors.New("invalid verification code")
 		},
 	}
@@ -926,7 +927,7 @@ func TestHandleDisable2FA_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &MockAuthService{
-		disableTwoFactorFunc: func(ctx context.Context, userID uint, code, backupCode string) error {
+		disableTwoFactorFunc: func(ctx context.Context, userID uuid.UUID, code, backupCode string) error {
 			return nil
 		},
 	}
@@ -968,7 +969,7 @@ func TestHandleDisable2FA_InvalidCode(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &MockAuthService{
-		disableTwoFactorFunc: func(ctx context.Context, userID uint, code, backupCode string) error {
+		disableTwoFactorFunc: func(ctx context.Context, userID uuid.UUID, code, backupCode string) error {
 			return errors.New("invalid verification code")
 		},
 	}
@@ -992,7 +993,7 @@ func TestHandleVerify2FA_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &MockAuthService{
-		verifyTwoFactorFunc: func(ctx context.Context, userID uint, code string) (bool, error) {
+		verifyTwoFactorFunc: func(ctx context.Context, userID uuid.UUID, code string) (bool, error) {
 			return true, nil
 		},
 	}
@@ -1030,7 +1031,7 @@ func TestHandleVerify2FA_InvalidCode(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &MockAuthService{
-		verifyTwoFactorFunc: func(ctx context.Context, userID uint, code string) (bool, error) {
+		verifyTwoFactorFunc: func(ctx context.Context, userID uuid.UUID, code string) (bool, error) {
 			return false, nil
 		},
 	}

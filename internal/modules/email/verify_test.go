@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"bey/internal/modules/users"
+
+	"github.com/gofrs/uuid/v5"
 )
 
 func TestVerifyVerificationToken_Valid(t *testing.T) {
@@ -15,7 +17,7 @@ func TestVerifyVerificationToken_Valid(t *testing.T) {
 
 	expiresAt := time.Now().Add(1 * time.Hour)
 	user := &users.User{
-		ID:                  1,
+		ID:                  uuid.Must(uuid.NewV7()),
 		VerificationToken:   HashToken(token),
 		VerificationExpires: &expiresAt,
 	}
@@ -34,7 +36,7 @@ func TestVerifyVerificationToken_Expired(t *testing.T) {
 
 	expiresAt := time.Now().Add(-1 * time.Hour)
 	user := &users.User{
-		ID:                  1,
+		ID:                  uuid.Must(uuid.NewV7()),
 		VerificationToken:   HashToken(token),
 		VerificationExpires: &expiresAt,
 	}
@@ -53,7 +55,7 @@ func TestVerifyVerificationToken_Wrong(t *testing.T) {
 
 	expiresAt := time.Now().Add(1 * time.Hour)
 	user := &users.User{
-		ID:                  1,
+		ID:                  uuid.Must(uuid.NewV7()),
 		VerificationToken:   HashToken(token),
 		VerificationExpires: &expiresAt,
 	}
@@ -72,7 +74,7 @@ func TestVerifyResetToken_Valid(t *testing.T) {
 
 	expiresAt := time.Now().Add(1 * time.Hour)
 	user := &users.User{
-		ID:           1,
+		ID:           uuid.Must(uuid.NewV7()),
 		ResetToken:   HashToken(token),
 		ResetExpires: &expiresAt,
 	}
@@ -91,7 +93,7 @@ func TestVerifyResetToken_Expired(t *testing.T) {
 
 	expiresAt := time.Now().Add(-1 * time.Hour)
 	user := &users.User{
-		ID:           1,
+		ID:           uuid.Must(uuid.NewV7()),
 		ResetToken:   HashToken(token),
 		ResetExpires: &expiresAt,
 	}
@@ -110,7 +112,7 @@ func TestVerifyResetToken_Wrong(t *testing.T) {
 
 	expiresAt := time.Now().Add(1 * time.Hour)
 	user := &users.User{
-		ID:           1,
+		ID:           uuid.Must(uuid.NewV7()),
 		ResetToken:   HashToken(token),
 		ResetExpires: &expiresAt,
 	}

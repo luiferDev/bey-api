@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
@@ -35,7 +36,7 @@ func setupTokenTest(t *testing.T) (*TokenGenerator, *gorm.DB) {
 func TestGenerateAccessToken(t *testing.T) {
 	tokenGen, _ := setupTokenTest(t)
 
-	token, expiresIn, err := tokenGen.GenerateAccessToken(1, "test@example.com", "customer")
+	token, expiresIn, err := tokenGen.GenerateAccessToken(uuid.Must(uuid.NewV7()), "test@example.com", "customer")
 	if err != nil {
 		t.Fatalf("GenerateAccessToken failed: %v", err)
 	}
@@ -56,7 +57,7 @@ func TestGenerateAccessToken(t *testing.T) {
 func TestGenerateAccessToken_Expiry(t *testing.T) {
 	tokenGen, _ := setupTokenTest(t)
 
-	token, expiresIn, err := tokenGen.GenerateAccessToken(1, "test@example.com", "admin")
+	token, expiresIn, err := tokenGen.GenerateAccessToken(uuid.Must(uuid.NewV7()), "test@example.com", "admin")
 	if err != nil {
 		t.Fatalf("GenerateAccessToken failed: %v", err)
 	}
@@ -71,8 +72,8 @@ func TestGenerateAccessToken_Expiry(t *testing.T) {
 		t.Fatalf("ValidateToken failed: %v", err)
 	}
 
-	if claims.UserID != 1 {
-		t.Errorf("claims.UserID = %d; want 1", claims.UserID)
+	if claims.UserID != "1" {
+		t.Errorf("claims.UserID = %s; want 1", claims.UserID)
 	}
 	if claims.Email != "test@example.com" {
 		t.Errorf("claims.Email = %s; want test@example.com", claims.Email)
@@ -118,7 +119,7 @@ func TestGenerateRefreshToken(t *testing.T) {
 func TestValidateToken(t *testing.T) {
 	tokenGen, _ := setupTokenTest(t)
 
-	token, _, err := tokenGen.GenerateAccessToken(42, "user@test.com", "customer")
+	token, _, err := tokenGen.GenerateAccessToken(uuid.Must(uuid.NewV7()), "user@test.com", "customer")
 	if err != nil {
 		t.Fatalf("GenerateAccessToken failed: %v", err)
 	}
@@ -128,8 +129,8 @@ func TestValidateToken(t *testing.T) {
 		t.Fatalf("ValidateToken failed: %v", err)
 	}
 
-	if claims.UserID != 42 {
-		t.Errorf("UserID = %d; want 42", claims.UserID)
+	if claims.UserID != "42" {
+		t.Errorf("UserID = %s; want 42", claims.UserID)
 	}
 	if claims.Email != "user@test.com" {
 		t.Errorf("Email = %s; want user@test.com", claims.Email)
@@ -152,7 +153,7 @@ func TestValidateToken_Expired(t *testing.T) {
 	cfg.Security.JWTConfig = cfg.Security.GetJWTConfig()
 
 	expiredTokenGen := NewTokenGenerator(tokenGen.db, cfg)
-	token, _, err := expiredTokenGen.GenerateAccessToken(1, "test@example.com", "customer")
+	token, _, err := expiredTokenGen.GenerateAccessToken(uuid.Must(uuid.NewV7()), "test@example.com", "customer")
 	if err != nil {
 		t.Fatalf("GenerateAccessToken failed: %v", err)
 	}

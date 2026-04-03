@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -314,7 +315,7 @@ func TestAuthFlow_RefreshToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate refresh token: %v", err)
 	}
-	if err := tokenGenerator.StoreRefreshToken(refreshToken, 1); err != nil {
+	if err := tokenGenerator.StoreRefreshToken(refreshToken, uuid.Must(uuid.NewV7())); err != nil {
 		t.Fatalf("Failed to store refresh token: %v", err)
 	}
 
@@ -381,7 +382,7 @@ func TestAuthFlow_Logout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate refresh token: %v", err)
 	}
-	if err := tokenGenerator.StoreRefreshToken(refreshToken, 1); err != nil {
+	if err := tokenGenerator.StoreRefreshToken(refreshToken, uuid.Must(uuid.NewV7())); err != nil {
 		t.Fatalf("Failed to store refresh token: %v", err)
 	}
 

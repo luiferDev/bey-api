@@ -6,15 +6,17 @@ import (
 	"time"
 
 	"bey/internal/modules/products"
+
+	"github.com/gofrs/uuid/v5"
 )
 
 type MockCartRepository struct {
-	getCartFunc    func(userID uint) (*Cart, error)
+	getCartFunc    func(userID uuid.UUID) (*Cart, error)
 	saveCartFunc   func(cart *Cart) error
-	deleteCartFunc func(userID uint) error
+	deleteCartFunc func(userID uuid.UUID) error
 }
 
-func (m *MockCartRepository) GetCart(userID uint) (*Cart, error) {
+func (m *MockCartRepository) GetCart(userID uuid.UUID) (*Cart, error) {
 	if m.getCartFunc != nil {
 		return m.getCartFunc(userID)
 	}
@@ -28,7 +30,7 @@ func (m *MockCartRepository) SaveCart(cart *Cart) error {
 	return nil
 }
 
-func (m *MockCartRepository) DeleteCart(userID uint) error {
+func (m *MockCartRepository) DeleteCart(userID uuid.UUID) error {
 	if m.deleteCartFunc != nil {
 		return m.deleteCartFunc(userID)
 	}
@@ -36,18 +38,18 @@ func (m *MockCartRepository) DeleteCart(userID uint) error {
 }
 
 type MockVariantFinder struct {
-	findByIDFunc         func(id uint) (*products.ProductVariant, error)
-	getPriceAndStockFunc func(id uint) (float64, int, int, error)
+	findByIDFunc         func(id uuid.UUID) (*products.ProductVariant, error)
+	getPriceAndStockFunc func(id uuid.UUID) (float64, int, int, error)
 }
 
-func (m *MockVariantFinder) FindByID(id uint) (*products.ProductVariant, error) {
+func (m *MockVariantFinder) FindByID(id uuid.UUID) (*products.ProductVariant, error) {
 	if m.findByIDFunc != nil {
 		return m.findByIDFunc(id)
 	}
 	return nil, nil
 }
 
-func (m *MockVariantFinder) GetPriceAndStock(id uint) (float64, int, int, error) {
+func (m *MockVariantFinder) GetPriceAndStock(id uuid.UUID) (float64, int, int, error) {
 	if m.getPriceAndStockFunc != nil {
 		return m.getPriceAndStockFunc(id)
 	}
@@ -57,8 +59,8 @@ func (m *MockVariantFinder) GetPriceAndStock(id uint) (float64, int, int, error)
 func TestCartService_AddItem(t *testing.T) {
 	tests := []struct {
 		name              string
-		userID            uint
-		variantID         uint
+		userID            uuid.UUID
+		variantID         uuid.UUID
 		quantity          int
 		mockCartRepo      *MockCartRepository
 		mockVariantFinder *MockVariantFinder
@@ -67,11 +69,11 @@ func TestCartService_AddItem(t *testing.T) {
 	}{
 		{
 			name:      "add item with sufficient stock - success",
-			userID:    1,
-			variantID: 1,
+			userID:    testCartUserID,
+			variantID: testVariantID,
 			quantity:  2,
 			mockCartRepo: &MockCartRepository{
-				getCartFunc: func(userID uint) (*Cart, error) {
+				getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 					return &Cart{UserID: userID, Items: []CartItem{}}, nil
 				},
 				saveCartFunc: func(cart *Cart) error {
@@ -79,10 +81,10 @@ func TestCartService_AddItem(t *testing.T) {
 				},
 			},
 			mockVariantFinder: &MockVariantFinder{
-				findByIDFunc: func(id uint) (*products.ProductVariant, error) {
-					return &products.ProductVariant{ID: 1, ProductID: 1}, nil
+				findByIDFunc: func(id uuid.UUID) (*products.ProductVariant, error) {
+					return &products.ProductVariant{ID: testVariantID, ProductID: testProductID}, nil
 				},
-				getPriceAndStockFunc: func(id uint) (float64, int, int, error) {
+				getPriceAndStockFunc: func(id uuid.UUID) (float64, int, int, error) {
 					return 10.0, 10, 0, nil
 				},
 			},
@@ -90,19 +92,19 @@ func TestCartService_AddItem(t *testing.T) {
 		},
 		{
 			name:      "add item with insufficient stock - failure",
-			userID:    1,
-			variantID: 1,
+			userID:    testCartUserID,
+			variantID: testVariantID,
 			quantity:  15,
 			mockCartRepo: &MockCartRepository{
-				getCartFunc: func(userID uint) (*Cart, error) {
+				getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 					return &Cart{UserID: userID, Items: []CartItem{}}, nil
 				},
 			},
 			mockVariantFinder: &MockVariantFinder{
-				findByIDFunc: func(id uint) (*products.ProductVariant, error) {
-					return &products.ProductVariant{ID: 1, ProductID: 1}, nil
+				findByIDFunc: func(id uuid.UUID) (*products.ProductVariant, error) {
+					return &products.ProductVariant{ID: testVariantID, ProductID: testProductID}, nil
 				},
-				getPriceAndStockFunc: func(id uint) (float64, int, int, error) {
+				getPriceAndStockFunc: func(id uuid.UUID) (float64, int, int, error) {
 					return 10.0, 10, 0, nil
 				},
 			},
@@ -111,16 +113,16 @@ func TestCartService_AddItem(t *testing.T) {
 		},
 		{
 			name:      "add item with non-existent variant - failure",
-			userID:    1,
-			variantID: 999,
+			userID:    testCartUserID,
+			variantID: uuid.Must(uuid.NewV7()),
 			quantity:  2,
 			mockCartRepo: &MockCartRepository{
-				getCartFunc: func(userID uint) (*Cart, error) {
+				getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 					return &Cart{UserID: userID, Items: []CartItem{}}, nil
 				},
 			},
 			mockVariantFinder: &MockVariantFinder{
-				findByIDFunc: func(id uint) (*products.ProductVariant, error) {
+				findByIDFunc: func(id uuid.UUID) (*products.ProductVariant, error) {
 					return nil, nil
 				},
 			},
@@ -129,14 +131,14 @@ func TestCartService_AddItem(t *testing.T) {
 		},
 		{
 			name:      "add item that already exists in cart - updates quantity",
-			userID:    1,
-			variantID: 1,
+			userID:    testCartUserID,
+			variantID: testVariantID,
 			quantity:  3,
 			mockCartRepo: &MockCartRepository{
-				getCartFunc: func(userID uint) (*Cart, error) {
+				getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 					return &Cart{
 						UserID: userID,
-						Items:  []CartItem{{VariantID: 1, Quantity: 2}},
+						Items:  []CartItem{{VariantID: testVariantID.String(), Quantity: 2}},
 					}, nil
 				},
 				saveCartFunc: func(cart *Cart) error {
@@ -144,10 +146,10 @@ func TestCartService_AddItem(t *testing.T) {
 				},
 			},
 			mockVariantFinder: &MockVariantFinder{
-				findByIDFunc: func(id uint) (*products.ProductVariant, error) {
-					return &products.ProductVariant{ID: 1, ProductID: 1}, nil
+				findByIDFunc: func(id uuid.UUID) (*products.ProductVariant, error) {
+					return &products.ProductVariant{ID: testVariantID, ProductID: testProductID}, nil
 				},
-				getPriceAndStockFunc: func(id uint) (float64, int, int, error) {
+				getPriceAndStockFunc: func(id uuid.UUID) (float64, int, int, error) {
 					return 10.0, 10, 0, nil
 				},
 			},
@@ -155,22 +157,22 @@ func TestCartService_AddItem(t *testing.T) {
 		},
 		{
 			name:      "add item exceeds stock when updating existing",
-			userID:    1,
-			variantID: 1,
+			userID:    testCartUserID,
+			variantID: testVariantID,
 			quantity:  9,
 			mockCartRepo: &MockCartRepository{
-				getCartFunc: func(userID uint) (*Cart, error) {
+				getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 					return &Cart{
 						UserID: userID,
-						Items:  []CartItem{{VariantID: 1, Quantity: 2}},
+						Items:  []CartItem{{VariantID: testVariantID.String(), Quantity: 2}},
 					}, nil
 				},
 			},
 			mockVariantFinder: &MockVariantFinder{
-				findByIDFunc: func(id uint) (*products.ProductVariant, error) {
-					return &products.ProductVariant{ID: 1, ProductID: 1}, nil
+				findByIDFunc: func(id uuid.UUID) (*products.ProductVariant, error) {
+					return &products.ProductVariant{ID: testVariantID, ProductID: testProductID}, nil
 				},
-				getPriceAndStockFunc: func(id uint) (float64, int, int, error) {
+				getPriceAndStockFunc: func(id uuid.UUID) (float64, int, int, error) {
 					return 10.0, 10, 0, nil
 				},
 			},
@@ -204,8 +206,8 @@ func TestCartService_AddItem(t *testing.T) {
 func TestCartService_UpdateQuantity(t *testing.T) {
 	tests := []struct {
 		name              string
-		userID            uint
-		variantID         uint
+		userID            uuid.UUID
+		variantID         uuid.UUID
 		quantity          int
 		mockCartRepo      *MockCartRepository
 		mockVariantFinder *MockVariantFinder
@@ -214,14 +216,14 @@ func TestCartService_UpdateQuantity(t *testing.T) {
 	}{
 		{
 			name:      "update quantity with sufficient stock - success",
-			userID:    1,
-			variantID: 1,
+			userID:    testCartUserID,
+			variantID: testVariantID,
 			quantity:  5,
 			mockCartRepo: &MockCartRepository{
-				getCartFunc: func(userID uint) (*Cart, error) {
+				getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 					return &Cart{
 						UserID: userID,
-						Items:  []CartItem{{VariantID: 1, Quantity: 2}},
+						Items:  []CartItem{{VariantID: testVariantID.String(), Quantity: 2}},
 					}, nil
 				},
 				saveCartFunc: func(cart *Cart) error {
@@ -229,7 +231,7 @@ func TestCartService_UpdateQuantity(t *testing.T) {
 				},
 			},
 			mockVariantFinder: &MockVariantFinder{
-				getPriceAndStockFunc: func(id uint) (float64, int, int, error) {
+				getPriceAndStockFunc: func(id uuid.UUID) (float64, int, int, error) {
 					return 10.0, 10, 0, nil
 				},
 			},
@@ -237,19 +239,19 @@ func TestCartService_UpdateQuantity(t *testing.T) {
 		},
 		{
 			name:      "update quantity with insufficient stock - failure",
-			userID:    1,
-			variantID: 1,
+			userID:    testCartUserID,
+			variantID: testVariantID,
 			quantity:  20,
 			mockCartRepo: &MockCartRepository{
-				getCartFunc: func(userID uint) (*Cart, error) {
+				getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 					return &Cart{
 						UserID: userID,
-						Items:  []CartItem{{VariantID: 1, Quantity: 2}},
+						Items:  []CartItem{{VariantID: testVariantID.String(), Quantity: 2}},
 					}, nil
 				},
 			},
 			mockVariantFinder: &MockVariantFinder{
-				getPriceAndStockFunc: func(id uint) (float64, int, int, error) {
+				getPriceAndStockFunc: func(id uuid.UUID) (float64, int, int, error) {
 					return 10.0, 10, 0, nil
 				},
 			},
@@ -258,19 +260,19 @@ func TestCartService_UpdateQuantity(t *testing.T) {
 		},
 		{
 			name:      "update quantity for non-existent item - failure",
-			userID:    1,
-			variantID: 999,
+			userID:    testCartUserID,
+			variantID: uuid.Must(uuid.NewV7()),
 			quantity:  5,
 			mockCartRepo: &MockCartRepository{
-				getCartFunc: func(userID uint) (*Cart, error) {
+				getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 					return &Cart{
 						UserID: userID,
-						Items:  []CartItem{{VariantID: 1, Quantity: 2}},
+						Items:  []CartItem{{VariantID: testVariantID.String(), Quantity: 2}},
 					}, nil
 				},
 			},
 			mockVariantFinder: &MockVariantFinder{
-				getPriceAndStockFunc: func(id uint) (float64, int, int, error) {
+				getPriceAndStockFunc: func(id uuid.UUID) (float64, int, int, error) {
 					return 10.0, 10, 0, nil
 				},
 			},
@@ -304,21 +306,21 @@ func TestCartService_UpdateQuantity(t *testing.T) {
 func TestCartService_RemoveItem(t *testing.T) {
 	tests := []struct {
 		name         string
-		userID       uint
-		variantID    uint
+		userID       uuid.UUID
+		variantID    uuid.UUID
 		mockCartRepo *MockCartRepository
 		wantErr      bool
 		checkRemoved func(*testing.T, *Cart)
 	}{
 		{
 			name:      "remove item - success",
-			userID:    1,
-			variantID: 1,
+			userID:    testCartUserID,
+			variantID: testVariantID,
 			mockCartRepo: &MockCartRepository{
-				getCartFunc: func(userID uint) (*Cart, error) {
+				getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 					return &Cart{
 						UserID: userID,
-						Items:  []CartItem{{VariantID: 1, Quantity: 2}, {VariantID: 2, Quantity: 1}},
+						Items:  []CartItem{{VariantID: testVariantID.String(), Quantity: 2}, {VariantID: testVariantID2.String(), Quantity: 1}},
 					}, nil
 				},
 				saveCartFunc: func(cart *Cart) error {
@@ -330,20 +332,20 @@ func TestCartService_RemoveItem(t *testing.T) {
 				if len(cart.Items) != 1 {
 					t.Errorf("expected 1 item, got %d", len(cart.Items))
 				}
-				if cart.Items[0].VariantID != 2 {
-					t.Errorf("expected remaining item with variant_id 2, got %d", cart.Items[0].VariantID)
+				if cart.Items[0].VariantID != testVariantID2.String() {
+					t.Errorf("expected remaining item with variant_id %s, got %s", testVariantID2.String(), cart.Items[0].VariantID)
 				}
 			},
 		},
 		{
 			name:      "remove item not in cart - returns original cart",
-			userID:    1,
-			variantID: 999,
+			userID:    testCartUserID,
+			variantID: uuid.Must(uuid.NewV7()),
 			mockCartRepo: &MockCartRepository{
-				getCartFunc: func(userID uint) (*Cart, error) {
+				getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 					return &Cart{
 						UserID: userID,
-						Items:  []CartItem{{VariantID: 1, Quantity: 2}},
+						Items:  []CartItem{{VariantID: testVariantID.String(), Quantity: 2}},
 					}, nil
 				},
 			},
@@ -381,15 +383,15 @@ func TestCartService_RemoveItem(t *testing.T) {
 func TestCartService_ClearCart(t *testing.T) {
 	tests := []struct {
 		name         string
-		userID       uint
+		userID       uuid.UUID
 		mockCartRepo *MockCartRepository
 		wantErr      bool
 	}{
 		{
 			name:   "clear cart - success",
-			userID: 1,
+			userID: testCartUserID,
 			mockCartRepo: &MockCartRepository{
-				deleteCartFunc: func(userID uint) error {
+				deleteCartFunc: func(userID uuid.UUID) error {
 					return nil
 				},
 			},
@@ -397,9 +399,9 @@ func TestCartService_ClearCart(t *testing.T) {
 		},
 		{
 			name:   "clear cart - repository error",
-			userID: 1,
+			userID: testCartUserID,
 			mockCartRepo: &MockCartRepository{
-				deleteCartFunc: func(userID uint) error {
+				deleteCartFunc: func(userID uuid.UUID) error {
 					return errors.New("database error")
 				},
 			},
@@ -429,19 +431,19 @@ func TestCartService_ClearCart(t *testing.T) {
 func TestCartService_GetCart(t *testing.T) {
 	tests := []struct {
 		name         string
-		userID       uint
+		userID       uuid.UUID
 		mockCartRepo *MockCartRepository
 		wantErr      bool
 		checkCart    func(*testing.T, *Cart)
 	}{
 		{
 			name:   "get cart - success",
-			userID: 1,
+			userID: testCartUserID,
 			mockCartRepo: &MockCartRepository{
-				getCartFunc: func(userID uint) (*Cart, error) {
+				getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 					return &Cart{
 						UserID:    userID,
-						Items:     []CartItem{{VariantID: 1, Quantity: 2}},
+						Items:     []CartItem{{VariantID: testVariantID.String(), Quantity: 2}},
 						CreatedAt: time.Now(),
 						UpdatedAt: time.Now(),
 					}, nil
@@ -449,8 +451,8 @@ func TestCartService_GetCart(t *testing.T) {
 			},
 			wantErr: false,
 			checkCart: func(t *testing.T, cart *Cart) {
-				if cart.UserID != 1 {
-					t.Errorf("userID = %d; want 1", cart.UserID)
+				if cart.UserID != testCartUserID {
+					t.Errorf("userID = %s; want %s", cart.UserID.String(), testCartUserID.String())
 				}
 				if len(cart.Items) != 1 {
 					t.Errorf("items length = %d; want 1", len(cart.Items))
@@ -459,9 +461,9 @@ func TestCartService_GetCart(t *testing.T) {
 		},
 		{
 			name:   "get cart - empty cart",
-			userID: 1,
+			userID: testCartUserID,
 			mockCartRepo: &MockCartRepository{
-				getCartFunc: func(userID uint) (*Cart, error) {
+				getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 					return &Cart{
 						UserID:    userID,
 						Items:     []CartItem{},
@@ -479,9 +481,9 @@ func TestCartService_GetCart(t *testing.T) {
 		},
 		{
 			name:   "get cart - repository error",
-			userID: 1,
+			userID: testCartUserID,
 			mockCartRepo: &MockCartRepository{
-				getCartFunc: func(userID uint) (*Cart, error) {
+				getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 					return nil, errors.New("database error")
 				},
 			},

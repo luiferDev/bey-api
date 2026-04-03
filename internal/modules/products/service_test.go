@@ -2,16 +2,18 @@ package products
 
 import (
 	"testing"
+
+	"github.com/gofrs/uuid/v5"
 )
 
 // Mock implementations for testing
 type MockCategoryRepository struct {
-	findByIDFunc   func(id uint) (*Category, error)
+	findByIDFunc   func(id uuid.UUID) (*Category, error)
 	findBySlugFunc func(slug string) (*Category, error)
 	findAllFunc    func() ([]Category, error)
 }
 
-func (m *MockCategoryRepository) FindByID(id uint) (*Category, error) {
+func (m *MockCategoryRepository) FindByID(id uuid.UUID) (*Category, error) {
 	if m.findByIDFunc != nil {
 		return m.findByIDFunc(id)
 	}
@@ -33,17 +35,17 @@ func (m *MockCategoryRepository) FindAll() ([]Category, error) {
 }
 
 type MockProductRepository struct {
-	findByIDFunc         func(id uint) (*Product, error)
+	findByIDFunc         func(id uuid.UUID) (*Product, error)
 	findBySlugFunc       func(slug string) (*Product, error)
 	createFunc           func(product *Product) error
 	updateFunc           func(product *Product) error
-	deleteFunc           func(id uint) error
+	deleteFunc           func(id uuid.UUID) error
 	findAllFunc          func(offset, limit int) ([]Product, error)
-	findByCategoryIDFunc func(categoryID uint, offset, limit int) ([]Product, error)
+	findByCategoryIDFunc func(categoryID uuid.UUID, offset, limit int) ([]Product, error)
 	findByActiveFunc     func(isActive bool, offset, limit int) ([]Product, error)
 }
 
-func (m *MockProductRepository) FindByID(id uint) (*Product, error) {
+func (m *MockProductRepository) FindByID(id uuid.UUID) (*Product, error) {
 	if m.findByIDFunc != nil {
 		return m.findByIDFunc(id)
 	}
@@ -71,7 +73,7 @@ func (m *MockProductRepository) Update(product *Product) error {
 	return nil
 }
 
-func (m *MockProductRepository) Delete(id uint) error {
+func (m *MockProductRepository) Delete(id uuid.UUID) error {
 	if m.deleteFunc != nil {
 		return m.deleteFunc(id)
 	}
@@ -85,7 +87,7 @@ func (m *MockProductRepository) FindAll(offset, limit int) ([]Product, error) {
 	return nil, nil
 }
 
-func (m *MockProductRepository) FindByCategoryID(categoryID uint, offset, limit int) ([]Product, error) {
+func (m *MockProductRepository) FindByCategoryID(categoryID uuid.UUID, offset, limit int) ([]Product, error) {
 	if m.findByCategoryIDFunc != nil {
 		return m.findByCategoryIDFunc(categoryID, offset, limit)
 	}
@@ -100,16 +102,16 @@ func (m *MockProductRepository) FindByActive(isActive bool, offset, limit int) (
 }
 
 type MockVariantRepository struct {
-	findByIDFunc        func(id uint) (*ProductVariant, error)
+	findByIDFunc        func(id uuid.UUID) (*ProductVariant, error)
 	findBySKUFunc       func(sku string) (*ProductVariant, error)
 	createFunc          func(variant *ProductVariant) error
 	updateFunc          func(variant *ProductVariant) error
-	updateStockFunc     func(id uint, stock int) error
-	deleteFunc          func(id uint) error
-	findByProductIDFunc func(productID uint) ([]ProductVariant, error)
+	updateStockFunc     func(id uuid.UUID, stock int) error
+	deleteFunc          func(id uuid.UUID) error
+	findByProductIDFunc func(productID uuid.UUID) ([]ProductVariant, error)
 }
 
-func (m *MockVariantRepository) FindByID(id uint) (*ProductVariant, error) {
+func (m *MockVariantRepository) FindByID(id uuid.UUID) (*ProductVariant, error) {
 	if m.findByIDFunc != nil {
 		return m.findByIDFunc(id)
 	}
@@ -137,21 +139,21 @@ func (m *MockVariantRepository) Update(variant *ProductVariant) error {
 	return nil
 }
 
-func (m *MockVariantRepository) UpdateStock(id uint, stock int) error {
+func (m *MockVariantRepository) UpdateStock(id uuid.UUID, stock int) error {
 	if m.updateStockFunc != nil {
 		return m.updateStockFunc(id, stock)
 	}
 	return nil
 }
 
-func (m *MockVariantRepository) Delete(id uint) error {
+func (m *MockVariantRepository) Delete(id uuid.UUID) error {
 	if m.deleteFunc != nil {
 		return m.deleteFunc(id)
 	}
 	return nil
 }
 
-func (m *MockVariantRepository) FindByProductID(productID uint) ([]ProductVariant, error) {
+func (m *MockVariantRepository) FindByProductID(productID uuid.UUID) ([]ProductVariant, error) {
 	if m.findByProductIDFunc != nil {
 		return m.findByProductIDFunc(productID)
 	}
@@ -159,15 +161,15 @@ func (m *MockVariantRepository) FindByProductID(productID uint) ([]ProductVarian
 }
 
 type MockImageRepository struct {
-	findByIDFunc        func(id uint) (*ProductImage, error)
+	findByIDFunc        func(id uuid.UUID) (*ProductImage, error)
 	createFunc          func(image *ProductImage) error
 	updateFunc          func(image *ProductImage) error
-	deleteFunc          func(id uint) error
-	findByProductIDFunc func(productID uint) ([]ProductImage, error)
-	setMainImageFunc    func(productID, imageID uint) error
+	deleteFunc          func(id uuid.UUID) error
+	findByProductIDFunc func(productID uuid.UUID) ([]ProductImage, error)
+	setMainImageFunc    func(productID, imageID uuid.UUID) error
 }
 
-func (m *MockImageRepository) FindByID(id uint) (*ProductImage, error) {
+func (m *MockImageRepository) FindByID(id uuid.UUID) (*ProductImage, error) {
 	if m.findByIDFunc != nil {
 		return m.findByIDFunc(id)
 	}
@@ -188,21 +190,21 @@ func (m *MockImageRepository) Update(image *ProductImage) error {
 	return nil
 }
 
-func (m *MockImageRepository) Delete(id uint) error {
+func (m *MockImageRepository) Delete(id uuid.UUID) error {
 	if m.deleteFunc != nil {
 		return m.deleteFunc(id)
 	}
 	return nil
 }
 
-func (m *MockImageRepository) FindByProductID(productID uint) ([]ProductImage, error) {
+func (m *MockImageRepository) FindByProductID(productID uuid.UUID) ([]ProductImage, error) {
 	if m.findByProductIDFunc != nil {
 		return m.findByProductIDFunc(productID)
 	}
 	return nil, nil
 }
 
-func (m *MockImageRepository) SetMainImage(productID, imageID uint) error {
+func (m *MockImageRepository) SetMainImage(productID, imageID uuid.UUID) error {
 	if m.setMainImageFunc != nil {
 		return m.setMainImageFunc(productID, imageID)
 	}
@@ -216,23 +218,23 @@ func (m *MockImageRepository) SetMainImage(productID, imageID uint) error {
 func TestProductService_ValidateCategory(t *testing.T) {
 	tests := []struct {
 		name         string
-		categoryID   uint
-		mockFindByID func(id uint) (*Category, error)
+		categoryID   uuid.UUID
+		mockFindByID func(id uuid.UUID) (*Category, error)
 		wantErr      bool
 		errMessage   string
 	}{
 		{
 			name:       "category exists",
-			categoryID: 1,
-			mockFindByID: func(id uint) (*Category, error) {
-				return &Category{ID: 1, Name: "Electronics"}, nil
+			categoryID: uuid.Must(uuid.NewV7()),
+			mockFindByID: func(id uuid.UUID) (*Category, error) {
+				return &Category{ID: uuid.Must(uuid.NewV7()), Name: "Electronics"}, nil
 			},
 			wantErr: false,
 		},
 		{
 			name:       "category not found",
-			categoryID: 999,
-			mockFindByID: func(id uint) (*Category, error) {
+			categoryID: uuid.Must(uuid.NewV7()),
+			mockFindByID: func(id uuid.UUID) (*Category, error) {
 				return nil, nil
 			},
 			wantErr:    true,
@@ -268,37 +270,37 @@ func TestProductService_ValidateCategory(t *testing.T) {
 func TestProductService_CheckProductAvailability(t *testing.T) {
 	tests := []struct {
 		name           string
-		productID      uint
+		productID      uuid.UUID
 		mockVariants   []ProductVariant
-		mockFindByID   func(id uint) (*ProductVariant, error)
+		mockFindByID   func(id uuid.UUID) (*ProductVariant, error)
 		wantAvailable  bool
 		wantTotalStock int
 	}{
 		{
 			name:      "product with stock",
-			productID: 1,
+			productID: uuid.Must(uuid.NewV7()),
 			mockVariants: []ProductVariant{
-				{ID: 1, ProductID: 1, Stock: 10},
-				{ID: 2, ProductID: 1, Stock: 5},
+				{ID: uuid.Must(uuid.NewV7()), ProductID: uuid.Must(uuid.NewV7()), Stock: 10},
+				{ID: uuid.Must(uuid.NewV7()), ProductID: uuid.Must(uuid.NewV7()), Stock: 5},
 			},
 			wantAvailable:  true,
 			wantTotalStock: 15,
 		},
 		{
 			name:      "product without stock",
-			productID: 1,
+			productID: uuid.Must(uuid.NewV7()),
 			mockVariants: []ProductVariant{
-				{ID: 1, ProductID: 1, Stock: 0},
+				{ID: uuid.Must(uuid.NewV7()), ProductID: uuid.Must(uuid.NewV7()), Stock: 0},
 			},
 			wantAvailable:  false,
 			wantTotalStock: 0,
 		},
 		{
 			name:      "product with mixed stock",
-			productID: 1,
+			productID: uuid.Must(uuid.NewV7()),
 			mockVariants: []ProductVariant{
-				{ID: 1, ProductID: 1, Stock: 0},
-				{ID: 2, ProductID: 1, Stock: 5},
+				{ID: uuid.Must(uuid.NewV7()), ProductID: uuid.Must(uuid.NewV7()), Stock: 0},
+				{ID: uuid.Must(uuid.NewV7()), ProductID: uuid.Must(uuid.NewV7()), Stock: 5},
 			},
 			wantAvailable:  true,
 			wantTotalStock: 5,
@@ -308,7 +310,7 @@ func TestProductService_CheckProductAvailability(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockVariantRepo := &MockVariantRepository{
-				findByProductIDFunc: func(productID uint) ([]ProductVariant, error) {
+				findByProductIDFunc: func(productID uuid.UUID) ([]ProductVariant, error) {
 					return tt.mockVariants, nil
 				},
 			}
@@ -335,7 +337,7 @@ func TestProductService_ValidateProductSlug(t *testing.T) {
 	tests := []struct {
 		name           string
 		slug           string
-		excludeID      *uint
+		excludeID      *uuid.UUID
 		mockFindBySlug func(slug string) (*Product, error)
 		wantErr        bool
 	}{
@@ -351,25 +353,25 @@ func TestProductService_ValidateProductSlug(t *testing.T) {
 			name: "duplicate slug",
 			slug: "existing-product",
 			mockFindBySlug: func(slug string) (*Product, error) {
-				return &Product{ID: 1, Name: "Existing"}, nil
+				return &Product{ID: uuid.Must(uuid.NewV7()), Name: "Existing"}, nil
 			},
 			wantErr: true,
 		},
 		{
 			name:      "duplicate slug but same ID (update)",
 			slug:      "existing-product",
-			excludeID: func() *uint { id := uint(1); return &id }(),
+			excludeID: func() *uuid.UUID { id := uuid.Must(uuid.NewV7()); return &id }(),
 			mockFindBySlug: func(slug string) (*Product, error) {
-				return &Product{ID: 1, Name: "Existing"}, nil
+				return &Product{ID: uuid.Must(uuid.NewV7()), Name: "Existing"}, nil
 			},
 			wantErr: false,
 		},
 		{
 			name:      "duplicate slug different ID (update)",
 			slug:      "existing-product",
-			excludeID: func() *uint { id := uint(2); return &id }(),
+			excludeID: func() *uuid.UUID { id := uuid.Must(uuid.NewV7()); return &id }(),
 			mockFindBySlug: func(slug string) (*Product, error) {
-				return &Product{ID: 1, Name: "Existing"}, nil
+				return &Product{ID: uuid.Must(uuid.NewV7()), Name: "Existing"}, nil
 			},
 			wantErr: true,
 		},
@@ -400,7 +402,7 @@ func TestProductService_ValidateVariantSKU(t *testing.T) {
 	tests := []struct {
 		name          string
 		sku           string
-		excludeID     *uint
+		excludeID     *uuid.UUID
 		mockFindBySKU func(sku string) (*ProductVariant, error)
 		wantErr       bool
 	}{
@@ -416,16 +418,16 @@ func TestProductService_ValidateVariantSKU(t *testing.T) {
 			name: "duplicate SKU",
 			sku:  "EXISTING-SKU",
 			mockFindBySKU: func(sku string) (*ProductVariant, error) {
-				return &ProductVariant{ID: 1, SKU: "EXISTING-SKU"}, nil
+				return &ProductVariant{ID: uuid.Must(uuid.NewV7()), SKU: "EXISTING-SKU"}, nil
 			},
 			wantErr: true,
 		},
 		{
 			name:      "duplicate SKU but same ID (update)",
 			sku:       "EXISTING-SKU",
-			excludeID: func() *uint { id := uint(1); return &id }(),
+			excludeID: func() *uuid.UUID { id := uuid.Must(uuid.NewV7()); return &id }(),
 			mockFindBySKU: func(sku string) (*ProductVariant, error) {
-				return &ProductVariant{ID: 1, SKU: "EXISTING-SKU"}, nil
+				return &ProductVariant{ID: uuid.Must(uuid.NewV7()), SKU: "EXISTING-SKU"}, nil
 			},
 			wantErr: false,
 		},
@@ -455,7 +457,7 @@ func TestProductService_ValidateVariantSKU(t *testing.T) {
 func TestProductService_GetProductStats(t *testing.T) {
 	tests := []struct {
 		name       string
-		productID  uint
+		productID  uuid.UUID
 		product    *Product
 		variants   []ProductVariant
 		images     []ProductImage
@@ -464,15 +466,15 @@ func TestProductService_GetProductStats(t *testing.T) {
 	}{
 		{
 			name:      "product with variants and images",
-			productID: 1,
-			product:   &Product{ID: 1, Name: "Test", IsActive: true},
+			productID: uuid.Must(uuid.NewV7()),
+			product:   &Product{ID: uuid.Must(uuid.NewV7()), Name: "Test", IsActive: true},
 			variants: []ProductVariant{
-				{ID: 1, ProductID: 1, Stock: 10},
-				{ID: 2, ProductID: 1, Stock: 5},
+				{ID: uuid.Must(uuid.NewV7()), ProductID: uuid.Must(uuid.NewV7()), Stock: 10},
+				{ID: uuid.Must(uuid.NewV7()), ProductID: uuid.Must(uuid.NewV7()), Stock: 5},
 			},
 			images: []ProductImage{
-				{ID: 1, ProductID: 1},
-				{ID: 2, ProductID: 1},
+				{ID: uuid.Must(uuid.NewV7()), ProductID: uuid.Must(uuid.NewV7())},
+				{ID: uuid.Must(uuid.NewV7()), ProductID: uuid.Must(uuid.NewV7())},
 			},
 			wantErr: false,
 			checkStats: func(t *testing.T, stats map[string]interface{}) {
@@ -489,7 +491,7 @@ func TestProductService_GetProductStats(t *testing.T) {
 		},
 		{
 			name:      "product not found",
-			productID: 999,
+			productID: uuid.Must(uuid.NewV7()),
 			product:   nil,
 			wantErr:   true,
 		},
@@ -498,17 +500,17 @@ func TestProductService_GetProductStats(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockProductRepo := &MockProductRepository{
-				findByIDFunc: func(id uint) (*Product, error) {
+				findByIDFunc: func(id uuid.UUID) (*Product, error) {
 					return tt.product, nil
 				},
 			}
 			mockVariantRepo := &MockVariantRepository{
-				findByProductIDFunc: func(productID uint) ([]ProductVariant, error) {
+				findByProductIDFunc: func(productID uuid.UUID) ([]ProductVariant, error) {
 					return tt.variants, nil
 				},
 			}
 			mockImageRepo := &MockImageRepository{
-				findByProductIDFunc: func(productID uint) ([]ProductImage, error) {
+				findByProductIDFunc: func(productID uuid.UUID) ([]ProductImage, error) {
 					return tt.images, nil
 				},
 			}

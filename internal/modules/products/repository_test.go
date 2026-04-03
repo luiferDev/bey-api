@@ -3,6 +3,7 @@ package products
 import (
 	"testing"
 
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -36,7 +37,7 @@ func TestCategoryRepository_Create(t *testing.T) {
 		t.Fatalf("Failed to create category: %v", err)
 	}
 
-	if category.ID == 0 {
+	if category.ID == uuid.Nil {
 		t.Error("Expected category ID to be set")
 	}
 }
@@ -72,7 +73,7 @@ func TestCategoryRepository_FindByID_NotFound(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewCategoryRepository(db)
 
-	found, err := repo.FindByID(999)
+	found, err := repo.FindByID(uuid.Must(uuid.NewV7()))
 	if err != nil {
 		t.Fatalf("Failed to find category: %v", err)
 	}
@@ -194,7 +195,7 @@ func TestProductRepository_Create(t *testing.T) {
 		t.Fatalf("Failed to create product: %v", err)
 	}
 
-	if product.ID == 0 {
+	if product.ID == uuid.Nil {
 		t.Error("Expected product ID to be set")
 	}
 }
@@ -414,7 +415,7 @@ func TestProductVariantRepository_Create(t *testing.T) {
 		t.Fatalf("Failed to create variant: %v", err)
 	}
 
-	if variant.ID == 0 {
+	if variant.ID == uuid.Nil {
 		t.Error("Expected variant ID to be set")
 	}
 }
@@ -552,7 +553,7 @@ func TestProductImageRepository_Create(t *testing.T) {
 		t.Fatalf("Failed to create image: %v", err)
 	}
 
-	if image.ID == 0 {
+	if image.ID == uuid.Nil {
 		t.Error("Expected image ID to be set")
 	}
 }

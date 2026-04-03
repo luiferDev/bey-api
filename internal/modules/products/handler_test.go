@@ -9,6 +9,7 @@ import (
 
 	"bey/internal/shared/response"
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -666,7 +667,7 @@ func TestSetMainImage_Success(t *testing.T) {
 		BasePrice: 10.99,
 	})
 	imageRepo.Create(&ProductImage{
-		ProductID: 1,
+		ProductID: uuid.Must(uuid.NewV7()),
 		URLImage:  "http://example.com/image.jpg",
 		IsMain:    false,
 	})

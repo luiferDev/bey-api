@@ -12,6 +12,15 @@ import (
 	"bey/internal/modules/products"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
+)
+
+var (
+	testCartUserID = uuid.Must(uuid.NewV7())
+	testVariantID  = uuid.Must(uuid.NewV7())
+	testVariantID2 = uuid.Must(uuid.NewV7())
+	testProductID  = uuid.Must(uuid.NewV7())
+	testOrderID    = uuid.Must(uuid.NewV7())
 )
 
 // MockOrderCreator implements OrderCreator interface
@@ -23,17 +32,16 @@ func (m *MockOrderCreator) Create(order *orders.Order) error {
 	if m.createFunc != nil {
 		return m.createFunc(order)
 	}
-	// Default: assign an ID to simulate successful creation
-	order.ID = 1
+	order.ID = testOrderID
 	return nil
 }
 
 // MockVariantStockReserver implements VariantStockReserver interface
 type MockVariantStockReserver struct {
-	reserveStockFunc func(id uint, quantity int) error
+	reserveStockFunc func(id uuid.UUID, quantity int) error
 }
 
-func (m *MockVariantStockReserver) ReserveStock(id uint, quantity int) error {
+func (m *MockVariantStockReserver) ReserveStock(id uuid.UUID, quantity int) error {
 	if m.reserveStockFunc != nil {
 		return m.reserveStockFunc(id, quantity)
 	}
@@ -42,10 +50,10 @@ func (m *MockVariantStockReserver) ReserveStock(id uint, quantity int) error {
 
 // MockInventoryReserver implements InventoryReserver interface
 type MockInventoryReserver struct {
-	reserveFunc func(productID uint, quantity int) error
+	reserveFunc func(productID uuid.UUID, quantity int) error
 }
 
-func (m *MockInventoryReserver) Reserve(productID uint, quantity int) error {
+func (m *MockInventoryReserver) Reserve(productID uuid.UUID, quantity int) error {
 	if m.reserveFunc != nil {
 		return m.reserveFunc(productID, quantity)
 	}
@@ -75,9 +83,7 @@ func setupCartTestRouterWithMocksAndOrder(
 
 	router.Use(func(c *gin.Context) {
 		if userID := c.GetHeader("X-User-ID"); userID != "" {
-			var uid uint
-			json.Unmarshal([]byte(userID), &uid)
-			c.Set("user_id", uid)
+			c.Set("user_id", userID)
 		}
 		c.Next()
 	})
@@ -99,7 +105,7 @@ func makeAuthReq(router *gin.Engine, method, path, body string) *httptest.Respon
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testCartUserID.String())
 	router.ServeHTTP(w, req)
 	return w
 }
@@ -120,10 +126,10 @@ func TestCartHandler_GetCart_Unauthorized(t *testing.T) {
 
 func TestCartHandler_GetCart_Success(t *testing.T) {
 	mockCartRepo := &MockCartRepository{
-		getCartFunc: func(userID uint) (*Cart, error) {
+		getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 			return &Cart{
 				UserID: userID,
-				Items:  []CartItem{{VariantID: 1, Quantity: 2}},
+				Items:  []CartItem{{VariantID: testVariantID.String(), Quantity: 2}},
 			}, nil
 		},
 	}
@@ -139,7 +145,7 @@ func TestCartHandler_GetCart_Success(t *testing.T) {
 
 func TestCartHandler_GetCart_Error(t *testing.T) {
 	mockCartRepo := &MockCartRepository{
-		getCartFunc: func(userID uint) (*Cart, error) {
+		getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 			return nil, errors.New("database error")
 		},
 	}
@@ -158,7 +164,7 @@ func TestCartHandler_AddItem_Unauthorized(t *testing.T) {
 	mockVariantFinder := &MockVariantFinder{}
 	router := setupCartTestRouterWithMocks(mockCartRepo, mockVariantFinder)
 
-	req, _ := http.NewRequest("POST", "/api/v1/cart/items", bytes.NewBufferString(`{"variant_id":1,"quantity":2}`))
+	req, _ := http.NewRequest("POST", "/api/v1/cart/items", bytes.NewBufferString(`{"variant_id":"`+testVariantID.String()+`","quantity":2}`))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -175,7 +181,7 @@ func TestCartHandler_AddItem_InvalidBody(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", "/api/v1/cart/items", bytes.NewBufferString("invalid json"))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testCartUserID.String())
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -186,7 +192,7 @@ func TestCartHandler_AddItem_InvalidBody(t *testing.T) {
 
 func TestCartHandler_AddItem_Success(t *testing.T) {
 	mockCartRepo := &MockCartRepository{
-		getCartFunc: func(userID uint) (*Cart, error) {
+		getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 			return &Cart{UserID: userID, Items: []CartItem{}}, nil
 		},
 		saveCartFunc: func(cart *Cart) error {
@@ -194,16 +200,16 @@ func TestCartHandler_AddItem_Success(t *testing.T) {
 		},
 	}
 	mockVariantFinder := &MockVariantFinder{
-		findByIDFunc: func(id uint) (*products.ProductVariant, error) {
-			return &products.ProductVariant{ID: id, ProductID: 1}, nil
+		findByIDFunc: func(id uuid.UUID) (*products.ProductVariant, error) {
+			return &products.ProductVariant{ID: id, ProductID: testProductID}, nil
 		},
-		getPriceAndStockFunc: func(id uint) (float64, int, int, error) {
+		getPriceAndStockFunc: func(id uuid.UUID) (float64, int, int, error) {
 			return 10.0, 100, 0, nil
 		},
 	}
 	router := setupCartTestRouterWithMocks(mockCartRepo, mockVariantFinder)
 
-	w := makeAuthReq(router, "POST", "/api/v1/cart/items", `{"variant_id":1,"quantity":2}`)
+	w := makeAuthReq(router, "POST", "/api/v1/cart/items", `{"variant_id":"`+testVariantID.String()+`","quantity":2}`)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
@@ -219,21 +225,21 @@ func TestCartHandler_AddItem_Success(t *testing.T) {
 
 func TestCartHandler_AddItem_InsufficientStock(t *testing.T) {
 	mockCartRepo := &MockCartRepository{
-		getCartFunc: func(userID uint) (*Cart, error) {
+		getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 			return &Cart{UserID: userID, Items: []CartItem{}}, nil
 		},
 	}
 	mockVariantFinder := &MockVariantFinder{
-		findByIDFunc: func(id uint) (*products.ProductVariant, error) {
-			return &products.ProductVariant{ID: id, ProductID: 1}, nil
+		findByIDFunc: func(id uuid.UUID) (*products.ProductVariant, error) {
+			return &products.ProductVariant{ID: id, ProductID: testProductID}, nil
 		},
-		getPriceAndStockFunc: func(id uint) (float64, int, int, error) {
+		getPriceAndStockFunc: func(id uuid.UUID) (float64, int, int, error) {
 			return 10.0, 5, 0, nil
 		},
 	}
 	router := setupCartTestRouterWithMocks(mockCartRepo, mockVariantFinder)
 
-	w := makeAuthReq(router, "POST", "/api/v1/cart/items", `{"variant_id":1,"quantity":10}`)
+	w := makeAuthReq(router, "POST", "/api/v1/cart/items", `{"variant_id":"`+testVariantID.String()+`","quantity":10}`)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status 400, got %d", w.Code)
@@ -243,13 +249,13 @@ func TestCartHandler_AddItem_InsufficientStock(t *testing.T) {
 func TestCartHandler_AddItem_VariantNotFound(t *testing.T) {
 	mockCartRepo := &MockCartRepository{}
 	mockVariantFinder := &MockVariantFinder{
-		findByIDFunc: func(id uint) (*products.ProductVariant, error) {
+		findByIDFunc: func(id uuid.UUID) (*products.ProductVariant, error) {
 			return nil, nil
 		},
 	}
 	router := setupCartTestRouterWithMocks(mockCartRepo, mockVariantFinder)
 
-	w := makeAuthReq(router, "POST", "/api/v1/cart/items", `{"variant_id":999,"quantity":2}`)
+	w := makeAuthReq(router, "POST", "/api/v1/cart/items", `{"variant_id":"`+uuid.Must(uuid.NewV7()).String()+`","quantity":2}`)
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("Expected status 404, got %d", w.Code)
@@ -261,7 +267,7 @@ func TestCartHandler_UpdateItem_Unauthorized(t *testing.T) {
 	mockVariantFinder := &MockVariantFinder{}
 	router := setupCartTestRouterWithMocks(mockCartRepo, mockVariantFinder)
 
-	req, _ := http.NewRequest("PUT", "/api/v1/cart/items/1", bytes.NewBufferString(`{"quantity":5}`))
+	req, _ := http.NewRequest("PUT", "/api/v1/cart/items/"+testVariantID.String(), bytes.NewBufferString(`{"quantity":5}`))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -276,9 +282,9 @@ func TestCartHandler_UpdateItem_InvalidQuantity(t *testing.T) {
 	mockVariantFinder := &MockVariantFinder{}
 	router := setupCartTestRouterWithMocks(mockCartRepo, mockVariantFinder)
 
-	req, _ := http.NewRequest("PUT", "/api/v1/cart/items/1", bytes.NewBufferString(`{"quantity":-1}`))
+	req, _ := http.NewRequest("PUT", "/api/v1/cart/items/"+testVariantID.String(), bytes.NewBufferString(`{"quantity":-1}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testCartUserID.String())
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -294,7 +300,7 @@ func TestCartHandler_UpdateItem_InvalidVariantID(t *testing.T) {
 
 	req, _ := http.NewRequest("PUT", "/api/v1/cart/items/invalid", bytes.NewBufferString(`{"quantity":5}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testCartUserID.String())
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -305,10 +311,10 @@ func TestCartHandler_UpdateItem_InvalidVariantID(t *testing.T) {
 
 func TestCartHandler_UpdateItem_Success(t *testing.T) {
 	mockCartRepo := &MockCartRepository{
-		getCartFunc: func(userID uint) (*Cart, error) {
+		getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 			return &Cart{
 				UserID: userID,
-				Items:  []CartItem{{VariantID: 1, Quantity: 2}},
+				Items:  []CartItem{{VariantID: testVariantID.String(), Quantity: 2}},
 			}, nil
 		},
 		saveCartFunc: func(cart *Cart) error {
@@ -316,13 +322,13 @@ func TestCartHandler_UpdateItem_Success(t *testing.T) {
 		},
 	}
 	mockVariantFinder := &MockVariantFinder{
-		getPriceAndStockFunc: func(id uint) (float64, int, int, error) {
+		getPriceAndStockFunc: func(id uuid.UUID) (float64, int, int, error) {
 			return 10.0, 100, 0, nil
 		},
 	}
 	router := setupCartTestRouterWithMocks(mockCartRepo, mockVariantFinder)
 
-	w := makeAuthReq(router, "PUT", "/api/v1/cart/items/1", `{"quantity":5}`)
+	w := makeAuthReq(router, "PUT", "/api/v1/cart/items/"+testVariantID.String(), `{"quantity":5}`)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
@@ -331,21 +337,21 @@ func TestCartHandler_UpdateItem_Success(t *testing.T) {
 
 func TestCartHandler_UpdateItem_InsufficientStock(t *testing.T) {
 	mockCartRepo := &MockCartRepository{
-		getCartFunc: func(userID uint) (*Cart, error) {
+		getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 			return &Cart{
 				UserID: userID,
-				Items:  []CartItem{{VariantID: 1, Quantity: 2}},
+				Items:  []CartItem{{VariantID: testVariantID.String(), Quantity: 2}},
 			}, nil
 		},
 	}
 	mockVariantFinder := &MockVariantFinder{
-		getPriceAndStockFunc: func(id uint) (float64, int, int, error) {
+		getPriceAndStockFunc: func(id uuid.UUID) (float64, int, int, error) {
 			return 10.0, 5, 0, nil
 		},
 	}
 	router := setupCartTestRouterWithMocks(mockCartRepo, mockVariantFinder)
 
-	w := makeAuthReq(router, "PUT", "/api/v1/cart/items/1", `{"quantity":10}`)
+	w := makeAuthReq(router, "PUT", "/api/v1/cart/items/"+testVariantID.String(), `{"quantity":10}`)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status 400, got %d", w.Code)
@@ -357,7 +363,7 @@ func TestCartHandler_RemoveItem_Unauthorized(t *testing.T) {
 	mockVariantFinder := &MockVariantFinder{}
 	router := setupCartTestRouterWithMocks(mockCartRepo, mockVariantFinder)
 
-	req, _ := http.NewRequest("DELETE", "/api/v1/cart/items/1", nil)
+	req, _ := http.NewRequest("DELETE", "/api/v1/cart/items/"+testVariantID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -372,7 +378,7 @@ func TestCartHandler_RemoveItem_InvalidVariantID(t *testing.T) {
 	router := setupCartTestRouterWithMocks(mockCartRepo, mockVariantFinder)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/cart/items/invalid", nil)
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testCartUserID.String())
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -383,10 +389,10 @@ func TestCartHandler_RemoveItem_InvalidVariantID(t *testing.T) {
 
 func TestCartHandler_RemoveItem_Success(t *testing.T) {
 	mockCartRepo := &MockCartRepository{
-		getCartFunc: func(userID uint) (*Cart, error) {
+		getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 			return &Cart{
 				UserID: userID,
-				Items:  []CartItem{{VariantID: 1, Quantity: 2}},
+				Items:  []CartItem{{VariantID: testVariantID.String(), Quantity: 2}},
 			}, nil
 		},
 		saveCartFunc: func(cart *Cart) error {
@@ -396,7 +402,7 @@ func TestCartHandler_RemoveItem_Success(t *testing.T) {
 	mockVariantFinder := &MockVariantFinder{}
 	router := setupCartTestRouterWithMocks(mockCartRepo, mockVariantFinder)
 
-	w := makeAuthReq(router, "DELETE", "/api/v1/cart/items/1", "")
+	w := makeAuthReq(router, "DELETE", "/api/v1/cart/items/"+testVariantID.String(), "")
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
@@ -405,14 +411,14 @@ func TestCartHandler_RemoveItem_Success(t *testing.T) {
 
 func TestCartHandler_RemoveItem_Error(t *testing.T) {
 	mockCartRepo := &MockCartRepository{
-		getCartFunc: func(userID uint) (*Cart, error) {
+		getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 			return nil, errors.New("database error")
 		},
 	}
 	mockVariantFinder := &MockVariantFinder{}
 	router := setupCartTestRouterWithMocks(mockCartRepo, mockVariantFinder)
 
-	w := makeAuthReq(router, "DELETE", "/api/v1/cart/items/1", "")
+	w := makeAuthReq(router, "DELETE", "/api/v1/cart/items/"+testVariantID.String(), "")
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("Expected status 500, got %d", w.Code)
@@ -435,7 +441,7 @@ func TestCartHandler_ClearCart_Unauthorized(t *testing.T) {
 
 func TestCartHandler_ClearCart_Success(t *testing.T) {
 	mockCartRepo := &MockCartRepository{
-		deleteCartFunc: func(userID uint) error {
+		deleteCartFunc: func(userID uuid.UUID) error {
 			return nil
 		},
 	}
@@ -451,7 +457,7 @@ func TestCartHandler_ClearCart_Success(t *testing.T) {
 
 func TestCartHandler_ClearCart_Error(t *testing.T) {
 	mockCartRepo := &MockCartRepository{
-		deleteCartFunc: func(userID uint) error {
+		deleteCartFunc: func(userID uuid.UUID) error {
 			return errors.New("database error")
 		},
 	}
@@ -483,7 +489,7 @@ func TestCartHandler_Checkout_Unauthorized(t *testing.T) {
 
 func TestCartHandler_Checkout_EmptyCart(t *testing.T) {
 	mockCartRepo := &MockCartRepository{
-		getCartFunc: func(userID uint) (*Cart, error) {
+		getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 			return &Cart{UserID: userID, Items: []CartItem{}}, nil
 		},
 	}
@@ -500,27 +506,27 @@ func TestCartHandler_Checkout_EmptyCart(t *testing.T) {
 
 func TestCartHandler_Checkout_Success(t *testing.T) {
 	mockCartRepo := &MockCartRepository{
-		getCartFunc: func(userID uint) (*Cart, error) {
+		getCartFunc: func(userID uuid.UUID) (*Cart, error) {
 			return &Cart{
 				UserID: userID,
-				Items:  []CartItem{{VariantID: 1, Quantity: 2}},
+				Items:  []CartItem{{VariantID: testVariantID.String(), Quantity: 2}},
 			}, nil
 		},
-		deleteCartFunc: func(userID uint) error {
+		deleteCartFunc: func(userID uuid.UUID) error {
 			return nil
 		},
 	}
 	mockVariantFinder := &MockVariantFinder{
-		findByIDFunc: func(id uint) (*products.ProductVariant, error) {
-			return &products.ProductVariant{ID: id, ProductID: 10, SKU: "TEST-SKU", Price: 50.00, Stock: 100}, nil
+		findByIDFunc: func(id uuid.UUID) (*products.ProductVariant, error) {
+			return &products.ProductVariant{ID: id, ProductID: testProductID, SKU: "TEST-SKU", Price: 50.00, Stock: 100}, nil
 		},
-		getPriceAndStockFunc: func(id uint) (float64, int, int, error) {
+		getPriceAndStockFunc: func(id uuid.UUID) (float64, int, int, error) {
 			return 50.00, 100, 0, nil
 		},
 	}
 	mockOrderRepo := &MockOrderCreator{
 		createFunc: func(order *orders.Order) error {
-			order.ID = 1
+			order.ID = testOrderID
 			return nil
 		},
 	}
@@ -541,8 +547,8 @@ func TestCartHandler_Checkout_Success(t *testing.T) {
 		t.Fatal("Expected data field in response")
 	}
 
-	if data["order_id"] == nil || int(data["order_id"].(float64)) != 1 {
-		t.Errorf("Expected order_id 1, got %v", data["order_id"])
+	if data["order_id"] == nil || data["order_id"] != testOrderID.String() {
+		t.Errorf("Expected order_id %s, got %v", testOrderID.String(), data["order_id"])
 	}
 
 	if data["cart_cleared"] != true {
