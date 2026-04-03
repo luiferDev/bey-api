@@ -3,10 +3,12 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
 
 	"bey/internal/concurrency"
@@ -276,7 +278,83 @@ func (c *Config) GetAdminPassword() string {
 	return c.App.AdminPassword
 }
 
+// applyEnvOverrides overrides sensitive config fields with environment variables.
+// This ensures secrets are never stored in config.yaml — they come from .env or
+// real environment variables in production.
+func (c *Config) applyEnvOverrides() {
+	// Database
+	if v := os.Getenv("DB_HOST"); v != "" {
+		c.Database.Host = v
+	}
+	if v := os.Getenv("DB_PORT"); v != "" {
+		fmt.Sscanf(v, "%d", &c.Database.Port)
+	}
+	if v := os.Getenv("DB_USER"); v != "" {
+		c.Database.User = v
+	}
+	if v := os.Getenv("DB_PASSWORD"); v != "" {
+		c.Database.Password = v
+	}
+	if v := os.Getenv("DB_NAME"); v != "" {
+		c.Database.Name = v
+	}
+
+	// Admin
+	if v := os.Getenv("ADMIN_EMAIL"); v != "" {
+		c.App.AdminEmail = v
+	}
+	if v := os.Getenv("ADMIN_PASSWORD"); v != "" {
+		c.App.AdminPassword = v
+	}
+
+	// JWT / Security
+	if v := os.Getenv("JWT_SECRET"); v != "" {
+		c.Security.JWTSecret = v
+	}
+
+	// SMTP
+	if v := os.Getenv("SMTP_HOST"); v != "" {
+		c.Email.SMTP.Host = v
+	}
+	if v := os.Getenv("SMTP_PORT"); v != "" {
+		fmt.Sscanf(v, "%d", &c.Email.SMTP.Port)
+	}
+	if v := os.Getenv("SMTP_USERNAME"); v != "" {
+		c.Email.SMTP.Username = v
+	}
+	if v := os.Getenv("SMTP_PASSWORD"); v != "" {
+		c.Email.SMTP.Password = v
+	}
+
+	// OAuth Google
+	if v := os.Getenv("GOOGLE_OAUTH_CLIENT_ID"); v != "" {
+		c.OAuth.Google.ClientID = v
+	}
+	if v := os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"); v != "" {
+		c.OAuth.Google.ClientSecret = v
+	}
+
+	// Wompi
+	if v := os.Getenv("WOMPI_PUBLIC_KEY"); v != "" {
+		c.Wompi.PublicKey = v
+	}
+	if v := os.Getenv("WOMPI_PRIVATE_KEY"); v != "" {
+		c.Wompi.PrivateKey = v
+	}
+	if v := os.Getenv("WOMPI_EVENT_KEY"); v != "" {
+		c.Wompi.EventKey = v
+	}
+	if v := os.Getenv("WOMPI_INTEGRITY_KEY"); v != "" {
+		c.Wompi.IntegrityKey = v
+	}
+}
+
 func Load(path string) (*Config, error) {
+	// Load .env file if it exists (silent fail — env vars may already be set)
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Warning: .env file not found or could not be loaded: %v", err)
+	}
+
 	// Validate path to prevent path traversal attacks
 	absPath, err := filepath.Abs(path)
 	if err != nil {
@@ -292,6 +370,9 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
+
+	// Override sensitive config values with environment variables
+	cfg.applyEnvOverrides()
 
 	if cfg.Concurrency.WorkerPool.WorkerPoolSize == 0 {
 		cfg.Concurrency.WorkerPool.WorkerPoolSize = 4

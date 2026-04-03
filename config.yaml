@@ -5,13 +5,13 @@ app:
   static_path: "./cmd/api/static"
   swagger_enabled: true
   admin_email: "admin@bey.com"
-  admin_password: "Admin123!@#"
+  admin_password: ""  # Override with ADMIN_PASSWORD env var
 
 database:
   host: "postgres"
   port: 5432
   user: "bey_user"
-  password: "bey_password"
+  password: ""  # Override with DB_PASSWORD env var
   name: "bey_db"
   sslmode: "disable"
   max_open_conns: 25
@@ -32,9 +32,7 @@ security:
   allowed_origins:
     - "http://localhost:3000"
     - "http://localhost:8080"
-  # SECURITY: MUST be replaced with a strong secret (min 32 chars) before deployment.
-  # Generate with: openssl rand -hex 32
-  jwt_secret: "REPLACE_WITH_STRONG_SECRET_MIN_32_CHARS"
+  jwt_secret: ""  # Override with JWT_SECRET env var (min 32 chars)
   jwt_expiry_hours: 2
   jwt_access_expiry: "15m"
   jwt_refresh_expiry: "168h"
@@ -43,32 +41,24 @@ security:
   csrf_enabled: true
 
 rate_limit:
-  # Enable/disable rate limiting globally
   enabled: true
   redis:
-    # Redis backend for distributed rate limiting (optional)
-    # When enabled, rate limits are shared across multiple API instances
     enabled: false
     host: "localhost"
     port: 6379
     password: ""
     db: 0
   defaults:
-    # Default rate limits applied to all endpoints
     requests_per_minute: 60
     burst_capacity: 10
   endpoints:
-    # Endpoint-specific rate limits (overrides defaults)
-    # Format: "/path": { requests_per_minute: X, burst_capacity: Y }
     /api/v1/auth/login:
-      # Strict limit for auth endpoints to prevent brute force
       requests_per_minute: 5
       burst_capacity: 2
     /api/v1/auth/refresh:
       requests_per_minute: 10
       burst_capacity: 3
     /api/v1/admin:
-      # Admin endpoints have higher limits
       requests_per_minute: 60
       burst_capacity: 10
     /api/v1/auth/forgot-password:
@@ -79,66 +69,42 @@ rate_limit:
       burst_capacity: 2
 
 email:
-  # Email sending configuration for password reset & verification
   enabled: true
   from_name: "Bey API"
   from_email: "noreply@beyapi.com"
   smtp:
-    # Gmail SMTP settings
-    # For Gmail: use smtp.gmail.com on port 587 (TLS) or 465 (SSL)
-    # IMPORTANT: Use an App Password, NOT your regular Gmail password
-    # To generate App Password:
-    #   1. Enable 2-Factor Authentication on your Google Account
-    #   2. Go to https://myaccount.google.com/apppasswords
-    #   3. Generate a new app password for "Mail"
-    #   4. Use that 16-character password here (e.g., "abcd efgh ijkl mnop")
     host: "smtp.gmail.com"
     port: 587
-    username: "your-email@gmail.com"
-    password: "your-app-password"
+    username: ""  # Override with SMTP_USERNAME env var
+    password: ""  # Override with SMTP_PASSWORD env var
 
 oauth:
   google:
-    # Google OAuth2 credentials
-    # Get these from Google Cloud Console:
-    # 1. Go to https://console.cloud.google.com/
-    # 2. Create a project or select existing
-    # 3. Go to APIs & Services > Credentials
-    # 4. Create OAuth 2.0 Client ID
-    # 5. Set authorized redirect URIs
-    client_id: "your-google-client-id"
-    client_secret: "your-google-client-secret"
-    # Redirect URL (must match Google Cloud Console settings)
+    client_id: ""     # Override with GOOGLE_OAUTH_CLIENT_ID env var
+    client_secret: "" # Override with GOOGLE_OAUTH_CLIENT_SECRET env var
     redirect_url: "http://localhost:8080/api/v1/auth/google/callback"
 
 cart:
-  # Shopping cart Redis configuration
   enabled: true
   redis:
     host: "redis"
     port: 6379
     password: ""
-    db: 1 # Separate DB from rate-limiter (DB 0)
-  # Cart TTL in days
+    db: 1
   ttl_days: 7
 
 wompi:
-  # Wompi payment gateway configuration for Colombian payments
   enabled: true
-  # Environment: sandbox (testing) or production
   environment: "sandbox"
-  # Keys from Wompi dashboard
-  public_key: "your-public-key"
-  private_key: "your-private-key"
-  event_key: "your-event-key"
-  integrity_key: "your-integrity-key"
-  # API base URL (different for sandbox vs production)
+  public_key: ""    # Override with WOMPI_PUBLIC_KEY env var
+  private_key: ""   # Override with WOMPI_PRIVATE_KEY env var
+  event_key: ""     # Override with WOMPI_EVENT_KEY env var
+  integrity_key: "" # Override with WOMPI_INTEGRITY_KEY env var
   base_url: "https://sandbox.wompi.co"
 
 cache:
-  # Redis cache configuration for read-heavy operations
   enabled: true
-  db: 2 # Separate DB from rate-limiter (DB 0) and cart (DB 1)
-  default_ttl: 28800 # 8 hours in seconds
+  db: 2
+  default_ttl: 28800
   warming_enabled: true
   warming_product_limit: 100
