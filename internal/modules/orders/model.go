@@ -3,12 +3,15 @@ package orders
 import (
 	"time"
 
+	"bey/internal/shared/uuidutil"
+
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/gorm"
 )
 
 type Order struct {
-	ID                   uint           `gorm:"primarykey" json:"id"`
-	UserID               uint           `gorm:"index" json:"user_id"`
+	ID                   uuid.UUID      `gorm:"type:uuid;primarykey" json:"id"`
+	UserID               uuid.UUID      `gorm:"index" json:"user_id"`
 	Status               string         `gorm:"size:50;default:pending" json:"status"`
 	TotalPrice           float64        `gorm:"precision:10;scale:2" json:"total_price"`
 	ShippingAddress      string         `gorm:"type:text" json:"shipping_address"`
@@ -22,14 +25,28 @@ type Order struct {
 	Items                []OrderItem    `gorm:"foreignKey:OrderID" json:"items"`
 }
 
+func (o *Order) BeforeCreate(tx *gorm.DB) error {
+	if o.ID == uuid.Nil {
+		o.ID = uuidutil.GenerateV7()
+	}
+	return nil
+}
+
 type OrderItem struct {
-	ID        uint      `gorm:"primarykey" json:"id"`
-	OrderID   uint      `gorm:"index" json:"order_id"`
-	ProductID uint      `gorm:"index" json:"product_id"`
-	VariantID *uint     `gorm:"index" json:"variant_id"` // Nullable - si es null, es el producto base
-	Quantity  int       `json:"quantity"`
-	UnitPrice float64   `gorm:"precision:10;scale:2" json:"unit_price"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        uuid.UUID  `gorm:"type:uuid;primarykey" json:"id"`
+	OrderID   uuid.UUID  `gorm:"index" json:"order_id"`
+	ProductID uuid.UUID  `gorm:"index" json:"product_id"`
+	VariantID *uuid.UUID `gorm:"index" json:"variant_id"`
+	Quantity  int        `json:"quantity"`
+	UnitPrice float64    `gorm:"precision:10;scale:2" json:"unit_price"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+func (oi *OrderItem) BeforeCreate(tx *gorm.DB) error {
+	if oi.ID == uuid.Nil {
+		oi.ID = uuidutil.GenerateV7()
+	}
+	return nil
 }
 
 type CreateOrderRequest struct {
@@ -40,13 +57,13 @@ type CreateOrderRequest struct {
 
 type CreateOrderItemRequest struct {
 	ProductID uint  `json:"product_id" binding:"required"`
-	VariantID *uint `json:"variant_id"` // Opcional - si se especifica, usa la variante
+	VariantID *uint `json:"variant_id"`
 	Quantity  int   `json:"quantity" binding:"required,gt=0"`
 }
 
 type OrderResponse struct {
-	ID              uint                `json:"id"`
-	UserID          uint                `json:"user_id"`
+	ID              string              `json:"id"`
+	UserID          string              `json:"user_id"`
 	Status          string              `json:"status"`
 	TotalPrice      float64             `json:"total_price"`
 	ShippingAddress string              `json:"shipping_address"`
@@ -56,9 +73,9 @@ type OrderResponse struct {
 }
 
 type OrderItemResponse struct {
-	ID        uint    `json:"id"`
-	ProductID uint    `json:"product_id"`
-	VariantID *uint   `json:"variant_id"`
+	ID        string  `json:"id"`
+	ProductID string  `json:"product_id"`
+	VariantID *string `json:"variant_id"`
 	Quantity  int     `json:"quantity"`
 	UnitPrice float64 `json:"unit_price"`
 }

@@ -3,11 +3,14 @@ package users
 import (
 	"time"
 
+	"bey/internal/shared/uuidutil"
+
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/gorm"
 )
 
 type User struct {
-	ID                  uint           `gorm:"primarykey" json:"id"`
+	ID                  uuid.UUID      `gorm:"type:uuid;primarykey" json:"id"`
 	Email               string         `gorm:"uniqueIndex;size:255" json:"email"`
 	Password            string         `gorm:"size:255" json:"-"`
 	FirstName           string         `gorm:"size:100" json:"first_name"`
@@ -22,13 +25,20 @@ type User struct {
 	ResetExpires        *time.Time     `gorm:"index" json:"-"`
 	TwoFASecret         string         `gorm:"size:255" json:"-"`
 	TwoFAEnabled        bool           `gorm:"default:false" json:"two_fa_enabled"`
-	TwoFABackupCodes    string         `gorm:"type:text" json:"-"` // JSON array of backup codes, hashed
+	TwoFABackupCodes    string         `gorm:"type:text" json:"-"`
 	OAuthProvider       string         `gorm:"size:50" json:"oauth_provider,omitempty"`
 	OAuthProviderID     string         `gorm:"size:255" json:"oauth_provider_id,omitempty"`
 	AvatarURL           string         `gorm:"size:500" json:"avatar_url,omitempty"`
 	CreatedAt           time.Time      `json:"created_at"`
 	UpdatedAt           time.Time      `json:"updated_at"`
 	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (u *User) BeforeCreate(tx *gorm.DB) error {
+	if u.ID == uuid.Nil {
+		u.ID = uuidutil.GenerateV7()
+	}
+	return nil
 }
 
 type UpdateUserRequest struct {
@@ -39,7 +49,7 @@ type UpdateUserRequest struct {
 }
 
 type UserResponse struct {
-	ID        uint      `json:"id"`
+	ID        string    `json:"id"`
 	Email     string    `json:"email"`
 	FirstName string    `json:"first_name"`
 	LastName  string    `json:"last_name"`
