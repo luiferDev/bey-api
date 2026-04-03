@@ -5,9 +5,7 @@ app:
   static_path: "./cmd/api/static"
   swagger_enabled: true
   admin_email: "admin@bey.com"
-  # SECURITY: MUST be replaced with a strong password before deployment.
-  # Generate with: openssl rand -base64 24
-  admin_password: "REPLACE_WITH_STRONG_RANDOM_PASSWORD"
+  admin_password: "Admin123!@#"
 
 database:
   host: "postgres"
