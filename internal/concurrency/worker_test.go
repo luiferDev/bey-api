@@ -33,7 +33,9 @@ func TestWorkerPool_SubmitAndProcess(t *testing.T) {
 		t.Fatalf("Failed to submit task: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	if err := pool.Shutdown(); err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
 
 	mu.Lock()
 	if !handlerCalled {
@@ -43,10 +45,6 @@ func TestWorkerPool_SubmitAndProcess(t *testing.T) {
 
 	if task.Status != TaskStatusCompleted {
 		t.Errorf("Expected task status completed, got %s", task.Status)
-	}
-
-	if err := pool.Shutdown(); err != nil {
-		t.Fatalf("Shutdown failed: %v", err)
 	}
 }
 
@@ -176,18 +174,16 @@ func TestWorkerPool_TaskErrorHandling(t *testing.T) {
 		t.Fatalf("Failed to submit task: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
-	if task.Status != TaskStatusFailed {
-		t.Errorf("Expected task status failed, got %s", task.Status)
-	}
-
-	if task.Error != expectedErr.Error() {
-		t.Errorf("Expected error message '%s', got '%s'", expectedErr.Error(), task.Error)
-	}
-
 	if err := pool.Shutdown(); err != nil {
 		t.Fatalf("Shutdown failed: %v", err)
+	}
+
+	if task.GetStatus() != TaskStatusFailed {
+		t.Errorf("Expected task status failed, got %s", task.GetStatus())
+	}
+
+	if task.GetError() != expectedErr.Error() {
+		t.Errorf("Expected error message '%s', got '%s'", expectedErr.Error(), task.GetError())
 	}
 }
 
@@ -242,8 +238,10 @@ func TestWorkerPool_Shutdown(t *testing.T) {
 }
 
 func TestWorkerPool_CancelTask(t *testing.T) {
+	// Block the first worker so we can cancel the second task before it starts.
+	block := make(chan struct{})
 	handler := func(task *Task) error {
-		time.Sleep(100 * time.Millisecond)
+		<-block
 		return nil
 	}
 
@@ -252,26 +250,31 @@ func TestWorkerPool_CancelTask(t *testing.T) {
 		t.Fatalf("Failed to start pool: %v", err)
 	}
 
-	task := &Task{
-		Type:   TaskTypeOrderProcessing,
-		Status: TaskStatusPending,
+	// Submit a blocking task to occupy the single worker.
+	blockingTask := &Task{Type: TaskTypeOrderProcessing, Payload: "blocker"}
+	if err := pool.Submit(blockingTask); err != nil {
+		t.Fatalf("Failed to submit blocking task: %v", err)
 	}
 
+	// Submit the task we want to cancel.
+	task := &Task{Type: TaskTypeOrderProcessing, Payload: "cancellable"}
 	if err := pool.Submit(task); err != nil {
 		t.Fatalf("Failed to submit task: %v", err)
 	}
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 	task.Status = TaskStatusCancelled
 
-	time.Sleep(50 * time.Millisecond)
-
-	if task.Status == TaskStatusRunning {
-		t.Error("Task should have been cancelled before execution")
-	}
+	// Unblock the worker so it can finish the first task and see the cancelled status.
+	close(block)
 
 	if err := pool.Shutdown(); err != nil {
 		t.Fatalf("Shutdown failed: %v", err)
+	}
+
+	// The cancelled task should not have been processed.
+	if task.Status != TaskStatusCancelled {
+		t.Errorf("Expected task to remain cancelled, got %s", task.Status)
 	}
 }
 

@@ -135,7 +135,6 @@ func (s *OrderService) SubmitAsyncOrder(req CreateOrderRequest, userID uuid.UUID
 
 	task := &concurrency.Task{
 		Type:    concurrency.TaskTypeOrderProcessing,
-		Status:  concurrency.TaskStatusPending,
 		Payload: CreateOrderPayload{Request: req, UserID: userID},
 	}
 
@@ -150,14 +149,13 @@ func (s *OrderService) SubmitAsyncOrder(req CreateOrderRequest, userID uuid.UUID
 }
 
 func (s *OrderService) processOrderTask(task *concurrency.Task) {
-	task.Status = concurrency.TaskStatusRunning
-	task.UpdatedAt = time.Now()
+	task.SetStatus(concurrency.TaskStatusRunning)
+	task.SetUpdatedAt(time.Now())
 
 	payload, ok := task.Payload.(CreateOrderPayload)
 	if !ok {
-		task.Status = concurrency.TaskStatusFailed
-		task.Error = "invalid payload type"
-		task.UpdatedAt = time.Now()
+		task.SetStatus(concurrency.TaskStatusFailed)
+		task.SetUpdatedAt(time.Now())
 		return
 	}
 	req := payload.Request
@@ -172,32 +170,32 @@ func (s *OrderService) processOrderTask(task *concurrency.Task) {
 		if item.VariantID != nil && s.variantRepo != nil {
 			variantID, err := uuid.FromString(*item.VariantID)
 			if err != nil {
-				task.Status = concurrency.TaskStatusFailed
-				task.Error = "invalid variant_id format"
-				task.UpdatedAt = time.Now()
+				task.SetStatus(concurrency.TaskStatusFailed)
+				task.SetError("invalid variant_id format")
+				task.SetUpdatedAt(time.Now())
 				return
 			}
 
 			price, stock, reserved, err := s.variantRepo.GetPriceAndStock(variantID)
 			if err != nil {
-				task.Status = concurrency.TaskStatusFailed
-				task.Error = "failed to get variant info"
-				task.UpdatedAt = time.Now()
+				task.SetStatus(concurrency.TaskStatusFailed)
+				task.SetError("failed to get variant info")
+				task.SetUpdatedAt(time.Now())
 				return
 			}
 
 			available := stock - reserved
 			if available < item.Quantity {
-				task.Status = concurrency.TaskStatusFailed
-				task.Error = "insufficient stock for variant"
-				task.UpdatedAt = time.Now()
+				task.SetStatus(concurrency.TaskStatusFailed)
+				task.SetError("insufficient stock for variant")
+				task.SetUpdatedAt(time.Now())
 				return
 			}
 
 			if err := s.variantRepo.ReserveStock(variantID, item.Quantity); err != nil {
-				task.Status = concurrency.TaskStatusFailed
-				task.Error = "failed to reserve variant stock"
-				task.UpdatedAt = time.Now()
+				task.SetStatus(concurrency.TaskStatusFailed)
+				task.SetError("failed to reserve variant stock")
+				task.SetUpdatedAt(time.Now())
 				return
 			}
 
@@ -205,18 +203,18 @@ func (s *OrderService) processOrderTask(task *concurrency.Task) {
 		} else {
 			productID, err := uuid.FromString(item.ProductID)
 			if err != nil {
-				task.Status = concurrency.TaskStatusFailed
-				task.Error = "invalid product_id format"
-				task.UpdatedAt = time.Now()
+				task.SetStatus(concurrency.TaskStatusFailed)
+				task.SetError("invalid product_id format")
+				task.SetUpdatedAt(time.Now())
 				return
 			}
 
 			if s.productRepo != nil {
 				price, err := s.productRepo.GetPriceByID(productID)
 				if err != nil {
-					task.Status = concurrency.TaskStatusFailed
-					task.Error = "failed to get product price"
-					task.UpdatedAt = time.Now()
+					task.SetStatus(concurrency.TaskStatusFailed)
+					task.SetError("failed to get product price")
+					task.SetUpdatedAt(time.Now())
 					return
 				}
 				unitPrice = price
@@ -225,22 +223,22 @@ func (s *OrderService) processOrderTask(task *concurrency.Task) {
 			if s.inventoryRepo != nil {
 				inv, err := s.inventoryRepo.FindByProductID(productID)
 				if err != nil {
-					task.Status = concurrency.TaskStatusFailed
-					task.Error = "failed to check inventory"
-					task.UpdatedAt = time.Now()
+					task.SetStatus(concurrency.TaskStatusFailed)
+					task.SetError("failed to check inventory")
+					task.SetUpdatedAt(time.Now())
 					return
 				}
 				if inv == nil || inv.Quantity < item.Quantity {
-					task.Status = concurrency.TaskStatusFailed
-					task.Error = "insufficient inventory"
-					task.UpdatedAt = time.Now()
+					task.SetStatus(concurrency.TaskStatusFailed)
+					task.SetError("insufficient inventory")
+					task.SetUpdatedAt(time.Now())
 					return
 				}
 
 				if err := s.inventoryRepo.Reserve(productID, item.Quantity); err != nil {
-					task.Status = concurrency.TaskStatusFailed
-					task.Error = "failed to reserve inventory"
-					task.UpdatedAt = time.Now()
+					task.SetStatus(concurrency.TaskStatusFailed)
+					task.SetError("failed to reserve inventory")
+					task.SetUpdatedAt(time.Now())
 					return
 				}
 			}
@@ -272,19 +270,19 @@ func (s *OrderService) processOrderTask(task *concurrency.Task) {
 	}
 
 	if err := s.repo.Create(order); err != nil {
-		task.Status = concurrency.TaskStatusFailed
-		task.Error = err.Error()
-		task.UpdatedAt = time.Now()
+		task.SetStatus(concurrency.TaskStatusFailed)
+		task.SetError(err.Error())
+		task.SetUpdatedAt(time.Now())
 		return
 	}
 
-	task.Result = map[string]interface{}{
+	task.SetResult(map[string]interface{}{
 		"order_id":    order.ID,
 		"total_price": order.TotalPrice,
 		"status":      order.Status,
-	}
-	task.Status = concurrency.TaskStatusCompleted
-	task.UpdatedAt = time.Now()
+	})
+	task.SetStatus(concurrency.TaskStatusCompleted)
+	task.SetUpdatedAt(time.Now())
 }
 
 func (s *OrderService) GetTaskStatus(taskID string) (*concurrency.Task, error) {

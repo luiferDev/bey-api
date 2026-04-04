@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     tags:
-      - 'v*'
+      - "v*"
 
 env:
-  GO_VERSION: '1.26'
+  GO_VERSION: "1.26"
   DOCKER_REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
@@ -74,9 +74,9 @@ jobs:
       - name: Run trivy image scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}'
-          format: 'sarif'
-          output: 'trivy-image-results.sarif'
+          image-ref: "${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          format: "sarif"
+          output: "trivy-image-results.sarif"
         continue-on-error: true
 
       - name: Upload trivy image results

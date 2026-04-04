@@ -106,8 +106,8 @@ func TestTokenBucket_ConcurrentAccess(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	if tb.tokens < 900 {
-		t.Errorf("Expected most tokens to remain after concurrent access, got %f", tb.tokens)
+	if tb.Tokens() < 900 {
+		t.Errorf("Expected most tokens to remain after concurrent access, got %f", tb.Tokens())
 	}
 }
 

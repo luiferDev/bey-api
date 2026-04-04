@@ -58,19 +58,19 @@ func (p *workerPool) worker(id int) {
 			if !ok {
 				return
 			}
-			if task.Status == TaskStatusCancelled {
+			if task.GetStatus() == TaskStatusCancelled {
 				continue
 			}
-			task.Status = TaskStatusRunning
-			task.UpdatedAt = time.Now()
+			task.SetStatus(TaskStatusRunning)
+			task.SetUpdatedAt(time.Now())
 
 			if err := p.handler(task); err != nil {
-				task.Status = TaskStatusFailed
-				task.Error = err.Error()
+				task.SetStatus(TaskStatusFailed)
+				task.SetError(err.Error())
 			} else {
-				task.Status = TaskStatusCompleted
+				task.SetStatus(TaskStatusCompleted)
 			}
-			task.UpdatedAt = time.Now()
+			task.SetUpdatedAt(time.Now())
 		case <-p.stopChan:
 			return
 		}
@@ -95,9 +95,9 @@ func (p *workerPool) Shutdown() error {
 		return nil
 	}
 
-	close(p.stopChan)
-	p.wg.Wait()
 	close(p.taskQueue)
+	p.wg.Wait()
+	close(p.stopChan)
 
 	p.started = false
 	return nil

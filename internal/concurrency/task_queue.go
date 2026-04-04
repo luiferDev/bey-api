@@ -31,9 +31,8 @@ func (q *inMemoryTaskQueue) Submit(task *Task) (string, error) {
 	}
 
 	task.ID = uuid.New().String()
-	task.Status = TaskStatusPending
-	task.CreatedAt = time.Now()
-	task.UpdatedAt = time.Now()
+	task.SetStatus(TaskStatusPending)
+	task.SetUpdatedAt(time.Now())
 
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -52,7 +51,9 @@ func (q *inMemoryTaskQueue) GetStatus(taskID string) (*Task, error) {
 		return nil, nil
 	}
 
-	return task, nil
+	// Return a thread-safe copy to prevent data races with worker goroutines.
+	taskCopy := task.Copy()
+	return &taskCopy, nil
 }
 
 func (q *inMemoryTaskQueue) Cancel(taskID string) error {
@@ -64,12 +65,12 @@ func (q *inMemoryTaskQueue) Cancel(taskID string) error {
 		return errors.New("task not found")
 	}
 
-	if task.Status == TaskStatusCompleted || task.Status == TaskStatusFailed {
+	if task.GetStatus() == TaskStatusCompleted || task.GetStatus() == TaskStatusFailed {
 		return errors.New("cannot cancel completed or failed task")
 	}
 
-	task.Status = TaskStatusCancelled
-	task.UpdatedAt = time.Now()
+	task.SetStatus(TaskStatusCancelled)
+	task.SetUpdatedAt(time.Now())
 
 	return nil
 }
