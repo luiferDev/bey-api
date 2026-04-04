@@ -6,6 +6,11 @@ on:
   push:
     branches: [main, develop]
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 env:
   GO_VERSION: '1.26'
   GOLANGCI_LINT_VERSION: 'v2.1'
@@ -46,6 +51,7 @@ jobs:
       - name: Run tests
         run: |
           go test -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out > coverage.txt
 
       - name: Upload coverage to GitHub
         uses: actions/upload-artifact@v4
@@ -61,18 +67,9 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const coverage = fs.readFileSync('coverage.out', 'utf8');
-            const lines = coverage.split('\n');
-            let total = 0;
-            let covered = 0;
-            for (const line of lines) {
-              if (line.includes('total:')) {
-                const match = line.match(/total:.*?(\d+)%/);
-                if (match) {
-                  total = parseInt(match[1]);
-                }
-              }
-            }
+            const content = fs.readFileSync('coverage.txt', 'utf8');
+            const match = content.match(/total:\s+\(statements\)\s+(\d+\.\d+)%/);
+            const total = match ? parseFloat(match[1]).toFixed(1) : 'N/A';
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
