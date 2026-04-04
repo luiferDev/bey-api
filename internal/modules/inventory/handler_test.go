@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -32,7 +33,7 @@ func setupTestRouterWithInventory(t *testing.T) (*gin.Engine, *InventoryHandler)
 	// Simulate admin user context for tests
 	router.Use(func(c *gin.Context) {
 		c.Set("user_role", "admin")
-		c.Set("user_id", uint(1))
+		c.Set("user_id", uuid.Must(uuid.NewV7()).String())
 		c.Next()
 	})
 	return router, handler
@@ -41,9 +42,10 @@ func setupTestRouterWithInventory(t *testing.T) (*gin.Engine, *InventoryHandler)
 func TestGetInventory_NotFound(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router.GET("/api/v1/inventory/:product_id", handler.GetByProductID)
 
-	req, _ := http.NewRequest("GET", "/api/v1/inventory/1", nil)
+	req, _ := http.NewRequest("GET", "/api/v1/inventory/"+testUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -69,9 +71,10 @@ func TestGetInventory_InvalidProductID(t *testing.T) {
 func TestUpdateInventory_InvalidBody(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router.PUT("/api/v1/inventory/:product_id", handler.Update)
 
-	req, _ := http.NewRequest("PUT", "/api/v1/inventory/1", bytes.NewBufferString("invalid"))
+	req, _ := http.NewRequest("PUT", "/api/v1/inventory/"+testUUID.String(), bytes.NewBufferString("invalid"))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -84,10 +87,11 @@ func TestUpdateInventory_InvalidBody(t *testing.T) {
 func TestUpdateInventory_Success(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router.PUT("/api/v1/inventory/:product_id", handler.Update)
 
 	body := `{"quantity":100}`
-	req, _ := http.NewRequest("PUT", "/api/v1/inventory/1", bytes.NewBufferString(body))
+	req, _ := http.NewRequest("PUT", "/api/v1/inventory/"+testUUID.String(), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -114,10 +118,11 @@ func TestUpdateInventory_Success(t *testing.T) {
 func TestReserveInventory_InvalidQuantity(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router.POST("/api/v1/inventory/:product_id/reserve", handler.Reserve)
 
 	body := `{"quantity":0}`
-	req, _ := http.NewRequest("POST", "/api/v1/inventory/1/reserve", bytes.NewBufferString(body))
+	req, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/reserve", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -130,9 +135,10 @@ func TestReserveInventory_InvalidQuantity(t *testing.T) {
 func TestReserveInventory_InvalidBody(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router.POST("/api/v1/inventory/:product_id/reserve", handler.Reserve)
 
-	req, _ := http.NewRequest("POST", "/api/v1/inventory/1/reserve", bytes.NewBufferString("invalid"))
+	req, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/reserve", bytes.NewBufferString("invalid"))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -145,10 +151,11 @@ func TestReserveInventory_InvalidBody(t *testing.T) {
 func TestReserveInventory_InsufficientStock(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router.POST("/api/v1/inventory/:product_id/reserve", handler.Reserve)
 
 	body := `{"quantity":1000}`
-	req, _ := http.NewRequest("POST", "/api/v1/inventory/1/reserve", bytes.NewBufferString(body))
+	req, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/reserve", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -161,11 +168,12 @@ func TestReserveInventory_InsufficientStock(t *testing.T) {
 func TestReserveInventory_Success(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router.PUT("/api/v1/inventory/:product_id", handler.Update)
 	router.POST("/api/v1/inventory/:product_id/reserve", handler.Reserve)
 
 	updateBody := `{"quantity":100}`
-	req1, _ := http.NewRequest("PUT", "/api/v1/inventory/1", bytes.NewBufferString(updateBody))
+	req1, _ := http.NewRequest("PUT", "/api/v1/inventory/"+testUUID.String(), bytes.NewBufferString(updateBody))
 	req1.Header.Set("Content-Type", "application/json")
 	w1 := httptest.NewRecorder()
 	router.ServeHTTP(w1, req1)
@@ -175,7 +183,7 @@ func TestReserveInventory_Success(t *testing.T) {
 	}
 
 	reserveBody := `{"quantity":10}`
-	req2, _ := http.NewRequest("POST", "/api/v1/inventory/1/reserve", bytes.NewBufferString(reserveBody))
+	req2, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/reserve", bytes.NewBufferString(reserveBody))
 	req2.Header.Set("Content-Type", "application/json")
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req2)
@@ -188,12 +196,13 @@ func TestReserveInventory_Success(t *testing.T) {
 func TestReleaseInventory_Success(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router.PUT("/api/v1/inventory/:product_id", handler.Update)
 	router.POST("/api/v1/inventory/:product_id/reserve", handler.Reserve)
 	router.POST("/api/v1/inventory/:product_id/release", handler.Release)
 
 	updateBody := `{"quantity":100}`
-	req1, _ := http.NewRequest("PUT", "/api/v1/inventory/1", bytes.NewBufferString(updateBody))
+	req1, _ := http.NewRequest("PUT", "/api/v1/inventory/"+testUUID.String(), bytes.NewBufferString(updateBody))
 	req1.Header.Set("Content-Type", "application/json")
 	w1 := httptest.NewRecorder()
 	router.ServeHTTP(w1, req1)
@@ -203,7 +212,7 @@ func TestReleaseInventory_Success(t *testing.T) {
 	}
 
 	reserveBody := `{"quantity":20}`
-	req2, _ := http.NewRequest("POST", "/api/v1/inventory/1/reserve", bytes.NewBufferString(reserveBody))
+	req2, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/reserve", bytes.NewBufferString(reserveBody))
 	req2.Header.Set("Content-Type", "application/json")
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req2)
@@ -213,7 +222,7 @@ func TestReleaseInventory_Success(t *testing.T) {
 	}
 
 	releaseBody := `{"quantity":10}`
-	req3, _ := http.NewRequest("POST", "/api/v1/inventory/1/release", bytes.NewBufferString(releaseBody))
+	req3, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/release", bytes.NewBufferString(releaseBody))
 	req3.Header.Set("Content-Type", "application/json")
 	w3 := httptest.NewRecorder()
 	router.ServeHTTP(w3, req3)
@@ -226,12 +235,13 @@ func TestReleaseInventory_Success(t *testing.T) {
 func TestReleaseInventory_NotEnoughReserved(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router.PUT("/api/v1/inventory/:product_id", handler.Update)
 	router.POST("/api/v1/inventory/:product_id/reserve", handler.Reserve)
 	router.POST("/api/v1/inventory/:product_id/release", handler.Release)
 
 	updateBody := `{"quantity":100}`
-	req1, _ := http.NewRequest("PUT", "/api/v1/inventory/1", bytes.NewBufferString(updateBody))
+	req1, _ := http.NewRequest("PUT", "/api/v1/inventory/"+testUUID.String(), bytes.NewBufferString(updateBody))
 	req1.Header.Set("Content-Type", "application/json")
 	w1 := httptest.NewRecorder()
 	router.ServeHTTP(w1, req1)
@@ -241,7 +251,7 @@ func TestReleaseInventory_NotEnoughReserved(t *testing.T) {
 	}
 
 	releaseBody := `{"quantity":50}`
-	req2, _ := http.NewRequest("POST", "/api/v1/inventory/1/release", bytes.NewBufferString(releaseBody))
+	req2, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/release", bytes.NewBufferString(releaseBody))
 	req2.Header.Set("Content-Type", "application/json")
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req2)
@@ -254,10 +264,11 @@ func TestReleaseInventory_NotEnoughReserved(t *testing.T) {
 func TestReleaseInventory_NotFound(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
 
+	testUUID := uuid.Must(uuid.NewV7())
 	router.POST("/api/v1/inventory/:product_id/release", handler.Release)
 
 	body := `{"quantity":10}`
-	req, _ := http.NewRequest("POST", "/api/v1/inventory/999/release", bytes.NewBufferString(body))
+	req, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/release", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)

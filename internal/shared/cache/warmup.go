@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/gofrs/uuid/v5"
 )
 
 // Warmer interfaces to avoid circular dependencies
@@ -17,7 +19,7 @@ type ProductWarmer interface {
 }
 
 type VariantWarmer interface {
-	FindByProduct(ctx context.Context, productID uint) ([]interface{}, error)
+	FindByProduct(ctx context.Context, productID uuid.UUID) ([]interface{}, error)
 }
 
 // CacheWarmer handles async cache warming on startup
@@ -163,29 +165,31 @@ func (w *CacheWarmer) warmVariants(ctx context.Context) {
 
 	totalCached := 0
 	for _, prod := range products {
-		var id uint
+		var id uuid.UUID
 		switch v := prod.(type) {
 		case map[string]interface{}:
 			if idVal, ok := v["id"]; ok {
-				id = uint(idVal.(float64))
+				if idStr, ok := idVal.(string); ok {
+					id, _ = uuid.FromString(idStr)
+				}
 			}
 		default:
 			continue
 		}
 
-		if id == 0 {
+		if id == uuid.Nil {
 			continue
 		}
 
 		variants, err := w.variantRepo.FindByProduct(ctx, id)
 		if err != nil {
-			log.Printf("Cache warming: failed to fetch variants for product %d: %v", id, err)
+			log.Printf("Cache warming: failed to fetch variants for product %s: %v", id.String(), err)
 			continue
 		}
 
-		key := w.cacheSvc.Key("cache", "variant", "product", fmt.Sprintf("%d", id))
+		key := w.cacheSvc.Key("cache", "variant", "product", id.String())
 		if err := w.cacheSvc.Set(ctx, key, variants); err != nil {
-			log.Printf("Cache warming: failed to cache variants for product %d: %v", id, err)
+			log.Printf("Cache warming: failed to cache variants for product %s: %v", id.String(), err)
 		} else {
 			totalCached += len(variants)
 		}

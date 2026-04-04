@@ -3,6 +3,7 @@ package inventory
 import (
 	"testing"
 
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -25,7 +26,7 @@ func TestInventoryRepository_Create(t *testing.T) {
 	repo := NewInventoryRepository(db)
 
 	inv := &Inventory{
-		ProductID: 1,
+		ProductID: uuid.Must(uuid.NewV7()),
 		Quantity:  100,
 		Reserved:  0,
 	}
@@ -35,7 +36,7 @@ func TestInventoryRepository_Create(t *testing.T) {
 		t.Fatalf("Failed to create inventory: %v", err)
 	}
 
-	if inv.ID == 0 {
+	if inv.ID == uuid.Nil {
 		t.Error("Expected inventory ID to be set")
 	}
 }
@@ -45,7 +46,7 @@ func TestInventoryRepository_FindByID(t *testing.T) {
 	repo := NewInventoryRepository(db)
 
 	inv := &Inventory{
-		ProductID: 1,
+		ProductID: uuid.Must(uuid.NewV7()),
 		Quantity:  100,
 		Reserved:  0,
 	}
@@ -69,7 +70,7 @@ func TestInventoryRepository_FindByID_NotFound(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewInventoryRepository(db)
 
-	found, err := repo.FindByID(999)
+	found, err := repo.FindByID(uuid.Must(uuid.NewV7()))
 	if err != nil {
 		t.Fatalf("Failed to find inventory: %v", err)
 	}
@@ -83,14 +84,15 @@ func TestInventoryRepository_FindByProductID(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewInventoryRepository(db)
 
+	productID := uuid.Must(uuid.NewV7())
 	inv := &Inventory{
-		ProductID: 1,
+		ProductID: productID,
 		Quantity:  100,
 		Reserved:  0,
 	}
 	repo.Create(inv)
 
-	found, err := repo.FindByProductID(1)
+	found, err := repo.FindByProductID(productID)
 	if err != nil {
 		t.Fatalf("Failed to find inventory by product ID: %v", err)
 	}
@@ -108,7 +110,7 @@ func TestInventoryRepository_FindByProductID_NotFound(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewInventoryRepository(db)
 
-	found, err := repo.FindByProductID(999)
+	found, err := repo.FindByProductID(uuid.Must(uuid.NewV7()))
 	if err != nil {
 		t.Fatalf("Failed to find inventory by product ID: %v", err)
 	}
@@ -122,8 +124,9 @@ func TestInventoryRepository_Update(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewInventoryRepository(db)
 
+	productID := uuid.Must(uuid.NewV7())
 	inv := &Inventory{
-		ProductID: 1,
+		ProductID: productID,
 		Quantity:  100,
 		Reserved:  0,
 	}
@@ -135,7 +138,7 @@ func TestInventoryRepository_Update(t *testing.T) {
 		t.Fatalf("Failed to update inventory: %v", err)
 	}
 
-	found, _ := repo.FindByProductID(1)
+	found, _ := repo.FindByProductID(productID)
 	if found.Quantity != 150 {
 		t.Errorf("Expected quantity 150, got %d", found.Quantity)
 	}
@@ -145,19 +148,20 @@ func TestInventoryRepository_UpdateQuantity(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewInventoryRepository(db)
 
+	productID := uuid.Must(uuid.NewV7())
 	inv := &Inventory{
-		ProductID: 1,
+		ProductID: productID,
 		Quantity:  100,
 		Reserved:  0,
 	}
 	repo.Create(inv)
 
-	err := repo.UpdateQuantity(1, 200)
+	err := repo.UpdateQuantity(productID, 200)
 	if err != nil {
 		t.Fatalf("Failed to update quantity: %v", err)
 	}
 
-	found, _ := repo.FindByProductID(1)
+	found, _ := repo.FindByProductID(productID)
 	if found.Quantity != 200 {
 		t.Errorf("Expected quantity 200, got %d", found.Quantity)
 	}
@@ -167,19 +171,20 @@ func TestInventoryRepository_Reserve(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewInventoryRepository(db)
 
+	productID := uuid.Must(uuid.NewV7())
 	inv := &Inventory{
-		ProductID: 1,
+		ProductID: productID,
 		Quantity:  100,
 		Reserved:  0,
 	}
 	repo.Create(inv)
 
-	err := repo.Reserve(1, 30)
+	err := repo.Reserve(productID, 30)
 	if err != nil {
 		t.Fatalf("Failed to reserve inventory: %v", err)
 	}
 
-	found, _ := repo.FindByProductID(1)
+	found, _ := repo.FindByProductID(productID)
 	// Quantity should decrease: 100 - 30 = 70
 	if found.Quantity != 70 {
 		t.Errorf("Expected quantity 70, got %d", found.Quantity)

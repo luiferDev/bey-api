@@ -4,10 +4,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
+
 	"bey/internal/config"
 	"bey/internal/shared/response"
-
-	"github.com/gin-gonic/gin"
 )
 
 // @Summary User login
@@ -203,18 +204,23 @@ func HandleResetPassword(authService AuthServiceInterface, responseHandler *resp
 // @Router /api/v1/auth/2fa/setup [post]
 func HandleSetup2FA(authService AuthServiceInterface, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID, exists := c.Get("user_id")
+		userIDStr, exists := c.Get("user_id")
 		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
-		userIDUint, ok := userID.(uint)
+		rawID, ok := userIDStr.(string)
 		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID type"})
+			return
+		}
+		userID, err := uuid.FromString(rawID)
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID"})
 			return
 		}
 
-		resp, err := authService.SetupTwoFactor(c.Request.Context(), userIDUint)
+		resp, err := authService.SetupTwoFactor(c.Request.Context(), userID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to setup two-factor authentication"})
 			return
@@ -235,13 +241,18 @@ func HandleSetup2FA(authService AuthServiceInterface, responseHandler *response.
 // @Router /api/v1/auth/2fa/enable [post]
 func HandleEnable2FA(authService AuthServiceInterface, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID, exists := c.Get("user_id")
+		userIDStr, exists := c.Get("user_id")
 		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
-		userIDUint, ok := userID.(uint)
+		rawID, ok := userIDStr.(string)
 		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID type"})
+			return
+		}
+		userID, err := uuid.FromString(rawID)
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID"})
 			return
 		}
@@ -252,7 +263,7 @@ func HandleEnable2FA(authService AuthServiceInterface, responseHandler *response
 			return
 		}
 
-		resp, err := authService.EnableTwoFactor(c.Request.Context(), userIDUint, req.Code)
+		resp, err := authService.EnableTwoFactor(c.Request.Context(), userID, req.Code)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid verification code"})
 			return
@@ -273,13 +284,18 @@ func HandleEnable2FA(authService AuthServiceInterface, responseHandler *response
 // @Router /api/v1/auth/2fa/disable [post]
 func HandleDisable2FA(authService AuthServiceInterface, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID, exists := c.Get("user_id")
+		userIDStr, exists := c.Get("user_id")
 		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
-		userIDUint, ok := userID.(uint)
+		rawID, ok := userIDStr.(string)
 		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID type"})
+			return
+		}
+		userID, err := uuid.FromString(rawID)
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID"})
 			return
 		}
@@ -290,7 +306,7 @@ func HandleDisable2FA(authService AuthServiceInterface, responseHandler *respons
 			return
 		}
 
-		if err := authService.DisableTwoFactor(c.Request.Context(), userIDUint, req.Code, req.BackupCode); err != nil {
+		if err := authService.DisableTwoFactor(c.Request.Context(), userID, req.Code, req.BackupCode); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid verification code"})
 			return
 		}
@@ -310,13 +326,18 @@ func HandleDisable2FA(authService AuthServiceInterface, responseHandler *respons
 // @Router /api/v1/auth/2fa/verify [post]
 func HandleVerify2FA(authService AuthServiceInterface, responseHandler *response.ResponseHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID, exists := c.Get("user_id")
+		userIDStr, exists := c.Get("user_id")
 		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
-		userIDUint, ok := userID.(uint)
+		rawID, ok := userIDStr.(string)
 		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID type"})
+			return
+		}
+		userID, err := uuid.FromString(rawID)
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID"})
 			return
 		}
@@ -327,7 +348,7 @@ func HandleVerify2FA(authService AuthServiceInterface, responseHandler *response
 			return
 		}
 
-		valid, err := authService.VerifyTwoFactor(c.Request.Context(), userIDUint, req.Code)
+		valid, err := authService.VerifyTwoFactor(c.Request.Context(), userID, req.Code)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "verification failed"})
 			return

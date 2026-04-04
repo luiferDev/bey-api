@@ -126,7 +126,7 @@ func seedAdminUser(db *gorm.DB, cfg *config.Config) error {
 		return fmt.Errorf("failed to seed admin user: %w", err)
 	}
 
-	log.Printf("Admin user seeded successfully: %s", adminEmail)
+	log.Printf("Admin user seeded successfully: %s (password: %s)", adminEmail, adminPassword)
 	return nil
 }
 

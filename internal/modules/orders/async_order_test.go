@@ -11,6 +11,7 @@ import (
 	"bey/internal/concurrency"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -35,6 +36,10 @@ func setupOrderTestRouter(t *testing.T) (*gin.Engine, *OrderService) {
 	orderService := NewOrderServiceWithTaskQueue(orderRepo, taskQueue)
 
 	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", uuid.Must(uuid.NewV7()).String())
+		c.Next()
+	})
 	api := router.Group("/api/v1")
 	RegisterRoutesWithService(api, db, orderService)
 
@@ -48,8 +53,8 @@ func TestAsyncOrderCreation_SubmitOrder(t *testing.T) {
 		ShippingAddress: "123 Main St",
 		Notes:           "Test order",
 		Items: []CreateOrderItemRequest{
-			{ProductID: 1, Quantity: 2},
-			{ProductID: 2, Quantity: 1},
+			{ProductID: uuid.Must(uuid.NewV7()).String(), Quantity: 2},
+			{ProductID: uuid.Must(uuid.NewV7()).String(), Quantity: 1},
 		},
 	}
 
@@ -108,11 +113,11 @@ func TestAsyncOrderCreation_OrderProcessing(t *testing.T) {
 	orderReq := CreateOrderRequest{
 		ShippingAddress: "123 Main St",
 		Items: []CreateOrderItemRequest{
-			{ProductID: 1, Quantity: 2},
+			{ProductID: uuid.Must(uuid.NewV7()).String(), Quantity: 2},
 		},
 	}
 
-	taskID, err := orderService.SubmitAsyncOrder(orderReq, 1)
+	taskID, err := orderService.SubmitAsyncOrder(orderReq, uuid.Must(uuid.NewV7()))
 	if err != nil {
 		t.Fatalf("Failed to submit async order: %v", err)
 	}
@@ -140,13 +145,17 @@ func TestAsyncOrderCreation_WithoutTaskQueue(t *testing.T) {
 	orderService := NewOrderService(nil)
 
 	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", uuid.Must(uuid.NewV7()).String())
+		c.Next()
+	})
 	api := router.Group("/api/v1")
 	RegisterRoutesWithService(api, db, orderService)
 
 	orderReq := CreateOrderRequest{
 		ShippingAddress: "123 Main St",
 		Items: []CreateOrderItemRequest{
-			{ProductID: 1, Quantity: 2},
+			{ProductID: uuid.Must(uuid.NewV7()).String(), Quantity: 2},
 		},
 	}
 
@@ -158,7 +167,7 @@ func TestAsyncOrderCreation_WithoutTaskQueue(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusInternalServerError {
-		t.Errorf("Expected status 500 when task queue not configured, got %d", w.Code)
+		t.Errorf("Expected status 500 when task queue not configured, got %d. Body: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -171,7 +180,7 @@ func TestAsyncOrderCreation_MultipleOrders(t *testing.T) {
 		orderReq := CreateOrderRequest{
 			ShippingAddress: "Address " + string(rune('0'+i)),
 			Items: []CreateOrderItemRequest{
-				{ProductID: 1, Quantity: i + 1},
+				{ProductID: uuid.Must(uuid.NewV7()).String(), Quantity: i + 1},
 			},
 		}
 

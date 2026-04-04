@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/redis/go-redis/v9"
 
 	"bey/internal/config"
@@ -41,11 +42,11 @@ func NewRedisCartRepository(cfg config.CartConfig) (*RedisCartRepository, error)
 	}, nil
 }
 
-func (r *RedisCartRepository) cartKey(userID uint) string {
-	return fmt.Sprintf("cart:%d", userID)
+func (r *RedisCartRepository) cartKey(userID uuid.UUID) string {
+	return fmt.Sprintf("cart:%s", userID.String())
 }
 
-func (r *RedisCartRepository) GetCart(userID uint) (*Cart, error) {
+func (r *RedisCartRepository) GetCart(userID uuid.UUID) (*Cart, error) {
 	key := r.cartKey(userID)
 	data, err := r.client.Get(r.ctx, key).Bytes()
 	if err == redis.Nil {
@@ -80,12 +81,12 @@ func (r *RedisCartRepository) SaveCart(cart *Cart) error {
 	return nil
 }
 
-func (r *RedisCartRepository) DeleteCart(userID uint) error {
+func (r *RedisCartRepository) DeleteCart(userID uuid.UUID) error {
 	key := r.cartKey(userID)
 	return r.client.Del(r.ctx, key).Err()
 }
 
-func (r *RedisCartRepository) ExtendTTL(userID uint) error {
+func (r *RedisCartRepository) ExtendTTL(userID uuid.UUID) error {
 	key := r.cartKey(userID)
 	return r.client.Expire(r.ctx, key, r.ttl).Err()
 }

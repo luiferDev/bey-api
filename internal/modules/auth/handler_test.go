@@ -7,14 +7,16 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 
 	"bey/internal/config"
 	"bey/internal/shared/response"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
 )
+
+var testUserID = uuid.Must(uuid.NewV7()).String()
 
 type MockAuthService struct {
 	loginFunc              func(ctx context.Context, email, password string) (*LoginResponse, error)
@@ -24,10 +26,10 @@ type MockAuthService struct {
 	resendVerificationFunc func(ctx context.Context, email string) error
 	forgotPasswordFunc     func(ctx context.Context, email string) error
 	resetPasswordFunc      func(ctx context.Context, token, newPassword string) error
-	setupTwoFactorFunc     func(ctx context.Context, userID uint) (*TwoFASetupResponse, error)
-	enableTwoFactorFunc    func(ctx context.Context, userID uint, code string) (*TwoFAEnableResponse, error)
-	disableTwoFactorFunc   func(ctx context.Context, userID uint, code, backupCode string) error
-	verifyTwoFactorFunc    func(ctx context.Context, userID uint, code string) (bool, error)
+	setupTwoFactorFunc     func(ctx context.Context, userID uuid.UUID) (*TwoFASetupResponse, error)
+	enableTwoFactorFunc    func(ctx context.Context, userID uuid.UUID, code string) (*TwoFAEnableResponse, error)
+	disableTwoFactorFunc   func(ctx context.Context, userID uuid.UUID, code, backupCode string) error
+	verifyTwoFactorFunc    func(ctx context.Context, userID uuid.UUID, code string) (bool, error)
 	loginWith2FAFunc       func(ctx context.Context, tempToken, code string) (*TokenResponse, error)
 }
 
@@ -84,28 +86,28 @@ func (m *MockAuthService) ResetPassword(ctx context.Context, token, newPassword 
 	return nil
 }
 
-func (m *MockAuthService) SetupTwoFactor(ctx context.Context, userID uint) (*TwoFASetupResponse, error) {
+func (m *MockAuthService) SetupTwoFactor(ctx context.Context, userID uuid.UUID) (*TwoFASetupResponse, error) {
 	if m.setupTwoFactorFunc != nil {
 		return m.setupTwoFactorFunc(ctx, userID)
 	}
 	return nil, nil
 }
 
-func (m *MockAuthService) EnableTwoFactor(ctx context.Context, userID uint, code string) (*TwoFAEnableResponse, error) {
+func (m *MockAuthService) EnableTwoFactor(ctx context.Context, userID uuid.UUID, code string) (*TwoFAEnableResponse, error) {
 	if m.enableTwoFactorFunc != nil {
 		return m.enableTwoFactorFunc(ctx, userID, code)
 	}
 	return nil, nil
 }
 
-func (m *MockAuthService) DisableTwoFactor(ctx context.Context, userID uint, code, backupCode string) error {
+func (m *MockAuthService) DisableTwoFactor(ctx context.Context, userID uuid.UUID, code, backupCode string) error {
 	if m.disableTwoFactorFunc != nil {
 		return m.disableTwoFactorFunc(ctx, userID, code, backupCode)
 	}
 	return nil
 }
 
-func (m *MockAuthService) VerifyTwoFactor(ctx context.Context, userID uint, code string) (bool, error) {
+func (m *MockAuthService) VerifyTwoFactor(ctx context.Context, userID uuid.UUID, code string) (bool, error) {
 	if m.verifyTwoFactorFunc != nil {
 		return m.verifyTwoFactorFunc(ctx, userID, code)
 	}
@@ -128,10 +130,7 @@ func setupAuthTestRouter(mockSvc *MockAuthService, cfg *config.Config) *gin.Engi
 
 	router.Use(func(c *gin.Context) {
 		if userIDStr := c.GetHeader("X-User-ID"); userIDStr != "" {
-			userID, err := strconv.ParseUint(userIDStr, 10, 32)
-			if err == nil {
-				c.Set("user_id", uint(userID))
-			}
+			c.Set("user_id", userIDStr)
 		}
 		c.Next()
 	})
@@ -162,8 +161,8 @@ func makeAuthRequest(router *gin.Engine, method, path, body string, userID *uint
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if userID != nil {
-		req.Header.Set("X-User-ID", "1")
-		w.Header().Set("X-User-ID", "1")
+		req.Header.Set("X-User-ID", uuid.Must(uuid.NewV7()).String())
+		w.Header().Set("X-User-ID", uuid.Must(uuid.NewV7()).String())
 	}
 	router.ServeHTTP(w, req)
 	return w
@@ -796,7 +795,7 @@ func TestHandleSetup2FA_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &MockAuthService{
-		setupTwoFactorFunc: func(ctx context.Context, userID uint) (*TwoFASetupResponse, error) {
+		setupTwoFactorFunc: func(ctx context.Context, userID uuid.UUID) (*TwoFASetupResponse, error) {
 			return &TwoFASetupResponse{
 				Secret:          "TESTSECRET",
 				QRCode:          "base64qrcode",
@@ -810,7 +809,7 @@ func TestHandleSetup2FA_Success(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/setup", nil)
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -838,7 +837,7 @@ func TestHandleEnable2FA_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &MockAuthService{
-		enableTwoFactorFunc: func(ctx context.Context, userID uint, code string) (*TwoFAEnableResponse, error) {
+		enableTwoFactorFunc: func(ctx context.Context, userID uuid.UUID, code string) (*TwoFAEnableResponse, error) {
 			return &TwoFAEnableResponse{
 				Success:     true,
 				BackupCodes: []string{"code1", "code2"},
@@ -853,7 +852,7 @@ func TestHandleEnable2FA_Success(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/enable",
 		bytes.NewBufferString(`{"code":"123456"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -883,7 +882,7 @@ func TestHandleEnable2FA_InvalidCode(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &MockAuthService{
-		enableTwoFactorFunc: func(ctx context.Context, userID uint, code string) (*TwoFAEnableResponse, error) {
+		enableTwoFactorFunc: func(ctx context.Context, userID uuid.UUID, code string) (*TwoFAEnableResponse, error) {
 			return nil, errors.New("invalid verification code")
 		},
 	}
@@ -895,7 +894,7 @@ func TestHandleEnable2FA_InvalidCode(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/enable",
 		bytes.NewBufferString(`{"code":"wrongcode"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
@@ -914,7 +913,7 @@ func TestHandleEnable2FA_MissingCode(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/enable",
 		bytes.NewBufferString(`{}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
@@ -926,7 +925,7 @@ func TestHandleDisable2FA_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &MockAuthService{
-		disableTwoFactorFunc: func(ctx context.Context, userID uint, code, backupCode string) error {
+		disableTwoFactorFunc: func(ctx context.Context, userID uuid.UUID, code, backupCode string) error {
 			return nil
 		},
 	}
@@ -938,7 +937,7 @@ func TestHandleDisable2FA_Success(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/disable",
 		bytes.NewBufferString(`{"code":"123456"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -968,7 +967,7 @@ func TestHandleDisable2FA_InvalidCode(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &MockAuthService{
-		disableTwoFactorFunc: func(ctx context.Context, userID uint, code, backupCode string) error {
+		disableTwoFactorFunc: func(ctx context.Context, userID uuid.UUID, code, backupCode string) error {
 			return errors.New("invalid verification code")
 		},
 	}
@@ -980,7 +979,7 @@ func TestHandleDisable2FA_InvalidCode(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/disable",
 		bytes.NewBufferString(`{"code":"wrongcode"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
@@ -992,7 +991,7 @@ func TestHandleVerify2FA_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &MockAuthService{
-		verifyTwoFactorFunc: func(ctx context.Context, userID uint, code string) (bool, error) {
+		verifyTwoFactorFunc: func(ctx context.Context, userID uuid.UUID, code string) (bool, error) {
 			return true, nil
 		},
 	}
@@ -1004,7 +1003,7 @@ func TestHandleVerify2FA_Success(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/verify",
 		bytes.NewBufferString(`{"code":"123456"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -1030,7 +1029,7 @@ func TestHandleVerify2FA_InvalidCode(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &MockAuthService{
-		verifyTwoFactorFunc: func(ctx context.Context, userID uint, code string) (bool, error) {
+		verifyTwoFactorFunc: func(ctx context.Context, userID uuid.UUID, code string) (bool, error) {
 			return false, nil
 		},
 	}
@@ -1042,7 +1041,7 @@ func TestHandleVerify2FA_InvalidCode(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/verify",
 		bytes.NewBufferString(`{"code":"wrongcode"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -1079,7 +1078,7 @@ func TestHandleVerify2FA_MissingCode(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/v1/auth/2fa/verify",
 		bytes.NewBufferString(`{}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("X-User-ID", testUserID)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {

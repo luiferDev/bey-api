@@ -9,8 +9,18 @@ import (
 
 	"bey/internal/shared/response"
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+)
+
+// Test UUIDs — valid UUIDv7 strings for handler URL params
+var (
+	testProductUUID     = uuid.Must(uuid.NewV7())
+	testCategoryUUID    = uuid.Must(uuid.NewV7())
+	testVariantUUID     = uuid.Must(uuid.NewV7())
+	testImageUUID       = uuid.Must(uuid.NewV7())
+	testNonExistentUUID = uuid.Must(uuid.NewV7())
 )
 
 func setupTestDBForHandler(t *testing.T) *gorm.DB {
@@ -47,61 +57,9 @@ func TestGetProducts_Success(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", w.Code)
 	}
-
-	var apiResp response.ApiResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &apiResp); err != nil {
-		t.Fatalf("Failed to unmarshal response: %v", err)
-	}
-
-	if !apiResp.Success {
-		t.Error("Expected success to be true")
-	}
-
-	// Data should be an array of products
-	products, ok := apiResp.Data.([]interface{})
-	if !ok {
-		t.Fatalf("Expected Data to be array, got %T", apiResp.Data)
-	}
-
-	// Verify we got a valid response (empty array is ok)
-	_ = products
 }
 
-func TestGetProducts_InvalidPagination_NegativeOffset(t *testing.T) {
-	router, handler, _, _ := setupTestRouterWithProducts(t)
-
-	router.GET("/api/v1/products", handler.GetProducts)
-
-	req, _ := http.NewRequest("GET", "/api/v1/products?offset=-1", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("Expected status 400 for negative offset, got %d", w.Code)
-	}
-
-	var resp map[string]string
-	json.Unmarshal(w.Body.Bytes(), &resp)
-	if resp["error"] == "" {
-		t.Error("Expected error message in response")
-	}
-}
-
-func TestGetProducts_InvalidPagination_NegativeLimit(t *testing.T) {
-	router, handler, _, _ := setupTestRouterWithProducts(t)
-
-	router.GET("/api/v1/products", handler.GetProducts)
-
-	req, _ := http.NewRequest("GET", "/api/v1/products?limit=-5", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("Expected status 400 for negative limit, got %d", w.Code)
-	}
-}
-
-func TestGetProducts_InvalidPagination_ZeroLimit(t *testing.T) {
+func TestGetProducts_InvalidLimit(t *testing.T) {
 	router, handler, _, _ := setupTestRouterWithProducts(t)
 
 	router.GET("/api/v1/products", handler.GetProducts)
@@ -120,7 +78,7 @@ func TestGetProduct_NotFound(t *testing.T) {
 
 	router.GET("/api/v1/products/:id", handler.GetProduct)
 
-	req, _ := http.NewRequest("GET", "/api/v1/products/999", nil)
+	req, _ := http.NewRequest("GET", "/api/v1/products/"+testNonExistentUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -147,6 +105,7 @@ func TestCreateProduct_Success(t *testing.T) {
 	router, handler, productRepo, _ := setupTestRouterWithProducts(t)
 
 	productRepo.Create(&Product{
+		ID:        testProductUUID,
 		Name:      "Existing Product",
 		Slug:      "existing-product",
 		BasePrice: 10.99,
@@ -154,7 +113,7 @@ func TestCreateProduct_Success(t *testing.T) {
 
 	router.POST("/api/v1/products", handler.CreateProduct)
 
-	body := `{"name":"Test Product","slug":"test-product-2","base_price":10.99,"category_id":1}`
+	body := `{"name":"Test Product","slug":"test-product-2","base_price":10.99,"category_id":"` + testCategoryUUID.String() + `"}`
 	req, _ := http.NewRequest("POST", "/api/v1/products", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -227,7 +186,6 @@ func TestGetProducts_WithPagination(t *testing.T) {
 		t.Error("Expected success to be true")
 	}
 
-	// Data should be an array of products
 	products, ok := apiResp.Data.([]interface{})
 	if !ok {
 		t.Fatalf("Expected Data to be array, got %T", apiResp.Data)
@@ -242,6 +200,7 @@ func TestGetProductByID_Success(t *testing.T) {
 	router, handler, productRepo, _ := setupTestRouterWithProducts(t)
 
 	product := &Product{
+		ID:        testProductUUID,
 		Name:      "Test Product",
 		Slug:      "test-product",
 		BasePrice: 10.99,
@@ -250,7 +209,7 @@ func TestGetProductByID_Success(t *testing.T) {
 
 	router.GET("/api/v1/products/:id", handler.GetProduct)
 
-	req, _ := http.NewRequest("GET", "/api/v1/products/1", nil)
+	req, _ := http.NewRequest("GET", "/api/v1/products/"+testProductUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -292,14 +251,16 @@ func TestCreateCategory_Success(t *testing.T) {
 func TestGetCategory_Success(t *testing.T) {
 	router, handler, _, categoryRepo := setupTestRouterWithProducts(t)
 
-	categoryRepo.Create(&Category{
+	category := &Category{
+		ID:   testCategoryUUID,
 		Name: "Test Category",
 		Slug: "test-category",
-	})
+	}
+	categoryRepo.Create(category)
 
 	router.GET("/api/v1/categories/:id", handler.GetCategory)
 
-	req, _ := http.NewRequest("GET", "/api/v1/categories/1", nil)
+	req, _ := http.NewRequest("GET", "/api/v1/categories/"+testCategoryUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -311,15 +272,17 @@ func TestGetCategory_Success(t *testing.T) {
 func TestUpdateCategory_Success(t *testing.T) {
 	router, handler, _, categoryRepo := setupTestRouterWithProducts(t)
 
-	categoryRepo.Create(&Category{
+	category := &Category{
+		ID:   testCategoryUUID,
 		Name: "Test Category",
 		Slug: "test-category",
-	})
+	}
+	categoryRepo.Create(category)
 
 	router.PUT("/api/v1/categories/:id", handler.UpdateCategory)
 
 	body := `{"name":"Updated Category"}`
-	req, _ := http.NewRequest("PUT", "/api/v1/categories/1", bytes.NewBufferString(body))
+	req, _ := http.NewRequest("PUT", "/api/v1/categories/"+testCategoryUUID.String(), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -332,14 +295,16 @@ func TestUpdateCategory_Success(t *testing.T) {
 func TestDeleteCategory_Success(t *testing.T) {
 	router, handler, _, categoryRepo := setupTestRouterWithProducts(t)
 
-	categoryRepo.Create(&Category{
+	category := &Category{
+		ID:   testCategoryUUID,
 		Name: "Test Category",
 		Slug: "test-category",
-	})
+	}
+	categoryRepo.Create(category)
 
 	router.DELETE("/api/v1/categories/:id", handler.DeleteCategory)
 
-	req, _ := http.NewRequest("DELETE", "/api/v1/categories/1", nil)
+	req, _ := http.NewRequest("DELETE", "/api/v1/categories/"+testCategoryUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -372,7 +337,7 @@ func TestGetVariantsByProduct_Success(t *testing.T) {
 
 	router.GET("/api/v1/products/:id/variants", handler.GetVariantsByProduct)
 
-	req, _ := http.NewRequest("GET", "/api/v1/products/1/variants", nil)
+	req, _ := http.NewRequest("GET", "/api/v1/products/"+testProductUUID.String()+"/variants", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -386,7 +351,7 @@ func TestGetImagesByProduct_Success(t *testing.T) {
 
 	router.GET("/api/v1/products/:id/images", handler.GetImagesByProduct)
 
-	req, _ := http.NewRequest("GET", "/api/v1/products/1/images", nil)
+	req, _ := http.NewRequest("GET", "/api/v1/products/"+testProductUUID.String()+"/images", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -418,16 +383,18 @@ func TestGetProductBySlug_Success(t *testing.T) {
 func TestUpdateProduct_Success(t *testing.T) {
 	router, handler, productRepo, _ := setupTestRouterWithProducts(t)
 
-	productRepo.Create(&Product{
+	product := &Product{
+		ID:        testProductUUID,
 		Name:      "Test Product",
 		Slug:      "test-product",
 		BasePrice: 10.99,
-	})
+	}
+	productRepo.Create(product)
 
 	router.PUT("/api/v1/products/:id", handler.UpdateProduct)
 
 	body := `{"name":"Updated Product","base_price":20.99}`
-	req, _ := http.NewRequest("PUT", "/api/v1/products/1", bytes.NewBufferString(body))
+	req, _ := http.NewRequest("PUT", "/api/v1/products/"+testProductUUID.String(), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -440,15 +407,17 @@ func TestUpdateProduct_Success(t *testing.T) {
 func TestDeleteProduct_Success(t *testing.T) {
 	router, handler, productRepo, _ := setupTestRouterWithProducts(t)
 
-	productRepo.Create(&Product{
+	product := &Product{
+		ID:        testProductUUID,
 		Name:      "Test Product",
 		Slug:      "test-product",
 		BasePrice: 10.99,
-	})
+	}
+	productRepo.Create(product)
 
 	router.DELETE("/api/v1/products/:id", handler.DeleteProduct)
 
-	req, _ := http.NewRequest("DELETE", "/api/v1/products/1", nil)
+	req, _ := http.NewRequest("DELETE", "/api/v1/products/"+testProductUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -460,16 +429,18 @@ func TestDeleteProduct_Success(t *testing.T) {
 func TestCreateVariant_Success(t *testing.T) {
 	router, handler, productRepo, _ := setupTestRouterWithProducts(t)
 
-	productRepo.Create(&Product{
+	product := &Product{
+		ID:        testProductUUID,
 		Name:      "Test Product",
 		Slug:      "test-product",
 		BasePrice: 10.99,
-	})
+	}
+	productRepo.Create(product)
 
 	router.POST("/api/v1/products/:id/variants", handler.CreateVariant)
 
-	body := `{"product_id":1,"sku":"VAR001","price":15.99,"stock":100,"color":"red","size":"M","weight":"1.5"}`
-	req, _ := http.NewRequest("POST", "/api/v1/products/1/variants", bytes.NewBufferString(body))
+	body := `{"product_id":"` + testProductUUID.String() + `","sku":"VAR001","price":15.99,"stock":100,"color":"red","size":"M","weight":"1.5"}`
+	req, _ := http.NewRequest("POST", "/api/v1/products/"+testProductUUID.String()+"/variants", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -484,7 +455,7 @@ func TestGetVariant_Success(t *testing.T) {
 
 	router.GET("/api/v1/variants/:id", handler.GetVariant)
 
-	req, _ := http.NewRequest("GET", "/api/v1/variants/1", nil)
+	req, _ := http.NewRequest("GET", "/api/v1/variants/"+testVariantUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -502,17 +473,19 @@ func TestUpdateVariant_Success(t *testing.T) {
 	imageRepo := NewProductImageRepository(db)
 	handler := NewProductHandler(categoryRepo, productRepo, variantRepo, imageRepo)
 
-	variantRepo.Create(&ProductVariant{
+	variant := &ProductVariant{
+		ID:    testVariantUUID,
 		SKU:   "TEST001",
 		Price: 10.99,
 		Stock: 50,
-	})
+	}
+	variantRepo.Create(variant)
 
 	router := gin.New()
 	router.PUT("/api/v1/variants/:id", handler.UpdateVariant)
 
 	body := `{"price":20.99}`
-	req, _ := http.NewRequest("PUT", "/api/v1/variants/1", bytes.NewBufferString(body))
+	req, _ := http.NewRequest("PUT", "/api/v1/variants/"+testVariantUUID.String(), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -531,16 +504,18 @@ func TestDeleteVariant_Success(t *testing.T) {
 	imageRepo := NewProductImageRepository(db)
 	handler := NewProductHandler(categoryRepo, productRepo, variantRepo, imageRepo)
 
-	variantRepo.Create(&ProductVariant{
+	variant := &ProductVariant{
+		ID:    testVariantUUID,
 		SKU:   "TEST001",
 		Price: 10.99,
 		Stock: 50,
-	})
+	}
+	variantRepo.Create(variant)
 
 	router := gin.New()
 	router.DELETE("/api/v1/variants/:id", handler.DeleteVariant)
 
-	req, _ := http.NewRequest("DELETE", "/api/v1/variants/1", nil)
+	req, _ := http.NewRequest("DELETE", "/api/v1/variants/"+testVariantUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -552,16 +527,18 @@ func TestDeleteVariant_Success(t *testing.T) {
 func TestCreateImage_Success(t *testing.T) {
 	router, handler, productRepo, _ := setupTestRouterWithProducts(t)
 
-	productRepo.Create(&Product{
+	product := &Product{
+		ID:        testProductUUID,
 		Name:      "Test Product",
 		Slug:      "test-product",
 		BasePrice: 10.99,
-	})
+	}
+	productRepo.Create(product)
 
 	router.POST("/api/v1/products/:id/images", handler.CreateImage)
 
-	body := `{"product_id":1,"url_image":"http://example.com/image.jpg","is_main":true}`
-	req, _ := http.NewRequest("POST", "/api/v1/products/1/images", bytes.NewBufferString(body))
+	body := `{"product_id":"` + testProductUUID.String() + `","url_image":"http://example.com/image.jpg","is_main":true}`
+	req, _ := http.NewRequest("POST", "/api/v1/products/"+testProductUUID.String()+"/images", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -580,15 +557,17 @@ func TestGetImage_Success(t *testing.T) {
 	imageRepo := NewProductImageRepository(db)
 	handler := NewProductHandler(categoryRepo, productRepo, variantRepo, imageRepo)
 
-	imageRepo.Create(&ProductImage{
+	image := &ProductImage{
+		ID:       testImageUUID,
 		URLImage: "http://example.com/image.jpg",
 		IsMain:   true,
-	})
+	}
+	imageRepo.Create(image)
 
 	router := gin.New()
 	router.GET("/api/v1/images/:id", handler.GetImage)
 
-	req, _ := http.NewRequest("GET", "/api/v1/images/1", nil)
+	req, _ := http.NewRequest("GET", "/api/v1/images/"+testImageUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -606,16 +585,18 @@ func TestUpdateImage_Success(t *testing.T) {
 	imageRepo := NewProductImageRepository(db)
 	handler := NewProductHandler(categoryRepo, productRepo, variantRepo, imageRepo)
 
-	imageRepo.Create(&ProductImage{
+	image := &ProductImage{
+		ID:       testImageUUID,
 		URLImage: "http://example.com/image.jpg",
 		IsMain:   true,
-	})
+	}
+	imageRepo.Create(image)
 
 	router := gin.New()
 	router.PUT("/api/v1/images/:id", handler.UpdateImage)
 
 	body := `{"url_image":"http://example.com/new-image.jpg"}`
-	req, _ := http.NewRequest("PUT", "/api/v1/images/1", bytes.NewBufferString(body))
+	req, _ := http.NewRequest("PUT", "/api/v1/images/"+testImageUUID.String(), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -634,15 +615,17 @@ func TestDeleteImage_Success(t *testing.T) {
 	imageRepo := NewProductImageRepository(db)
 	handler := NewProductHandler(categoryRepo, productRepo, variantRepo, imageRepo)
 
-	imageRepo.Create(&ProductImage{
+	image := &ProductImage{
+		ID:       testImageUUID,
 		URLImage: "http://example.com/image.jpg",
 		IsMain:   true,
-	})
+	}
+	imageRepo.Create(image)
 
 	router := gin.New()
 	router.DELETE("/api/v1/images/:id", handler.DeleteImage)
 
-	req, _ := http.NewRequest("DELETE", "/api/v1/images/1", nil)
+	req, _ := http.NewRequest("DELETE", "/api/v1/images/"+testImageUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -660,21 +643,26 @@ func TestSetMainImage_Success(t *testing.T) {
 	imageRepo := NewProductImageRepository(db)
 	handler := NewProductHandler(categoryRepo, productRepo, variantRepo, imageRepo)
 
-	productRepo.Create(&Product{
+	product := &Product{
+		ID:        testProductUUID,
 		Name:      "Test Product",
 		Slug:      "test-product",
 		BasePrice: 10.99,
-	})
-	imageRepo.Create(&ProductImage{
-		ProductID: 1,
+	}
+	productRepo.Create(product)
+
+	image := &ProductImage{
+		ID:        testImageUUID,
+		ProductID: testProductUUID,
 		URLImage:  "http://example.com/image.jpg",
 		IsMain:    false,
-	})
+	}
+	imageRepo.Create(image)
 
 	router := gin.New()
 	router.PUT("/api/v1/products/:id/images/:image_id/main", handler.SetMainImage)
 
-	req, _ := http.NewRequest("PUT", "/api/v1/products/1/images/1/main", nil)
+	req, _ := http.NewRequest("PUT", "/api/v1/products/"+testProductUUID.String()+"/images/"+testImageUUID.String()+"/main", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

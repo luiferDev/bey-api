@@ -3,10 +3,13 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
 
 	"bey/internal/concurrency"
@@ -276,7 +279,184 @@ func (c *Config) GetAdminPassword() string {
 	return c.App.AdminPassword
 }
 
+// splitAndTrim splits a string by separator and trims whitespace from each part.
+func splitAndTrim(s, sep string) []string {
+	parts := []string{}
+	for _, p := range strings.Split(s, sep) {
+		parts = append(parts, strings.TrimSpace(p))
+	}
+	return parts
+}
+
+// applyEnvOverrides overrides sensitive config fields with environment variables.
+// This ensures secrets are never stored in config.yaml — they come from .env or
+// real environment variables in production.
+func (c *Config) applyEnvOverrides() {
+	// Database
+	if v := os.Getenv("DB_HOST"); v != "" {
+		c.Database.Host = v
+	}
+	if v := os.Getenv("DB_PORT"); v != "" {
+		fmt.Sscanf(v, "%d", &c.Database.Port)
+	}
+	if v := os.Getenv("DB_USER"); v != "" {
+		c.Database.User = v
+	}
+	if v := os.Getenv("DB_PASSWORD"); v != "" {
+		c.Database.Password = v
+	}
+	if v := os.Getenv("DB_NAME"); v != "" {
+		c.Database.Name = v
+	}
+
+	// Admin
+	if v := os.Getenv("ADMIN_EMAIL"); v != "" {
+		c.App.AdminEmail = v
+	}
+	if v := os.Getenv("ADMIN_PASSWORD"); v != "" {
+		c.App.AdminPassword = v
+	}
+
+	// JWT / Security
+	if v := os.Getenv("JWT_SECRET"); v != "" {
+		c.Security.JWTSecret = v
+	}
+	if v := os.Getenv("JWT_EXPIRY_HOURS"); v != "" {
+		fmt.Sscanf(v, "%d", &c.Security.JWTExpiryHours)
+	}
+	if v := os.Getenv("JWT_ACCESS_EXPIRY"); v != "" {
+		c.Security.JWTAccessExpiry, _ = time.ParseDuration(v)
+	}
+	if v := os.Getenv("JWT_REFRESH_EXPIRY"); v != "" {
+		c.Security.JWTRefreshExpiry, _ = time.ParseDuration(v)
+	}
+	if v := os.Getenv("JWT_ISSUER"); v != "" {
+		c.Security.JWTIssuer = v
+	}
+	if v := os.Getenv("JWT_ALGORITHM"); v != "" {
+		c.Security.JWTAlgorithm = v
+	}
+
+	// CORS
+	if v := os.Getenv("ALLOWED_ORIGINS"); v != "" {
+		c.Security.AllowedOrigins = nil
+		for _, origin := range splitAndTrim(v, ",") {
+			if origin != "" {
+				c.Security.AllowedOrigins = append(c.Security.AllowedOrigins, origin)
+			}
+		}
+	}
+
+	// SMTP
+	if v := os.Getenv("SMTP_HOST"); v != "" {
+		c.Email.SMTP.Host = v
+	}
+	if v := os.Getenv("SMTP_PORT"); v != "" {
+		fmt.Sscanf(v, "%d", &c.Email.SMTP.Port)
+	}
+	if v := os.Getenv("SMTP_USERNAME"); v != "" {
+		c.Email.SMTP.Username = v
+	}
+	if v := os.Getenv("SMTP_PASSWORD"); v != "" {
+		c.Email.SMTP.Password = v
+	}
+	if v := os.Getenv("EMAIL_FROM_NAME"); v != "" {
+		c.Email.FromName = v
+	}
+	if v := os.Getenv("EMAIL_FROM_EMAIL"); v != "" {
+		c.Email.FromEmail = v
+	}
+
+	// OAuth Google
+	if v := os.Getenv("GOOGLE_OAUTH_CLIENT_ID"); v != "" {
+		c.OAuth.Google.ClientID = v
+	}
+	if v := os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"); v != "" {
+		c.OAuth.Google.ClientSecret = v
+	}
+	if v := os.Getenv("GOOGLE_OAUTH_REDIRECT_URL"); v != "" {
+		c.OAuth.Google.RedirectURL = v
+	}
+
+	// Wompi
+	if v := os.Getenv("WOMPI_ENVIRONMENT"); v != "" {
+		c.Wompi.Environment = v
+	}
+	if v := os.Getenv("WOMPI_BASE_URL"); v != "" {
+		c.Wompi.BaseURL = v
+	}
+	if v := os.Getenv("WOMPI_PUBLIC_KEY"); v != "" {
+		c.Wompi.PublicKey = v
+	}
+	if v := os.Getenv("WOMPI_PRIVATE_KEY"); v != "" {
+		c.Wompi.PrivateKey = v
+	}
+	if v := os.Getenv("WOMPI_EVENT_KEY"); v != "" {
+		c.Wompi.EventKey = v
+	}
+	if v := os.Getenv("WOMPI_INTEGRITY_KEY"); v != "" {
+		c.Wompi.IntegrityKey = v
+	}
+}
+
+// applyDefaults sets fallback values for env-driven fields when .env is missing.
+func (c *Config) applyDefaults() {
+	if c.App.AdminEmail == "" {
+		c.App.AdminEmail = "admin@bey.com"
+	}
+	if c.Database.Host == "" {
+		c.Database.Host = "postgres"
+	}
+	if c.Database.User == "" {
+		c.Database.User = "bey_user"
+	}
+	if c.Database.Name == "" {
+		c.Database.Name = "bey_db"
+	}
+	if c.Email.FromName == "" {
+		c.Email.FromName = "Bey API"
+	}
+	if c.Email.FromEmail == "" {
+		c.Email.FromEmail = "noreply@beyapi.com"
+	}
+	if c.Email.SMTP.Host == "" {
+		c.Email.SMTP.Host = "smtp.gmail.com"
+	}
+	if c.OAuth.Google.RedirectURL == "" {
+		c.OAuth.Google.RedirectURL = "http://localhost:8080/api/v1/auth/google/callback"
+	}
+	if c.Wompi.Environment == "" {
+		c.Wompi.Environment = "sandbox"
+	}
+	if c.Wompi.BaseURL == "" {
+		c.Wompi.BaseURL = c.Wompi.GetBaseURL()
+	}
+	if len(c.Security.AllowedOrigins) == 0 {
+		c.Security.AllowedOrigins = []string{"http://localhost:3000", "http://localhost:8080"}
+	}
+	if c.Security.JWTExpiryHours == 0 {
+		c.Security.JWTExpiryHours = 2
+	}
+	if c.Security.JWTAccessExpiry == 0 {
+		c.Security.JWTAccessExpiry = 15 * time.Minute
+	}
+	if c.Security.JWTRefreshExpiry == 0 {
+		c.Security.JWTRefreshExpiry = 168 * time.Hour
+	}
+	if c.Security.JWTIssuer == "" {
+		c.Security.JWTIssuer = "bey_api"
+	}
+	if c.Security.JWTAlgorithm == "" {
+		c.Security.JWTAlgorithm = "HS256"
+	}
+}
+
 func Load(path string) (*Config, error) {
+	// Load .env file if it exists (silent fail — env vars may already be set)
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Warning: .env file not found or could not be loaded: %v", err)
+	}
+
 	// Validate path to prevent path traversal attacks
 	absPath, err := filepath.Abs(path)
 	if err != nil {
@@ -292,6 +472,12 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
+
+	// Override sensitive config values with environment variables
+	cfg.applyEnvOverrides()
+
+	// Apply defaults for env-driven fields (fallback when .env is missing)
+	cfg.applyDefaults()
 
 	if cfg.Concurrency.WorkerPool.WorkerPoolSize == 0 {
 		cfg.Concurrency.WorkerPool.WorkerPoolSize = 4

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/gorm"
 )
 
@@ -23,13 +24,13 @@ func (r *PaymentRepository) Create(payment *Payment) error {
 	return nil
 }
 
-func (r *PaymentRepository) FindByID(id uint) (*Payment, error) {
+func (r *PaymentRepository) FindByID(id uuid.UUID) (*Payment, error) {
 	var payment Payment
 	if err := r.db.First(&payment, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		log.Printf("ERROR: Failed to find payment by id %d: %v", id, err)
+		log.Printf("ERROR: Failed to find payment by id %s: %v", id.String(), err)
 		return nil, err
 	}
 	return &payment, nil
@@ -59,10 +60,10 @@ func (r *PaymentRepository) FindByReference(reference string) (*Payment, error) 
 	return &payment, nil
 }
 
-func (r *PaymentRepository) FindByOrderID(orderID uint) ([]Payment, error) {
+func (r *PaymentRepository) FindByOrderID(orderID uuid.UUID) ([]Payment, error) {
 	var payments []Payment
 	if err := r.db.Where("order_id = ?", orderID).Find(&payments).Error; err != nil {
-		log.Printf("ERROR: Failed to find payments by order id %d: %v", orderID, err)
+		log.Printf("ERROR: Failed to find payments by order id %s: %v", orderID.String(), err)
 		return nil, err
 	}
 	return payments, nil
@@ -70,23 +71,23 @@ func (r *PaymentRepository) FindByOrderID(orderID uint) ([]Payment, error) {
 
 func (r *PaymentRepository) Update(payment *Payment) error {
 	if err := r.db.Save(payment).Error; err != nil {
-		log.Printf("ERROR: Failed to update payment %d: %v", payment.ID, err)
+		log.Printf("ERROR: Failed to update payment %s: %v", payment.ID.String(), err)
 		return err
 	}
 	return nil
 }
 
-func (r *PaymentRepository) UpdateStatus(id uint, status string) error {
+func (r *PaymentRepository) UpdateStatus(id uuid.UUID, status string) error {
 	if err := r.db.Model(&Payment{}).Where("id = ?", id).Update("status", status).Error; err != nil {
-		log.Printf("ERROR: Failed to update payment status %d: %v", id, err)
+		log.Printf("ERROR: Failed to update payment status %s: %v", id.String(), err)
 		return err
 	}
 	return nil
 }
 
-func (r *PaymentRepository) Delete(id uint) error {
+func (r *PaymentRepository) Delete(id uuid.UUID) error {
 	if err := r.db.Delete(&Payment{}, id).Error; err != nil {
-		log.Printf("ERROR: Failed to delete payment %d: %v", id, err)
+		log.Printf("ERROR: Failed to delete payment %s: %v", id.String(), err)
 		return err
 	}
 	return nil
@@ -108,13 +109,13 @@ func (r *PaymentLinkRepository) Create(link *PaymentLink) error {
 	return nil
 }
 
-func (r *PaymentLinkRepository) FindByID(id uint) (*PaymentLink, error) {
+func (r *PaymentLinkRepository) FindByID(id uuid.UUID) (*PaymentLink, error) {
 	var link PaymentLink
 	if err := r.db.First(&link, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		log.Printf("ERROR: Failed to find payment link by id %d: %v", id, err)
+		log.Printf("ERROR: Failed to find payment link by id %s: %v", id.String(), err)
 		return nil, err
 	}
 	return &link, nil
@@ -144,25 +145,25 @@ func (r *PaymentLinkRepository) FindByReference(reference string) (*PaymentLink,
 	return &link, nil
 }
 
-func (r *PaymentLinkRepository) FindByOrderID(orderID uint) (*PaymentLink, error) {
+func (r *PaymentLinkRepository) FindByOrderID(orderID uuid.UUID) (*PaymentLink, error) {
 	var link PaymentLink
 	if err := r.db.Where("order_id = ?", orderID).First(&link).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		log.Printf("ERROR: Failed to find payment link by order id %d: %v", orderID, err)
+		log.Printf("ERROR: Failed to find payment link by order id %s: %v", orderID.String(), err)
 		return nil, err
 	}
 	return &link, nil
 }
 
-func (r *PaymentLinkRepository) FindActiveByOrderID(orderID uint) (*PaymentLink, error) {
+func (r *PaymentLinkRepository) FindActiveByOrderID(orderID uuid.UUID) (*PaymentLink, error) {
 	var link PaymentLink
 	if err := r.db.Where("order_id = ? AND status = ?", orderID, StatusActive).First(&link).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		log.Printf("ERROR: Failed to find active payment link by order id %d: %v", orderID, err)
+		log.Printf("ERROR: Failed to find active payment link by order id %s: %v", orderID.String(), err)
 		return nil, err
 	}
 	return &link, nil
@@ -170,31 +171,31 @@ func (r *PaymentLinkRepository) FindActiveByOrderID(orderID uint) (*PaymentLink,
 
 func (r *PaymentLinkRepository) Update(link *PaymentLink) error {
 	if err := r.db.Save(link).Error; err != nil {
-		log.Printf("ERROR: Failed to update payment link %d: %v", link.ID, err)
+		log.Printf("ERROR: Failed to update payment link %s: %v", link.ID.String(), err)
 		return err
 	}
 	return nil
 }
 
-func (r *PaymentLinkRepository) UpdateStatus(id uint, status string) error {
+func (r *PaymentLinkRepository) UpdateStatus(id uuid.UUID, status string) error {
 	if err := r.db.Model(&PaymentLink{}).Where("id = ?", id).Update("status", status).Error; err != nil {
-		log.Printf("ERROR: Failed to update payment link status %d: %v", id, err)
+		log.Printf("ERROR: Failed to update payment link status %s: %v", id.String(), err)
 		return err
 	}
 	return nil
 }
 
-func (r *PaymentLinkRepository) Delete(id uint) error {
+func (r *PaymentLinkRepository) Delete(id uuid.UUID) error {
 	if err := r.db.Delete(&PaymentLink{}, id).Error; err != nil {
-		log.Printf("ERROR: Failed to delete payment link %d: %v", id, err)
+		log.Printf("ERROR: Failed to delete payment link %s: %v", id.String(), err)
 		return err
 	}
 	return nil
 }
 
-func (r *PaymentLinkRepository) MarkAsUsed(id uint) error {
+func (r *PaymentLinkRepository) MarkAsUsed(id uuid.UUID) error {
 	if err := r.db.Model(&PaymentLink{}).Where("id = ?", id).Update("status", StatusUsed).Error; err != nil {
-		log.Printf("ERROR: Failed to mark payment link as used %d: %v", id, err)
+		log.Printf("ERROR: Failed to mark payment link as used %s: %v", id.String(), err)
 		return err
 	}
 	return nil

@@ -1,11 +1,11 @@
 package inventory
 
 import (
-	"bey/internal/shared/response"
-	"strconv"
-
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/gorm"
+
+	"bey/internal/shared/response"
 )
 
 type InventoryHandler struct {
@@ -20,22 +20,14 @@ func NewInventoryHandler(db *gorm.DB) *InventoryHandler {
 	}
 }
 
-// @Summary Get inventory by product ID
-// @Description Retrieves inventory for a specific product
-// @Tags Inventory
-// @Accept json
-// @Produce json
-// @Param product_id path int true "Product ID"
-// @Success 200 {object} InventoryResponse
-// @Router /api/v1/inventory/{product_id} [get]
 func (h *InventoryHandler) GetByProductID(c *gin.Context) {
-	productID, err := strconv.ParseUint(c.Param("product_id"), 10, 32)
+	productID, err := uuid.FromString(c.Param("product_id"))
 	if err != nil {
-		h.resp.ValidationError(c, "invalid product_id")
+		h.resp.ValidationError(c, "invalid product_id format")
 		return
 	}
 
-	inventory, err := h.repo.FindByProductID(uint(productID))
+	inventory, err := h.repo.FindByProductID(productID)
 	if err != nil {
 		h.resp.InternalError(c, "failed to get inventory")
 		return
@@ -47,15 +39,6 @@ func (h *InventoryHandler) GetByProductID(c *gin.Context) {
 	h.resp.Success(c, toInventoryResponse(inventory))
 }
 
-// @Summary Update inventory
-// @Description Updates inventory quantity for a product (creates if not exists)
-// @Tags Inventory
-// @Accept json
-// @Produce json
-// @Param product_id path int true "Product ID"
-// @Param inventory body UpdateInventoryRequest true "Inventory data"
-// @Success 200 {object} InventoryResponse
-// @Router /api/v1/inventory/{product_id} [put]
 func (h *InventoryHandler) Update(c *gin.Context) {
 	userRole := c.GetString("user_role")
 	if userRole != "admin" {
@@ -63,22 +46,21 @@ func (h *InventoryHandler) Update(c *gin.Context) {
 		return
 	}
 
-	productID, err := strconv.ParseUint(c.Param("product_id"), 10, 32)
+	productID, err := uuid.FromString(c.Param("product_id"))
 	if err != nil {
-		h.resp.ValidationError(c, "invalid product_id")
+		h.resp.ValidationError(c, "invalid product_id format")
 		return
 	}
 
-	inventory, err := h.repo.FindByProductID(uint(productID))
+	inventory, err := h.repo.FindByProductID(productID)
 	if err != nil {
 		h.resp.InternalError(c, "failed to get inventory")
 		return
 	}
 
-	// Auto-create if not exists
 	if inventory == nil {
 		inventory = &Inventory{
-			ProductID: uint(productID),
+			ProductID: productID,
 			Quantity:  0,
 			Reserved:  0,
 		}
@@ -106,15 +88,6 @@ func (h *InventoryHandler) Update(c *gin.Context) {
 	h.resp.Success(c, toInventoryResponse(inventory))
 }
 
-// @Summary Reserve inventory
-// @Description Reserves inventory quantity for a product (creates if not exists)
-// @Tags Inventory
-// @Accept json
-// @Produce json
-// @Param product_id path int true "Product ID"
-// @Param quantity body object true "Quantity to reserve"
-// @Success 200
-// @Router /api/v1/inventory/{product_id}/reserve [post]
 func (h *InventoryHandler) Reserve(c *gin.Context) {
 	userRole := c.GetString("user_role")
 	if userRole != "admin" {
@@ -122,22 +95,21 @@ func (h *InventoryHandler) Reserve(c *gin.Context) {
 		return
 	}
 
-	productID, err := strconv.ParseUint(c.Param("product_id"), 10, 32)
+	productID, err := uuid.FromString(c.Param("product_id"))
 	if err != nil {
-		h.resp.ValidationError(c, "invalid product_id")
+		h.resp.ValidationError(c, "invalid product_id format")
 		return
 	}
 
-	inventory, err := h.repo.FindByProductID(uint(productID))
+	inventory, err := h.repo.FindByProductID(productID)
 	if err != nil {
 		h.resp.InternalError(c, "failed to get inventory")
 		return
 	}
 
-	// Auto-create if not exists
 	if inventory == nil {
 		inventory = &Inventory{
-			ProductID: uint(productID),
+			ProductID: productID,
 			Quantity:  0,
 			Reserved:  0,
 		}
@@ -160,7 +132,7 @@ func (h *InventoryHandler) Reserve(c *gin.Context) {
 		return
 	}
 
-	if err := h.repo.Reserve(uint(productID), req.Quantity); err != nil {
+	if err := h.repo.Reserve(productID, req.Quantity); err != nil {
 		h.resp.InternalError(c, "failed to reserve inventory")
 		return
 	}
@@ -168,15 +140,6 @@ func (h *InventoryHandler) Reserve(c *gin.Context) {
 	h.resp.Success(c, gin.H{"message": "inventory reserved"})
 }
 
-// @Summary Release inventory
-// @Description Releases reserved inventory quantity for a product
-// @Tags Inventory
-// @Accept json
-// @Produce json
-// @Param product_id path int true "Product ID"
-// @Param quantity body object true "Quantity to release"
-// @Success 200
-// @Router /api/v1/inventory/{product_id}/release [post]
 func (h *InventoryHandler) Release(c *gin.Context) {
 	userRole := c.GetString("user_role")
 	if userRole != "admin" {
@@ -184,13 +147,13 @@ func (h *InventoryHandler) Release(c *gin.Context) {
 		return
 	}
 
-	productID, err := strconv.ParseUint(c.Param("product_id"), 10, 32)
+	productID, err := uuid.FromString(c.Param("product_id"))
 	if err != nil {
-		h.resp.ValidationError(c, "invalid product_id")
+		h.resp.ValidationError(c, "invalid product_id format")
 		return
 	}
 
-	inventory, err := h.repo.FindByProductID(uint(productID))
+	inventory, err := h.repo.FindByProductID(productID)
 	if err != nil {
 		h.resp.InternalError(c, "failed to get inventory")
 		return
@@ -213,7 +176,7 @@ func (h *InventoryHandler) Release(c *gin.Context) {
 		return
 	}
 
-	if err := h.repo.Release(uint(productID), req.Quantity); err != nil {
+	if err := h.repo.Release(productID, req.Quantity); err != nil {
 		h.resp.InternalError(c, "failed to release inventory")
 		return
 	}
@@ -223,8 +186,8 @@ func (h *InventoryHandler) Release(c *gin.Context) {
 
 func toInventoryResponse(inventory *Inventory) InventoryResponse {
 	return InventoryResponse{
-		ID:        inventory.ID,
-		ProductID: inventory.ProductID,
+		ID:        inventory.ID.String(),
+		ProductID: inventory.ProductID.String(),
 		Quantity:  inventory.Quantity,
 		Reserved:  inventory.Reserved,
 		Available: inventory.Quantity - inventory.Reserved,

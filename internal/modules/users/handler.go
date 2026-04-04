@@ -1,12 +1,11 @@
 package users
 
 import (
-	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
+	"gorm.io/gorm"
 
 	"bey/internal/shared/response"
-
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type UserHandler struct {
@@ -23,14 +22,6 @@ func NewUserHandler(db *gorm.DB) *UserHandler {
 	}
 }
 
-// @Summary Register a new user
-// @Description Creates a new user account (public endpoint)
-// @Tags Users
-// @Accept json
-// @Produce json
-// @Param user body CreateUserRequest true "User data (name, email, password, surname, phone)"
-// @Success 201 {object} UserResponse
-// @Router /api/v1/users/register [post]
 func (h *UserHandler) Register(c *gin.Context) {
 	var req CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -57,14 +48,6 @@ func (h *UserHandler) Register(c *gin.Context) {
 	h.resp.Created(c, toUserResponse(user))
 }
 
-// @Summary Register a new admin user
-// @Description Creates a new admin user account (admin only)
-// @Tags Users
-// @Accept json
-// @Produce json
-// @Param user body CreateUserRequest true "Admin user data"
-// @Success 201 {object} UserResponse
-// @Router /api/v1/users/register-admin [post]
 func (h *UserHandler) RegisterAdmin(c *gin.Context) {
 	var req CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -92,31 +75,24 @@ func (h *UserHandler) RegisterAdmin(c *gin.Context) {
 	h.resp.Created(c, toUserResponse(user))
 }
 
-// @Summary Get user by ID
-// @Description Retrieves a user by their ID (user themselves or admin)
-// @Tags Users
-// @Accept json
-// @Produce json
-// @Param id path int true "User ID"
-// @Success 200 {object} UserResponse
-// @Router /api/v1/users/{id} [get]
 func (h *UserHandler) GetByID(c *gin.Context) {
-	// Get ID from path parameter
 	idParam := c.Param("id")
-	var targetID uint
-	if _, err := fmt.Sscanf(idParam, "%d", &targetID); err != nil {
-		h.resp.Error(c, 400, "invalid user id")
+	targetID, err := uuid.FromString(idParam)
+	if err != nil {
+		h.resp.Error(c, 400, "invalid user id format")
 		return
 	}
 
-	// Get current user info from token
 	currentUserID := c.GetUint("user_id")
 	userRole := c.GetString("user_role")
 
-	// Check if current user is admin or is the same user
-	if userRole != "admin" && currentUserID != targetID {
-		h.resp.Error(c, 403, "you can only view your own profile")
-		return
+	if userRole != "admin" {
+		currentUUID, parseErr := uuid.FromString(c.GetString("user_id"))
+		if parseErr != nil || currentUUID != targetID {
+			h.resp.Error(c, 403, "you can only view your own profile")
+			return
+		}
+		_ = currentUserID
 	}
 
 	user, err := h.repo.FindByID(targetID)
@@ -131,32 +107,24 @@ func (h *UserHandler) GetByID(c *gin.Context) {
 	h.resp.Success(c, toUserResponse(user))
 }
 
-// @Summary Update a user
-// @Description Updates an existing user (user themselves or admin)
-// @Tags Users
-// @Accept json
-// @Produce json
-// @Param id path int true "User ID"
-// @Param user body UpdateUserRequest true "User data"
-// @Success 200 {object} UserResponse
-// @Router /api/v1/users/{id} [put]
 func (h *UserHandler) Update(c *gin.Context) {
-	// Get ID from path parameter
 	idParam := c.Param("id")
-	var targetID uint
-	if _, err := fmt.Sscanf(idParam, "%d", &targetID); err != nil {
-		h.resp.Error(c, 400, "invalid user id")
+	targetID, err := uuid.FromString(idParam)
+	if err != nil {
+		h.resp.Error(c, 400, "invalid user id format")
 		return
 	}
 
-	// Get current user info from token
 	currentUserID := c.GetUint("user_id")
 	userRole := c.GetString("user_role")
 
-	// Check if current user is admin or is the same user
-	if userRole != "admin" && currentUserID != targetID {
-		h.resp.Error(c, 403, "you can only update your own profile")
-		return
+	if userRole != "admin" {
+		currentUUID, parseErr := uuid.FromString(c.GetString("user_id"))
+		if parseErr != nil || currentUUID != targetID {
+			h.resp.Error(c, 403, "you can only update your own profile")
+			return
+		}
+		_ = currentUserID
 	}
 
 	user, err := h.repo.FindByID(targetID)
@@ -193,27 +161,17 @@ func (h *UserHandler) Update(c *gin.Context) {
 	h.resp.Success(c, toUserResponse(user))
 }
 
-// @Summary Delete a user
-// @Description Deletes a user by ID (admin only)
-// @Tags Users
-// @Accept json
-// @Produce json
-// @Param id path int true "User ID"
-// @Success 200 {object} gin.H
-// @Router /api/v1/users/{id} [delete]
 func (h *UserHandler) Delete(c *gin.Context) {
-	// Defense-in-depth: explicit admin role check
 	userRole := c.GetString("user_role")
 	if userRole != "admin" {
 		h.resp.Error(c, 403, "admin access required")
 		return
 	}
 
-	// Get ID from path parameter
 	idParam := c.Param("id")
-	var targetID uint
-	if _, err := fmt.Sscanf(idParam, "%d", &targetID); err != nil {
-		h.resp.Error(c, 400, "invalid user id")
+	targetID, err := uuid.FromString(idParam)
+	if err != nil {
+		h.resp.Error(c, 400, "invalid user id format")
 		return
 	}
 
@@ -224,13 +182,6 @@ func (h *UserHandler) Delete(c *gin.Context) {
 	h.resp.Success(c, gin.H{"message": "user deleted"})
 }
 
-// @Summary List all users
-// @Description Retrieves a list of all users
-// @Tags Users
-// @Accept json
-// @Produce json
-// @Success 200 {array} UserResponse
-// @Router /api/v1/users [get]
 func (h *UserHandler) List(c *gin.Context) {
 	users, err := h.repo.FindAll(0, 100)
 	if err != nil {
@@ -245,32 +196,24 @@ func (h *UserHandler) List(c *gin.Context) {
 	h.resp.Success(c, responses)
 }
 
-// @Summary Update user avatar
-// @Description Updates the avatar URL for a user (user themselves or admin)
-// @Tags Users
-// @Accept json
-// @Produce json
-// @Param id path int true "User ID"
-// @Param avatar body object true "Avatar URL"
-// @Success 200 {object} UserResponse
-// @Router /api/v1/users/{id}/avatar [put]
 func (h *UserHandler) UpdateAvatar(c *gin.Context) {
-	// Get ID from path parameter
 	idParam := c.Param("id")
-	var targetID uint
-	if _, err := fmt.Sscanf(idParam, "%d", &targetID); err != nil {
-		h.resp.Error(c, 400, "invalid user id")
+	targetID, err := uuid.FromString(idParam)
+	if err != nil {
+		h.resp.Error(c, 400, "invalid user id format")
 		return
 	}
 
-	// Get current user info from token
 	currentUserID := c.GetUint("user_id")
 	userRole := c.GetString("user_role")
 
-	// Check if current user is admin or is the same user
-	if userRole != "admin" && currentUserID != targetID {
-		h.resp.Error(c, 403, "you can only update your own avatar")
-		return
+	if userRole != "admin" {
+		currentUUID, parseErr := uuid.FromString(c.GetString("user_id"))
+		if parseErr != nil || currentUUID != targetID {
+			h.resp.Error(c, 403, "you can only update your own avatar")
+			return
+		}
+		_ = currentUserID
 	}
 
 	user, err := h.repo.FindByID(targetID)
@@ -303,7 +246,7 @@ func (h *UserHandler) UpdateAvatar(c *gin.Context) {
 
 func toUserResponse(user *User) UserResponse {
 	return UserResponse{
-		ID:        user.ID,
+		ID:        user.ID.String(),
 		Email:     user.Email,
 		FirstName: user.FirstName,
 		LastName:  user.LastName,

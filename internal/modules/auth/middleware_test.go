@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
@@ -66,7 +67,7 @@ func TestAuthMiddleware_ValidBearerToken(t *testing.T) {
 	cfg.Security.JWTConfig = cfg.Security.GetJWTConfig()
 
 	tokenGen := NewTokenGenerator(nil, cfg)
-	accessToken, _, _ := tokenGen.GenerateAccessToken(1, "test@example.com", "admin")
+	accessToken, _, _ := tokenGen.GenerateAccessToken(uuid.Must(uuid.NewV7()), "test@example.com", "admin")
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -97,7 +98,7 @@ func TestAuthMiddleware_ValidCookieToken(t *testing.T) {
 	cfg.Security.JWTConfig = cfg.Security.GetJWTConfig()
 
 	tokenGen := NewTokenGenerator(nil, cfg)
-	accessToken, _, _ := tokenGen.GenerateAccessToken(1, "test@example.com", "customer")
+	accessToken, _, _ := tokenGen.GenerateAccessToken(uuid.Must(uuid.NewV7()), "test@example.com", "customer")
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 	req.AddCookie(&http.Cookie{Name: "access_token", Value: accessToken})
@@ -162,7 +163,7 @@ func TestAuthMiddleware_ExpiredToken(t *testing.T) {
 	cfg.Security.JWTConfig = cfg.Security.GetJWTConfig()
 
 	expiredTokenGen := NewTokenGenerator(nil, cfg)
-	expiredToken, _, _ := expiredTokenGen.GenerateAccessToken(1, "test@example.com", "customer")
+	expiredToken, _, _ := expiredTokenGen.GenerateAccessToken(uuid.Must(uuid.NewV7()), "test@example.com", "customer")
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 	req.Header.Set("Authorization", "Bearer "+expiredToken)
@@ -178,7 +179,7 @@ func TestAuthMiddleware_ExpiredToken(t *testing.T) {
 func TestAuthMiddleware_SetsClaims(t *testing.T) {
 	middleware, r := setupMiddlewareTest(t)
 
-	expectedUserID := uint(42)
+	expectedUserID := uuid.Must(uuid.NewV7())
 	expectedEmail := "claims@test.com"
 	expectedRole := "admin"
 
@@ -187,8 +188,8 @@ func TestAuthMiddleware_SetsClaims(t *testing.T) {
 		userRole, _ := c.Get("user_role")
 		userEmail, _ := c.Get("user_email")
 
-		if userID != expectedUserID {
-			t.Errorf("user_id = %v; want %d", userID, expectedUserID)
+		if userID != expectedUserID.String() {
+			t.Errorf("user_id = %v; want %s", userID, expectedUserID.String())
 		}
 		if userRole != expectedRole {
 			t.Errorf("user_role = %v; want %s", userRole, expectedRole)

@@ -8,17 +8,25 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
+)
+
+var (
+	testPaymentID      = uuid.Must(uuid.NewV7())
+	testPaymentOrderID = uuid.Must(uuid.NewV7())
+	testPaymentLinkID  = uuid.Must(uuid.NewV7())
+	testPaymentLinkOID = uuid.Must(uuid.NewV7())
 )
 
 type MockPaymentService struct {
 	createPaymentFunc         func(req *CreatePaymentRequest) (*Payment, error)
-	getPaymentFunc            func(id uint) (*Payment, error)
+	getPaymentFunc            func(id uuid.UUID) (*Payment, error)
 	getPaymentStatusFunc      func(wompiID string) (*Payment, error)
-	cancelPaymentFunc         func(id uint) (*Payment, error)
+	cancelPaymentFunc         func(id uuid.UUID) (*Payment, error)
 	createPaymentLinkFunc     func(req *CreatePaymentLinkRequest) (*PaymentLink, error)
-	getPaymentLinkFunc        func(id uint) (*PaymentLink, error)
-	activatePaymentLinkFunc   func(id uint) (*PaymentLink, error)
-	deactivatePaymentLinkFunc func(id uint) (*PaymentLink, error)
+	getPaymentLinkFunc        func(id uuid.UUID) (*PaymentLink, error)
+	activatePaymentLinkFunc   func(id uuid.UUID) (*PaymentLink, error)
+	deactivatePaymentLinkFunc func(id uuid.UUID) (*PaymentLink, error)
 	verifySignatureFunc       func(payload []byte, signature string) bool
 	processWebhookFunc        func(event *WebhookEvent) error
 }
@@ -30,7 +38,7 @@ func (m *MockPaymentService) CreatePayment(req *CreatePaymentRequest) (*Payment,
 	return nil, nil
 }
 
-func (m *MockPaymentService) GetPayment(id uint) (*Payment, error) {
+func (m *MockPaymentService) GetPayment(id uuid.UUID) (*Payment, error) {
 	if m.getPaymentFunc != nil {
 		return m.getPaymentFunc(id)
 	}
@@ -44,7 +52,7 @@ func (m *MockPaymentService) GetPaymentStatus(wompiID string) (*Payment, error) 
 	return nil, nil
 }
 
-func (m *MockPaymentService) CancelPayment(id uint) (*Payment, error) {
+func (m *MockPaymentService) CancelPayment(id uuid.UUID) (*Payment, error) {
 	if m.cancelPaymentFunc != nil {
 		return m.cancelPaymentFunc(id)
 	}
@@ -58,21 +66,21 @@ func (m *MockPaymentService) CreatePaymentLink(req *CreatePaymentLinkRequest) (*
 	return nil, nil
 }
 
-func (m *MockPaymentService) GetPaymentLink(id uint) (*PaymentLink, error) {
+func (m *MockPaymentService) GetPaymentLink(id uuid.UUID) (*PaymentLink, error) {
 	if m.getPaymentLinkFunc != nil {
 		return m.getPaymentLinkFunc(id)
 	}
 	return nil, nil
 }
 
-func (m *MockPaymentService) ActivatePaymentLink(id uint) (*PaymentLink, error) {
+func (m *MockPaymentService) ActivatePaymentLink(id uuid.UUID) (*PaymentLink, error) {
 	if m.activatePaymentLinkFunc != nil {
 		return m.activatePaymentLinkFunc(id)
 	}
 	return nil, nil
 }
 
-func (m *MockPaymentService) DeactivatePaymentLink(id uint) (*PaymentLink, error) {
+func (m *MockPaymentService) DeactivatePaymentLink(id uuid.UUID) (*PaymentLink, error) {
 	if m.deactivatePaymentLinkFunc != nil {
 		return m.deactivatePaymentLinkFunc(id)
 	}
@@ -115,8 +123,8 @@ func (h *TestPaymentHandler) CreatePayment(c *gin.Context) {
 
 func (h *TestPaymentHandler) GetPayment(c *gin.Context) {
 	idStr := c.Param("id")
-	var id uint
-	if _, err := parseUintParams(idStr, &id); err != nil {
+	id, err := uuid.FromString(idStr)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payment ID"})
 		return
 	}
@@ -180,8 +188,8 @@ func (h *TestPaymentHandler) GetPaymentStatus(c *gin.Context) {
 
 func (h *TestPaymentHandler) VoidPayment(c *gin.Context) {
 	idStr := c.Param("id")
-	var id uint
-	if _, err := parseUintParams(idStr, &id); err != nil {
+	id, err := uuid.FromString(idStr)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payment ID"})
 		return
 	}
@@ -213,8 +221,8 @@ func (h *TestPaymentHandler) CreatePaymentLink(c *gin.Context) {
 
 func (h *TestPaymentHandler) GetPaymentLink(c *gin.Context) {
 	idStr := c.Param("id")
-	var id uint
-	if _, err := parseUintParams(idStr, &id); err != nil {
+	id, err := uuid.FromString(idStr)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payment link ID"})
 		return
 	}
@@ -234,8 +242,8 @@ func (h *TestPaymentHandler) GetPaymentLink(c *gin.Context) {
 
 func (h *TestPaymentHandler) ActivatePaymentLink(c *gin.Context) {
 	idStr := c.Param("id")
-	var id uint
-	if _, err := parseUintParams(idStr, &id); err != nil {
+	id, err := uuid.FromString(idStr)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payment link ID"})
 		return
 	}
@@ -251,8 +259,8 @@ func (h *TestPaymentHandler) ActivatePaymentLink(c *gin.Context) {
 
 func (h *TestPaymentHandler) DeactivatePaymentLink(c *gin.Context) {
 	idStr := c.Param("id")
-	var id uint
-	if _, err := parseUintParams(idStr, &id); err != nil {
+	id, err := uuid.FromString(idStr)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payment link ID"})
 		return
 	}
@@ -294,7 +302,7 @@ func TestPaymentHandler_CreatePayment(t *testing.T) {
 			name: "valid request",
 			body: `{"amount":100000,"currency":"COP","payment_token":"tok_test_123","reference":"order-123"}`,
 			mockResponse: &Payment{
-				ID:                 1,
+				ID:                 testPaymentID,
 				WompiTransactionID: "tx_123",
 				Amount:             100000,
 				Currency:           "COP",
@@ -385,9 +393,9 @@ func TestPaymentHandler_GetPayment(t *testing.T) {
 	}{
 		{
 			name: "valid payment ID",
-			id:   "1",
+			id:   testPaymentID.String(),
 			mockResponse: &Payment{
-				ID:                 1,
+				ID:                 testPaymentID,
 				WompiTransactionID: "tx_123",
 				Amount:             100000,
 				Currency:           "COP",
@@ -398,21 +406,14 @@ func TestPaymentHandler_GetPayment(t *testing.T) {
 		},
 		{
 			name:          "invalid payment ID - non-numeric",
-			id:            "abc",
+			id:            "not-a-uuid",
 			mockResponse:  nil,
-			wantStatus:    http.StatusNotFound,
-			wantErrInBody: true,
-		},
-		{
-			name:          "invalid payment ID - zero",
-			id:            "0",
-			mockResponse:  nil,
-			wantStatus:    http.StatusNotFound,
+			wantStatus:    http.StatusBadRequest,
 			wantErrInBody: true,
 		},
 		{
 			name:          "payment not found",
-			id:            "999",
+			id:            uuid.Must(uuid.NewV7()).String(),
 			mockResponse:  nil,
 			mockError:     nil,
 			wantStatus:    http.StatusNotFound,
@@ -423,7 +424,7 @@ func TestPaymentHandler_GetPayment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockService := &MockPaymentService{
-				getPaymentFunc: func(id uint) (*Payment, error) {
+				getPaymentFunc: func(id uuid.UUID) (*Payment, error) {
 					return tt.mockResponse, tt.mockError
 				},
 			}
@@ -553,7 +554,7 @@ func TestPaymentHandler_Integration(t *testing.T) {
 	mockService := &MockPaymentService{
 		createPaymentFunc: func(req *CreatePaymentRequest) (*Payment, error) {
 			return &Payment{
-				ID:                 1,
+				ID:                 testPaymentID,
 				WompiTransactionID: "tx_123",
 				Amount:             req.Amount,
 				Currency:           req.Currency,
@@ -597,7 +598,7 @@ func TestPaymentHandler_GetPaymentStatus_Success(t *testing.T) {
 	mockService := &MockPaymentService{
 		getPaymentStatusFunc: func(wompiID string) (*Payment, error) {
 			return &Payment{
-				ID:                 1,
+				ID:                 testPaymentID,
 				WompiTransactionID: wompiID,
 				Amount:             100000,
 				Currency:           "COP",
@@ -621,7 +622,7 @@ func TestPaymentHandler_GetPaymentStatus_Success(t *testing.T) {
 
 func TestPaymentHandler_VoidPayment_Success(t *testing.T) {
 	mockService := &MockPaymentService{
-		cancelPaymentFunc: func(id uint) (*Payment, error) {
+		cancelPaymentFunc: func(id uuid.UUID) (*Payment, error) {
 			return &Payment{
 				ID:     id,
 				Status: StatusVoided,
@@ -632,7 +633,7 @@ func TestPaymentHandler_VoidPayment_Success(t *testing.T) {
 	handler := &TestPaymentHandler{service: mockService}
 	router := setupTestRouter(handler)
 
-	req := httptest.NewRequest(http.MethodPost, "/payments/1/void", nil)
+	req := httptest.NewRequest(http.MethodPost, "/payments/"+testPaymentID.String()+"/void", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -646,7 +647,7 @@ func TestPaymentHandler_CreatePaymentLink_Success(t *testing.T) {
 	mockService := &MockPaymentService{
 		createPaymentLinkFunc: func(req *CreatePaymentLinkRequest) (*PaymentLink, error) {
 			return &PaymentLink{
-				ID:          1,
+				ID:          testPaymentLinkID,
 				WompiLinkID: "link_123",
 				URL:         "https://checkout.wompi.co/l/link_123",
 				Amount:      req.AmountInCents,
@@ -674,7 +675,7 @@ func TestPaymentHandler_CreatePaymentLink_Success(t *testing.T) {
 
 func TestPaymentHandler_GetPaymentLink_Success(t *testing.T) {
 	mockService := &MockPaymentService{
-		getPaymentLinkFunc: func(id uint) (*PaymentLink, error) {
+		getPaymentLinkFunc: func(id uuid.UUID) (*PaymentLink, error) {
 			return &PaymentLink{
 				ID:          id,
 				WompiLinkID: "link_123",
@@ -690,7 +691,7 @@ func TestPaymentHandler_GetPaymentLink_Success(t *testing.T) {
 	handler := &TestPaymentHandler{service: mockService}
 	router := setupTestRouter(handler)
 
-	req := httptest.NewRequest(http.MethodGet, "/payments/links/1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/payments/links/"+testPaymentLinkID.String(), nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -702,7 +703,7 @@ func TestPaymentHandler_GetPaymentLink_Success(t *testing.T) {
 
 func TestPaymentHandler_ActivatePaymentLink_Success(t *testing.T) {
 	mockService := &MockPaymentService{
-		activatePaymentLinkFunc: func(id uint) (*PaymentLink, error) {
+		activatePaymentLinkFunc: func(id uuid.UUID) (*PaymentLink, error) {
 			return &PaymentLink{
 				ID:     id,
 				Status: StatusActive,
@@ -713,7 +714,7 @@ func TestPaymentHandler_ActivatePaymentLink_Success(t *testing.T) {
 	handler := &TestPaymentHandler{service: mockService}
 	router := setupTestRouter(handler)
 
-	req := httptest.NewRequest(http.MethodPatch, "/payments/links/1/activate", nil)
+	req := httptest.NewRequest(http.MethodPatch, "/payments/links/"+testPaymentLinkID.String()+"/activate", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -725,7 +726,7 @@ func TestPaymentHandler_ActivatePaymentLink_Success(t *testing.T) {
 
 func TestPaymentHandler_DeactivatePaymentLink_Success(t *testing.T) {
 	mockService := &MockPaymentService{
-		deactivatePaymentLinkFunc: func(id uint) (*PaymentLink, error) {
+		deactivatePaymentLinkFunc: func(id uuid.UUID) (*PaymentLink, error) {
 			return &PaymentLink{
 				ID:     id,
 				Status: StatusInactive,
@@ -736,7 +737,7 @@ func TestPaymentHandler_DeactivatePaymentLink_Success(t *testing.T) {
 	handler := &TestPaymentHandler{service: mockService}
 	router := setupTestRouter(handler)
 
-	req := httptest.NewRequest(http.MethodPatch, "/payments/links/1/deactivate", nil)
+	req := httptest.NewRequest(http.MethodPatch, "/payments/links/"+testPaymentLinkID.String()+"/deactivate", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -88,8 +89,8 @@ func TestLogin_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to validate access token: %v", err)
 	}
-	if claims.UserID != user.ID {
-		t.Errorf("claims.UserID = %d; want %d", claims.UserID, user.ID)
+	if claims.UserID != user.ID.String() {
+		t.Errorf("claims.UserID = %s; want %s", claims.UserID, user.ID)
 	}
 }
 
@@ -160,8 +161,8 @@ func TestRefresh_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to validate new access token: %v", err)
 	}
-	if claims.UserID != user.ID {
-		t.Errorf("claims.UserID = %d; want %d", claims.UserID, user.ID)
+	if claims.UserID != user.ID.String() {
+		t.Errorf("claims.UserID = %s; want %s", claims.UserID, user.ID)
 	}
 	if claims.Email != user.Email {
 		t.Errorf("claims.Email = %s; want %s", claims.Email, user.Email)
@@ -181,7 +182,7 @@ func TestRefresh_ExpiredToken(t *testing.T) {
 
 	expiredToken := &RefreshToken{
 		Token:     tokenGen.HashToken(refreshToken),
-		UserID:    1,
+		UserID:    uuid.Must(uuid.NewV7()),
 		ExpiresAt: time.Now().Add(-1 * time.Hour),
 		Revoked:   false,
 	}
@@ -216,7 +217,7 @@ func TestRefresh_RevokedToken(t *testing.T) {
 func TestLogout_Success(t *testing.T) {
 	service, db := setupServiceTest(t)
 
-	createTestUser(t, db, "test@example.com", "customer", true)
+	user := createTestUser(t, db, "test@example.com", "customer", true)
 
 	loginResp, err := service.Login(context.Background(), "test@example.com", "password123")
 	if err != nil {
@@ -229,7 +230,7 @@ func TestLogout_Success(t *testing.T) {
 	}
 
 	var token RefreshToken
-	if err := db.Where("user_id = ?", 1).First(&token).Error; err != nil {
+	if err := db.Where("user_id = ?", user.ID).First(&token).Error; err != nil {
 		t.Fatalf("failed to find refresh token: %v", err)
 	}
 	if !token.Revoked {

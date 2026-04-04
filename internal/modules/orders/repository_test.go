@@ -3,6 +3,7 @@ package orders
 import (
 	"testing"
 
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -25,13 +26,13 @@ func TestOrderRepository_Create(t *testing.T) {
 	repo := NewOrderRepository(db)
 
 	order := &Order{
-		UserID:          1,
+		UserID:          uuid.Must(uuid.NewV7()),
 		Status:          "pending",
 		TotalPrice:      99.99,
 		ShippingAddress: "123 Main St",
 		Notes:           "Please leave at door",
 		Items: []OrderItem{
-			{ProductID: 1, Quantity: 2, UnitPrice: 49.99},
+			{ProductID: uuid.Must(uuid.NewV7()), Quantity: 2, UnitPrice: 49.99},
 		},
 	}
 
@@ -40,7 +41,7 @@ func TestOrderRepository_Create(t *testing.T) {
 		t.Fatalf("Failed to create order: %v", err)
 	}
 
-	if order.ID == 0 {
+	if order.ID == uuid.Nil {
 		t.Error("Expected order ID to be set")
 	}
 
@@ -54,12 +55,12 @@ func TestOrderRepository_FindByID(t *testing.T) {
 	repo := NewOrderRepository(db)
 
 	order := &Order{
-		UserID:          1,
+		UserID:          uuid.Must(uuid.NewV7()),
 		Status:          "pending",
 		TotalPrice:      99.99,
 		ShippingAddress: "123 Main St",
 		Items: []OrderItem{
-			{ProductID: 1, Quantity: 2, UnitPrice: 49.99},
+			{ProductID: uuid.Must(uuid.NewV7()), Quantity: 2, UnitPrice: 49.99},
 		},
 	}
 	repo.Create(order)
@@ -86,7 +87,7 @@ func TestOrderRepository_FindByID_NotFound(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewOrderRepository(db)
 
-	found, err := repo.FindByID(999)
+	found, err := repo.FindByID(uuid.Must(uuid.NewV7()))
 	if err != nil {
 		t.Fatalf("Failed to find order: %v", err)
 	}
@@ -101,7 +102,7 @@ func TestOrderRepository_Update(t *testing.T) {
 	repo := NewOrderRepository(db)
 
 	order := &Order{
-		UserID:     1,
+		UserID:     uuid.Must(uuid.NewV7()),
 		Status:     "pending",
 		TotalPrice: 99.99,
 	}
@@ -124,7 +125,7 @@ func TestOrderRepository_Delete(t *testing.T) {
 	repo := NewOrderRepository(db)
 
 	order := &Order{
-		UserID:     1,
+		UserID:     uuid.Must(uuid.NewV7()),
 		Status:     "pending",
 		TotalPrice: 99.99,
 	}
@@ -145,17 +146,19 @@ func TestOrderRepository_FindByUserID(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewOrderRepository(db)
 
-	repo.Create(&Order{UserID: 1, Status: "pending", TotalPrice: 50})
-	repo.Create(&Order{UserID: 1, Status: "confirmed", TotalPrice: 75})
-	repo.Create(&Order{UserID: 2, Status: "pending", TotalPrice: 100})
+	userID := uuid.Must(uuid.NewV7())
+	userID2 := uuid.Must(uuid.NewV7())
+	repo.Create(&Order{UserID: userID, Status: "pending", TotalPrice: 50})
+	repo.Create(&Order{UserID: userID, Status: "confirmed", TotalPrice: 75})
+	repo.Create(&Order{UserID: userID2, Status: "pending", TotalPrice: 100})
 
-	orders, err := repo.FindByUserID(1)
+	orders, err := repo.FindByUserID(userID)
 	if err != nil {
 		t.Fatalf("Failed to find orders by user ID: %v", err)
 	}
 
 	if len(orders) != 2 {
-		t.Errorf("Expected 2 orders for user 1, got %d", len(orders))
+		t.Errorf("Expected 2 orders for user, got %d", len(orders))
 	}
 }
 
@@ -163,9 +166,9 @@ func TestOrderRepository_FindAll(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewOrderRepository(db)
 
-	repo.Create(&Order{UserID: 1, Status: "pending", TotalPrice: 50})
-	repo.Create(&Order{UserID: 2, Status: "confirmed", TotalPrice: 75})
-	repo.Create(&Order{UserID: 3, Status: "pending", TotalPrice: 100})
+	repo.Create(&Order{UserID: uuid.Must(uuid.NewV7()), Status: "pending", TotalPrice: 50})
+	repo.Create(&Order{UserID: uuid.Must(uuid.NewV7()), Status: "confirmed", TotalPrice: 75})
+	repo.Create(&Order{UserID: uuid.Must(uuid.NewV7()), Status: "pending", TotalPrice: 100})
 
 	orders, err := repo.FindAll(0, 10)
 	if err != nil {
@@ -181,11 +184,10 @@ func TestOrderRepository_FindAll_WithPagination(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewOrderRepository(db)
 
-	repo.Create(&Order{UserID: 1, Status: "pending", TotalPrice: 50})
-	repo.Create(&Order{UserID: 2, Status: "confirmed", TotalPrice: 75})
-	repo.Create(&Order{UserID: 3, Status: "pending", TotalPrice: 100})
+	repo.Create(&Order{UserID: uuid.Must(uuid.NewV7()), Status: "pending", TotalPrice: 50})
+	repo.Create(&Order{UserID: uuid.Must(uuid.NewV7()), Status: "confirmed", TotalPrice: 75})
+	repo.Create(&Order{UserID: uuid.Must(uuid.NewV7()), Status: "pending", TotalPrice: 100})
 
-	// Test limit
 	orders, err := repo.FindAll(0, 2)
 	if err != nil {
 		t.Fatalf("Failed to find orders with limit: %v", err)
@@ -195,7 +197,6 @@ func TestOrderRepository_FindAll_WithPagination(t *testing.T) {
 		t.Errorf("Expected 2 orders with limit, got %d", len(orders))
 	}
 
-	// Test offset
 	orders, err = repo.FindAll(2, 10)
 	if err != nil {
 		t.Fatalf("Failed to find orders with offset: %v", err)

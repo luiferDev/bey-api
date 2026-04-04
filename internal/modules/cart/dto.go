@@ -3,8 +3,8 @@ package cart
 import "time"
 
 type AddToCartRequest struct {
-	VariantID uint `json:"variant_id" binding:"required"`
-	Quantity  int  `json:"quantity" binding:"required,gt=0"`
+	VariantID string `json:"variant_id" binding:"required"`
+	Quantity  int    `json:"quantity" binding:"required,gt=0"`
 }
 
 type UpdateCartItemRequest struct {
@@ -12,15 +12,15 @@ type UpdateCartItemRequest struct {
 }
 
 type CartResponse struct {
-	UserID    uint               `json:"user_id"`
+	UserID    string             `json:"user_id"`
 	Items     []CartItemResponse `json:"items"`
 	CreatedAt time.Time          `json:"created_at"`
 	UpdatedAt time.Time          `json:"updated_at"`
 }
 
 type CartItemResponse struct {
-	VariantID uint `json:"variant_id"`
-	Quantity  int  `json:"quantity"`
+	VariantID string `json:"variant_id"`
+	Quantity  int    `json:"quantity"`
 }
 
 // CheckoutRequest - Request to convert cart to order
@@ -32,7 +32,7 @@ type CheckoutRequest struct {
 // CheckoutResponse - Response after creating order from cart
 type CheckoutResponse struct {
 	Message         string                 `json:"message"`
-	OrderID         uint                   `json:"order_id"`
+	OrderID         string                 `json:"order_id"`
 	ShippingAddress string                 `json:"shipping_address"`
 	Items           []CheckoutItemResponse `json:"items"`
 	TotalPrice      float64                `json:"total_price"`
@@ -41,8 +41,8 @@ type CheckoutResponse struct {
 
 // CheckoutItemResponse - Individual item in checkout response
 type CheckoutItemResponse struct {
-	ProductID uint    `json:"product_id"`
-	VariantID *uint   `json:"variant_id,omitempty"`
+	ProductID string  `json:"product_id"`
+	VariantID *string `json:"variant_id,omitempty"`
 	Quantity  int     `json:"quantity"`
 	UnitPrice float64 `json:"unit_price"`
 }

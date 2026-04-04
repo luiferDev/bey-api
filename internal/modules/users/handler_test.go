@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -153,14 +154,15 @@ func TestGetUserByID_NotFound(t *testing.T) {
 	handler := NewUserHandler(db)
 
 	router := gin.New()
+	nonExistentUUID := uuid.Must(uuid.NewV7())
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", uint(999))
+		c.Set("user_id", nonExistentUUID.String())
 		c.Set("user_role", "admin")
 		c.Next()
 	})
 	router.GET("/api/v1/users/:id", handler.GetByID)
 
-	req, _ := http.NewRequest("GET", "/api/v1/users/999", nil)
+	req, _ := http.NewRequest("GET", "/api/v1/users/"+nonExistentUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -175,15 +177,16 @@ func TestUpdateUser_NotFound(t *testing.T) {
 	handler := NewUserHandler(db)
 
 	router := gin.New()
+	nonExistentUUID := uuid.Must(uuid.NewV7())
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", uint(999))
+		c.Set("user_id", nonExistentUUID.String())
 		c.Set("user_role", "admin")
 		c.Next()
 	})
 	router.PUT("/api/v1/users/:id", handler.Update)
 
 	body := `{"first_name":"John"}`
-	req, _ := http.NewRequest("PUT", "/api/v1/users/999", bytes.NewBufferString(body))
+	req, _ := http.NewRequest("PUT", "/api/v1/users/"+nonExistentUUID.String(), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -196,13 +199,13 @@ func TestUpdateUser_NotFound(t *testing.T) {
 func TestDeleteUser_NotFound(t *testing.T) {
 	router, handler := setupTestRouterWithUsers(t)
 
-	// Add admin middleware for delete endpoint
+	nonExistentUUID := uuid.Must(uuid.NewV7())
 	router.DELETE("/api/v1/users/:id", func(c *gin.Context) {
 		c.Set("user_role", "admin")
 		c.Next()
 	}, handler.Delete)
 
-	req, _ := http.NewRequest("DELETE", "/api/v1/users/999", nil)
+	req, _ := http.NewRequest("DELETE", "/api/v1/users/"+nonExistentUUID.String(), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -308,7 +311,7 @@ func TestRegisterAdmin_MissingFields(t *testing.T) {
 	}
 }
 
-func createUserForAvatarTest(t *testing.T, router *gin.Engine, handler *UserHandler, email string) uint {
+func createUserForAvatarTest(t *testing.T, router *gin.Engine, handler *UserHandler, email string) uuid.UUID {
 	t.Helper()
 	body := `{"email":"` + email + `","password":"Password123","name":"Avatar","surname":"User"}`
 	req, _ := http.NewRequest("POST", "/api/v1/users/register", bytes.NewBufferString(body))
@@ -326,7 +329,12 @@ func createUserForAvatarTest(t *testing.T, router *gin.Engine, handler *UserHand
 	}
 
 	data := resp["data"].(map[string]interface{})
-	return uint(data["id"].(float64))
+	idStr := data["id"].(string)
+	id, err := uuid.FromString(idStr)
+	if err != nil {
+		t.Fatalf("Failed to parse user ID UUID: %v", err)
+	}
+	return id
 }
 
 func TestUpdateAvatar_Success(t *testing.T) {
@@ -338,14 +346,14 @@ func TestUpdateAvatar_Success(t *testing.T) {
 
 	avatarRouter := gin.New()
 	avatarRouter.Use(func(c *gin.Context) {
-		c.Set("user_id", userID)
+		c.Set("user_id", userID.String())
 		c.Set("user_role", "admin")
 		c.Next()
 	})
 	avatarRouter.PUT("/api/v1/users/:id/avatar", handler.UpdateAvatar)
 
 	body := `{"avatar_url":"https://example.com/avatar.jpg"}`
-	req, _ := http.NewRequest("PUT", "/api/v1/users/1/avatar", bytes.NewBufferString(body))
+	req, _ := http.NewRequest("PUT", "/api/v1/users/"+userID.String()+"/avatar", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	avatarRouter.ServeHTTP(w, req)
@@ -364,14 +372,14 @@ func TestUpdateAvatar_InvalidURL(t *testing.T) {
 
 	avatarRouter := gin.New()
 	avatarRouter.Use(func(c *gin.Context) {
-		c.Set("user_id", userID)
+		c.Set("user_id", userID.String())
 		c.Set("user_role", "admin")
 		c.Next()
 	})
 	avatarRouter.PUT("/api/v1/users/:id/avatar", handler.UpdateAvatar)
 
 	body := `{"avatar_url":"not-a-url"}`
-	req, _ := http.NewRequest("PUT", "/api/v1/users/1/avatar", bytes.NewBufferString(body))
+	req, _ := http.NewRequest("PUT", "/api/v1/users/"+userID.String()+"/avatar", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	avatarRouter.ServeHTTP(w, req)
@@ -386,14 +394,14 @@ func TestUpdateAvatar_Unauthorized(t *testing.T) {
 
 	avatarRouter := gin.New()
 	avatarRouter.Use(func(c *gin.Context) {
-		c.Set("user_id", uint(1))
+		c.Set("user_id", uuid.Must(uuid.NewV7()).String())
 		c.Set("user_role", "customer")
 		c.Next()
 	})
 	avatarRouter.PUT("/api/v1/users/:id/avatar", handler.UpdateAvatar)
 
 	body := `{"avatar_url":"https://example.com/avatar.jpg"}`
-	req, _ := http.NewRequest("PUT", "/api/v1/users/999/avatar", bytes.NewBufferString(body))
+	req, _ := http.NewRequest("PUT", "/api/v1/users/"+uuid.Must(uuid.NewV7()).String()+"/avatar", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	avatarRouter.ServeHTTP(w, req)

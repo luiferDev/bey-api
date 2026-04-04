@@ -9,29 +9,29 @@ import (
 
 // Category DTOs
 type CreateCategoryRequest struct {
-	Name        string `json:"name" binding:"required,max=255"`
-	Slug        string `json:"slug" binding:"required,max=255"`
-	Description string `json:"description"`
-	ParentID    *uint  `json:"parent_id"`
-	IsActive    *bool  `json:"is_active"`
-	SortOrder   *int   `json:"sort_order"`
+	Name        string  `json:"name" binding:"required,max=255"`
+	Slug        string  `json:"slug" binding:"required,max=255"`
+	Description string  `json:"description"`
+	ParentID    *string `json:"parent_id"`
+	IsActive    *bool   `json:"is_active"`
+	SortOrder   *int    `json:"sort_order"`
 }
 
 type UpdateCategoryRequest struct {
 	Name        *string `json:"name"`
 	Slug        *string `json:"slug"`
 	Description *string `json:"description"`
-	ParentID    *uint   `json:"parent_id"`
+	ParentID    *string `json:"parent_id"`
 	IsActive    *bool   `json:"is_active"`
 	SortOrder   *int    `json:"sort_order"`
 }
 
 type CategoryResponse struct {
-	ID            uint               `json:"id"`
+	ID            string             `json:"id"`
 	Name          string             `json:"name"`
 	Slug          string             `json:"slug"`
 	Description   string             `json:"description"`
-	ParentID      *uint              `json:"parent_id"`
+	ParentID      *string            `json:"parent_id"`
 	Path          string             `json:"path"`
 	Level         int                `json:"level"`
 	IsActive      bool               `json:"is_active"`
@@ -44,7 +44,7 @@ type CategoryResponse struct {
 
 // Product DTOs
 type CreateProductRequest struct {
-	CategoryID  uint    `json:"category_id" binding:"required"`
+	CategoryID  string  `json:"category_id" binding:"required"`
 	Name        string  `json:"name" binding:"required"`
 	Slug        string  `json:"slug" binding:"required"`
 	Brand       string  `json:"brand"`
@@ -54,7 +54,7 @@ type CreateProductRequest struct {
 }
 
 type UpdateProductRequest struct {
-	CategoryID  *uint    `json:"category_id"`
+	CategoryID  *string  `json:"category_id"`
 	Name        *string  `json:"name"`
 	Slug        *string  `json:"slug"`
 	Brand       *string  `json:"brand"`
@@ -64,8 +64,8 @@ type UpdateProductRequest struct {
 }
 
 type ProductResponse struct {
-	ID          uint                     `json:"id"`
-	CategoryID  uint                     `json:"category_id"`
+	ID          string                   `json:"id"`
+	CategoryID  string                   `json:"category_id"`
 	Name        string                   `json:"name"`
 	Slug        string                   `json:"slug"`
 	Brand       string                   `json:"brand"`
@@ -81,7 +81,7 @@ type ProductResponse struct {
 
 // ProductVariant DTOs
 type CreateProductVariantRequest struct {
-	ProductID uint    `json:"product_id" binding:"required"`
+	ProductID string  `json:"product_id" binding:"required"`
 	SKU       string  `json:"sku" binding:"required"`
 	Price     float64 `json:"price" binding:"required,gt=0"`
 	Stock     int     `json:"stock"`
@@ -106,8 +106,8 @@ type ProductVariantAttributeResponse struct {
 }
 
 type ProductVariantResponse struct {
-	ID        uint                             `json:"id"`
-	ProductID uint                             `json:"product_id"`
+	ID        string                           `json:"id"`
+	ProductID string                           `json:"product_id"`
 	SKU       string                           `json:"sku"`
 	Price     float64                          `json:"price"`
 	Stock     int                              `json:"stock"`
@@ -120,11 +120,11 @@ type ProductVariantResponse struct {
 
 // ProductImage DTOs
 type CreateProductImageRequest struct {
-	ProductID uint   `json:"product_id" binding:"required"`
-	VariantID *uint  `json:"variant_id"`
-	URLImage  string `json:"url_image" binding:"required"`
-	IsMain    *bool  `json:"is_main"`
-	SortOrder int    `json:"sort_order"`
+	ProductID string  `json:"product_id" binding:"required"`
+	VariantID *string `json:"variant_id"`
+	URLImage  string  `json:"url_image" binding:"required"`
+	IsMain    *bool   `json:"is_main"`
+	SortOrder int     `json:"sort_order"`
 }
 
 type UpdateProductImageRequest struct {
@@ -134,12 +134,12 @@ type UpdateProductImageRequest struct {
 }
 
 type ProductImageResponse struct {
-	ID        uint   `json:"id"`
-	ProductID uint   `json:"product_id"`
-	VariantID *uint  `json:"variant_id"`
-	URLImage  string `json:"url_image"`
-	IsMain    bool   `json:"is_main"`
-	SortOrder int    `json:"sort_order"`
+	ID        string  `json:"id"`
+	ProductID string  `json:"product_id"`
+	VariantID *string `json:"variant_id"`
+	URLImage  string  `json:"url_image"`
+	IsMain    bool    `json:"is_main"`
+	SortOrder int     `json:"sort_order"`
 }
 
 var validAttributeKeys = map[string]bool{

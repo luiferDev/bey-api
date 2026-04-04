@@ -2,13 +2,14 @@ package orders
 
 import (
 	products "bey/internal/modules/products"
+	"github.com/gofrs/uuid/v5"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type ProductPriceFinder interface {
-	GetPriceByID(id uint) (float64, error)
+	GetPriceByID(id uuid.UUID) (float64, error)
 }
 
 func RegisterRoutes(rg *gin.RouterGroup, db *gorm.DB) {
