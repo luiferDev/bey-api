@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"bey/internal/config"
@@ -22,6 +23,7 @@ type PaymentService struct {
 	orderService      *orders.OrderService
 	integrityKey      string
 	webhookEventsSeen map[string]bool
+	webhookMu         sync.RWMutex
 }
 
 func NewPaymentService(
@@ -274,11 +276,14 @@ func (s *PaymentService) DeactivatePaymentLink(id uuid.UUID) (*PaymentLink, erro
 
 func (s *PaymentService) ProcessWebhook(event *WebhookEvent) error {
 	if event.EventID != "" {
-		if _, seen := s.webhookEventsSeen[event.EventID]; seen {
+		s.webhookMu.Lock()
+		if seen := s.webhookEventsSeen[event.EventID]; seen {
+			s.webhookMu.Unlock()
 			log.Printf("Webhook event %s already processed, skipping", event.EventID)
 			return nil
 		}
 		s.webhookEventsSeen[event.EventID] = true
+		s.webhookMu.Unlock()
 	}
 
 	transaction := event.Transaction

@@ -368,14 +368,14 @@ func (s *ProductService) SubmitBulkUpdateTask(req BulkUpdateProductsRequest) (st
 }
 
 func (s *ProductService) processBulkUpdateTask(task *concurrency.Task) {
-	task.Status = concurrency.TaskStatusRunning
-	task.UpdatedAt = time.Now()
+	task.SetStatus(concurrency.TaskStatusRunning)
+	task.SetUpdatedAt(time.Now())
 
 	req, ok := task.Payload.(BulkUpdateProductsRequest)
 	if !ok {
-		task.Status = concurrency.TaskStatusFailed
-		task.Error = "invalid payload type"
-		task.UpdatedAt = time.Now()
+		task.SetStatus(concurrency.TaskStatusFailed)
+		task.SetError("invalid payload type")
+		task.SetUpdatedAt(time.Now())
 		return
 	}
 
@@ -396,9 +396,9 @@ func (s *ProductService) processBulkUpdateTask(task *concurrency.Task) {
 		}
 	}
 
-	task.Result = result
-	task.Status = concurrency.TaskStatusCompleted
-	task.UpdatedAt = time.Now()
+	task.SetResult(result)
+	task.SetStatus(concurrency.TaskStatusCompleted)
+	task.SetUpdatedAt(time.Now())
 }
 
 func (s *ProductService) applyProductUpdate(productID uuid.UUID, update UpdateProductRequest) error {
@@ -458,14 +458,14 @@ func (s *ProductService) SubmitBulkCreateTask(req BulkCreateProductsRequest) (st
 }
 
 func (s *ProductService) processBulkCreateTask(task *concurrency.Task) {
-	task.Status = concurrency.TaskStatusRunning
-	task.UpdatedAt = time.Now()
+	task.SetStatus(concurrency.TaskStatusRunning)
+	task.SetUpdatedAt(time.Now())
 
 	req, ok := task.Payload.(BulkCreateProductsRequest)
 	if !ok {
-		task.Status = concurrency.TaskStatusFailed
-		task.Error = "invalid payload type"
-		task.UpdatedAt = time.Now()
+		task.SetStatus(concurrency.TaskStatusFailed)
+		task.SetError("invalid payload type")
+		task.SetUpdatedAt(time.Now())
 		return
 	}
 
@@ -483,9 +483,9 @@ func (s *ProductService) processBulkCreateTask(task *concurrency.Task) {
 		}
 	}
 
-	task.Result = result
-	task.Status = concurrency.TaskStatusCompleted
-	task.UpdatedAt = time.Now()
+	task.SetResult(result)
+	task.SetStatus(concurrency.TaskStatusCompleted)
+	task.SetUpdatedAt(time.Now())
 }
 
 func (s *ProductService) SubmitBulkDeleteTask(req BulkDeleteProductsRequest) (string, error) {
@@ -510,14 +510,14 @@ func (s *ProductService) SubmitBulkDeleteTask(req BulkDeleteProductsRequest) (st
 }
 
 func (s *ProductService) processBulkDeleteTask(task *concurrency.Task) {
-	task.Status = concurrency.TaskStatusRunning
-	task.UpdatedAt = time.Now()
+	task.SetStatus(concurrency.TaskStatusRunning)
+	task.SetUpdatedAt(time.Now())
 
 	req, ok := task.Payload.(BulkDeleteProductsRequest)
 	if !ok {
-		task.Status = concurrency.TaskStatusFailed
-		task.Error = "invalid payload type"
-		task.UpdatedAt = time.Now()
+		task.SetStatus(concurrency.TaskStatusFailed)
+		task.SetError("invalid payload type")
+		task.SetUpdatedAt(time.Now())
 		return
 	}
 
@@ -535,9 +535,9 @@ func (s *ProductService) processBulkDeleteTask(task *concurrency.Task) {
 		}
 	}
 
-	task.Result = result
-	task.Status = concurrency.TaskStatusCompleted
-	task.UpdatedAt = time.Now()
+	task.SetResult(result)
+	task.SetStatus(concurrency.TaskStatusCompleted)
+	task.SetUpdatedAt(time.Now())
 }
 
 func (s *ProductService) GetTaskStatus(taskID string) (*concurrency.Task, error) {

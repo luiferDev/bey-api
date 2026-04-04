@@ -18,6 +18,7 @@ type workerPool struct {
 	queueDepth  int
 	taskQueue   chan *Task
 	wg          sync.WaitGroup
+	mu          sync.Mutex
 	stopChan    chan struct{}
 	handler     TaskHandler
 	started     bool
@@ -30,11 +31,13 @@ func NewWorkerPool(workerCount int, queueDepth int, handler TaskHandler) WorkerP
 		taskQueue:   make(chan *Task, queueDepth),
 		stopChan:    make(chan struct{}),
 		handler:     handler,
-		started:     false,
 	}
 }
 
 func (p *workerPool) Start() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	if p.started {
 		return nil
 	}
@@ -78,7 +81,11 @@ func (p *workerPool) worker(id int) {
 }
 
 func (p *workerPool) Submit(task *Task) error {
-	if !p.started {
+	p.mu.Lock()
+	started := p.started
+	p.mu.Unlock()
+
+	if !started {
 		return ErrWorkerPoolNotStarted
 	}
 
@@ -91,15 +98,18 @@ func (p *workerPool) Submit(task *Task) error {
 }
 
 func (p *workerPool) Shutdown() error {
+	p.mu.Lock()
 	if !p.started {
+		p.mu.Unlock()
 		return nil
 	}
+	p.started = false
+	p.mu.Unlock()
 
 	close(p.taskQueue)
 	p.wg.Wait()
 	close(p.stopChan)
 
-	p.started = false
 	return nil
 }
 
