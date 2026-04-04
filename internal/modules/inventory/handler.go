@@ -36,7 +36,18 @@ func (h *InventoryHandler) GetByProductID(c *gin.Context) {
 		h.resp.NotFound(c, "inventory not found")
 		return
 	}
-	h.resp.Success(c, toInventoryResponse(inventory))
+
+	resp := toInventoryResponse(inventory)
+
+	// Sum stock from all variants of this product
+	variantStock, variantReserved, err := h.repo.GetVariantStockSummary(productID)
+	if err == nil && (variantStock > 0 || variantReserved > 0) {
+		resp.VariantStock = variantStock
+		resp.VariantReserved = variantReserved
+		resp.VariantAvailable = variantStock - variantReserved
+	}
+
+	h.resp.Success(c, resp)
 }
 
 func (h *InventoryHandler) Update(c *gin.Context) {

@@ -222,9 +222,32 @@ Todos los endpoints protegidos requieren JWT en el header `Authorization: Bearer
 |--------|----------|-------------|------|
 | `POST` | `/api/v1/orders` | Crear orden | ✅ |
 | `GET`  | `/api/v1/orders/:id` | Obtener orden | ✅ |
+| `PATCH` | `/api/v1/orders/:id/status` | Actualizar estado | ✅ |
 | `POST` | `/api/v1/orders/:id/confirm` | Confirmar orden | ✅ |
 | `POST` | `/api/v1/orders/:id/cancel` | Cancelar orden | ✅ |
+| `GET`  | `/api/v1/orders/tasks/:task_id` | Estado de tarea asíncrona | ✅ |
 | `GET`  | `/api/v1/orders` | Listar órdenes | 🔒 Admin |
+
+#### Estados de Orden
+
+| Estado | Descripción | Transiciones válidas |
+|--------|-------------|---------------------|
+| `pending` | Orden creada, esperando confirmación | → `confirmed`, → `cancelled` |
+| `confirmed` | Orden confirmada, stock descontado | → `shipped`, → `cancelled` |
+| `shipped` | Orden enviada al cliente | → `delivered` |
+| `delivered` | Orden entregada al cliente | (estado final) |
+| `cancelled` | Orden cancelada, stock liberado | (estado final) |
+
+> ⚠️ El endpoint `PATCH /api/v1/orders/:id/status` acepta **cualquier string** como estado. No hay validación de transiciones a nivel de API — la validación de estados válidos se hace en los endpoints `confirm` y `cancel`.
+
+#### Estados de Pago
+
+| Estado | Descripción |
+|--------|-------------|
+| `pending` | Pago pendiente |
+| `paid` | Pago aprobado |
+| `failed` | Pago rechazado |
+| `refunded` | Pago reembolsado |
 
 ### Pagos
 | Método | Endpoint | Descripción | Auth |

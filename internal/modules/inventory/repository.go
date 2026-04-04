@@ -62,3 +62,19 @@ func (r *InventoryRepository) Release(productID uuid.UUID, quantity int) error {
 		"reserved": gorm.Expr("reserved - ?", quantity),
 	}).Error
 }
+
+// VariantStockSummary returns the total stock and reserved across all variants of a product.
+func (r *InventoryRepository) GetVariantStockSummary(productID uuid.UUID) (totalStock, totalReserved int, err error) {
+	type stockResult struct {
+		TotalStock    int `gorm:"column:total_stock"`
+		TotalReserved int `gorm:"column:total_reserved"`
+	}
+	var result stockResult
+	err = r.db.Raw(`
+		SELECT COALESCE(SUM(stock), 0) as total_stock,
+		       COALESCE(SUM(reserved), 0) as total_reserved
+		FROM product_variants
+		WHERE product_id = ? AND deleted_at IS NULL
+	`, productID).Scan(&result).Error
+	return result.TotalStock, result.TotalReserved, err
+}
