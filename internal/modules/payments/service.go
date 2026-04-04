@@ -319,11 +319,12 @@ func (s *PaymentService) ProcessWebhook(event *WebhookEvent) error {
 			log.Printf("Updated payment link %d status from %s to %s", link.ID, oldStatus, link.Status)
 
 			if s.orderService != nil && link.OrderID != uuid.Nil {
-				if link.Status == StatusApproved {
+				switch link.Status {
+				case StatusApproved:
 					if err := s.orderService.UpdatePaymentStatus(link.OrderID, "paid", transaction.ID); err != nil {
 						log.Printf("Failed to update order payment status: %v", err)
 					}
-				} else if link.Status == StatusDeclined || link.Status == StatusVoided {
+				case StatusDeclined, StatusVoided:
 					if err := s.orderService.UpdatePaymentStatus(link.OrderID, "failed", transaction.ID); err != nil {
 						log.Printf("Failed to update order payment status: %v", err)
 					}
@@ -345,11 +346,12 @@ func (s *PaymentService) ProcessWebhook(event *WebhookEvent) error {
 		log.Printf("Updated payment %d status from %s to %s", payment.ID, oldStatus, payment.Status)
 
 		if s.orderService != nil && payment.OrderID != uuid.Nil {
-			if payment.Status == StatusApproved {
+			switch payment.Status {
+			case StatusApproved:
 				if err := s.orderService.UpdatePaymentStatus(payment.OrderID, "paid", transaction.ID); err != nil {
 					log.Printf("Failed to update order payment status: %v", err)
 				}
-			} else if payment.Status == StatusDeclined || payment.Status == StatusVoided {
+			case StatusDeclined, StatusVoided:
 				if err := s.orderService.UpdatePaymentStatus(payment.OrderID, "failed", transaction.ID); err != nil {
 					log.Printf("Failed to update order payment status: %v", err)
 				}

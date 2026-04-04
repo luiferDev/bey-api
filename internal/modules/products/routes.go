@@ -15,6 +15,7 @@ func SetupRoutes(router *gin.RouterGroup, db *gorm.DB) {
 }
 
 // SetupRoutesWithService sets up routes with a custom ProductService.
+//
 // Deprecated: Use SetupRoutesWithCache for cache support.
 func SetupRoutesWithService(router *gin.RouterGroup, db *gorm.DB, productService *ProductService, authMiddleware gin.HandlerFunc, adminMiddleware gin.HandlerFunc) {
 	categoryRepo := NewCategoryRepository(db)

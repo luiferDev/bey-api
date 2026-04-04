@@ -121,7 +121,7 @@ func removeSpecialChars(s string) string {
 	result := make([]byte, 0, len(s))
 	for _, c := range s {
 		if c >= '0' && c <= '9' || c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' {
-			result = append(result, byte(c))
+			result = append(result, byte(c)) //nolint:gosec // G115: c is ASCII alphanumeric (0-127), safe to convert
 		}
 	}
 	return string(result)
