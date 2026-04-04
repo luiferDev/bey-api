@@ -1,450 +1,140 @@
 # AGENTS.md - Bey API Development Guide
 
-## Project Overview
-Go REST API with Gin + GORM for e-commerce (products, categories, users, orders, inventory, cart, payments).  
-**Tech Stack**: Go 1.26, Gin, GORM, PostgreSQL, Redis, JWT, OAuth2, Wompi, YAML config
-
-```
-bey_api/
-├── cmd/api/main.go              # Entry point
-├── internal/
-│   ├── config/                  # YAML config loading
-│   ├── database/                # DB connection
-│   ├── concurrency/             # Worker pool, task queue
-│   ├── modules/                 # Feature modules
-│   │   ├── auth/               # JWT, OAuth2, 2FA
-│   │   ├── users/              # User management
-│   │   ├── products/           # Products, categories, variants
-│   │   ├── cart/               # Shopping cart (Redis)
-│   │   ├── orders/             # Order management
-│   │   ├── payments/          # Wompi integration
-│   │   ├── inventory/          # Stock management
-│   │   └── ...
-│   └── shared/                  # Middleware, helpers
-├── config.yaml
-└── openspec/                    # SDD specifications
-```
-
----
+Go 1.26 REST API with Gin + GORM for e-commerce (products, categories, users, orders, inventory, cart, payments).
+**Stack**: Go 1.26, Gin, GORM, PostgreSQL 17, Redis 8, JWT, OAuth2, Wompi, YAML config
 
 ## Essential Commands
 
-### Build & Run
 ```bash
-go run ./cmd/api/                    # Run dev server (localhost:8080)
-go build -o main ./cmd/api/          # Build binary
-go build -tags prod ./cmd/api/        # Build with production tag
-```
-
-### Testing - SINGLE TEST (most important)
-```bash
-# Run one specific test
-go test -v -run TestFunctionName ./internal/modules/products/...
-
-# Run all tests in a package
-go test -v ./internal/modules/products/...
-
-# Run all tests with coverage
-go test -v -cover ./...
-
-# Run with race detector (in development only)
-go test -race ./...
-
-# Run specific test file
-go test -v ./internal/modules/products/... -run TestProductRepository_FindByID
-```
-
-### Linting & Quality
-```bash
-go fmt ./...                    # Format code
-go vet ./...                    # Basic vet
-golangci-lint run              # Full lint (config: .golangci.yml)
-golangci-lint run --fast       # Fast mode (skip slow linters)
-```
-
-### Swagger Documentation
-```bash
+go run ./cmd/api/                          # Dev server (localhost:8080)
+go build -o main ./cmd/api/                # Build binary
+go test -v -run TestName ./internal/...    # Single test (MOST IMPORTANT)
+go test -race ./...                        # Race detector (dev only)
+go test -v -cover ./...                    # All tests with coverage
+golangci-lint run --timeout=5m             # Lint (v2.11+, config: .golangci.yml)
+go fmt ./... && go vet ./...               # Format + basic checks
 swag init -g cmd/api/main.go -o cmd/api/docs --parseDependency --parseInternal
-# Access: http://localhost:8080/swagger/index.html
+docker compose up -d                       # Start all services
 ```
 
-### Database
-```bash
-# Run migrations (auto in main.go via GORM AutoMigrate)
-# Reset test database (if using testcontainers)
+## Code Style
+
+### Imports (3 groups, blank line between)
+```go
+import (
+    "encoding/json"  // Stdlib
+    "github.com/gin-gonic/gin"  // Third-party
+    "bey/internal/config"  // Internal
+)
 ```
 
----
-
-## Code Style Guidelines
-
-### Naming Conventions
+### Naming
 | Type | Convention | Example |
 |------|-----------|---------|
 | Files | `snake_case` | `handler.go`, `product_repository.go` |
 | Types | `PascalCase` | `ProductHandler`, `ProductRepository` |
 | Variables | `camelCase` | `productRepo`, `categoryID` |
-| Constants | `PascalCase` or `SnakeCase` | `MaxItems`, `MAX_RETRIES` |
 | Interfaces | `er` suffix | `Repository`, `Handler`, `Service` |
 | Test files | `*_test.go` | `handler_test.go` |
 
-### Imports (3 groups, blank line between)
-```go
-import (
-    // Stdlib - standard library
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "time"
-
-    // Third-party - external dependencies
-    "github.com/gin-gonic/gin"
-    "github.com/golang-jwt/jwt/v5"
-    "gorm.io/gorm"
-
-    // Internal - project packages
-    "bey/internal/config"
-    "bey/internal/modules/products"
-)
-```
-
-### GORM Models
+### GORM Models — use `uuid.UUID` (gofrs/uuid/v5), NOT uint
 ```go
 type Product struct {
-    ID        uint           `gorm:"primaryKey" json:"id"`
-    Name      string         `gorm:"size:255;not null" json:"name"`
-    Slug      string         `gorm:"size:255;uniqueIndex;not null" json:"slug"`
-    BasePrice float64        `gorm:"type:decimal(12,2);not null" json:"base_price"`
-    Category  Category       `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
-    Images    []ProductImage `gorm:"foreignKey:ProductID" json:"images,omitempty"`
-    CreatedAt time.Time      `json:"created_at"`
-    UpdatedAt time.Time      `json:"updated_at"`
-}
-
-// Use pointer for optional relations
-type ProductVariant struct {
-    ID        uint                   `gorm:"primaryKey" json:"id"`
-    ProductID uint                   `json:"product_id"`
-    SKU       string                 `gorm:"size:100;uniqueIndex;not null" json:"sku"`
-    Price     float64                `gorm:"type:decimal(12,2);not null" json:"price"`
-    Stock     int                    `gorm:"default:0" json:"stock"`
-    Reserved  int                    `gorm:"default:0" json:"reserved"`
-    Attribute *ProductVariantAttribute `gorm:"foreignKey:VariantID" json:"attribute,omitempty"`
-    Images    []ProductImage          `gorm:"foreignKey:VariantID" json:"images,omitempty"`
+    ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+    Name      string    `gorm:"size:255;not null" json:"name"`
+    Slug      string    `gorm:"size:255;uniqueIndex;not null" json:"slug"`
+    Category  Category  `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 }
 ```
 
-### DTOs (Request/Response)
+### DTOs — Request/Response, never raw GORM models in handlers
 ```go
-// Request DTOs - use descriptive names
 type CreateProductRequest struct {
-    CategoryID  uint    `json:"category_id" binding:"required"`
-    Name        string  `json:"name" binding:"required,max=255"`
-    Slug        string  `json:"slug" binding:"required,max=255"`
-    BasePrice   float64 `json:"base_price" binding:"required,gt=0"`
-    Description string  `json:"description"`
+    CategoryID string  `json:"category_id" binding:"required"`
+    Name       string  `json:"name" binding:"required,max=255"`
+    BasePrice  float64 `json:"base_price" binding:"required,gt=0"`
 }
-
-// Response DTOs
-type ProductResponse struct {
-    ID        uint      `json:"id"`
-    Name      string    `json:"name"`
-    BasePrice float64   `json:"base_price"`
-    Category  Category  `json:"category,omitempty"`
-}
-
-// Optional fields use pointer types
 type UpdateProductRequest struct {
-    Name        *string  `json:"name"`
-    BasePrice   *float64  `json:"base_price"`
+    Name      *string  `json:"name"`      // Pointer = optional (PATCH)
+    BasePrice *float64 `json:"base_price"`
 }
 ```
 
-### Error Handling
+### Error Handling — return nil, nil for "not found"
 ```go
-// Return errors from repo/service layers
-// Use errors.Is() for GORM errors
-// Return nil, nil for "not found" (not sentinel errors)
-
-func (r *ProductRepository) FindByID(id uint) (*Product, error) {
+func (r *ProductRepository) FindByID(id uuid.UUID) (*Product, error) {
     var product Product
     if err := r.db.First(&product, id).Error; err != nil {
         if errors.Is(err, gorm.ErrRecordNotFound) {
-            return nil, nil  // Not found - not an error
+            return nil, nil  // Not found — NOT an error
         }
         return nil, fmt.Errorf("failed to find product: %w", err)
     }
     return &product, nil
 }
-
-// Custom error types for business logic
-var (
-    ErrProductNotFound   = errors.New("product not found")
-    ErrInsufficientStock = errors.New("insufficient stock")
-    ErrUnauthorized      = errors.New("unauthorized")
-)
 ```
 
-### Handler Pattern
+### Handler Pattern — use ResponseHandler, return early on errors
 ```go
-type ProductHandler struct {
-    productRepo *ProductRepository
-    productSvc  *ProductService
-}
-
-// Constructor pattern - dependency injection
-func NewProductHandler(productRepo *ProductRepository, productSvc *ProductService) *ProductHandler {
-    return &ProductHandler{
-        productRepo: productRepo,
-        productSvc:  productSvc,
-    }
-}
-
-// Handler methods - return early on errors
 func (h *ProductHandler) GetProduct(c *gin.Context) {
-    id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+    id, err := uuid.FromString(c.Param("id"))
     if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product ID"})
+        h.resp.ValidationError(c, "invalid product ID format")
         return
     }
-
-    product, err := h.productRepo.FindByID(uint(id))
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
-    if product == nil {
-        c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
-        return
-    }
-
-    c.JSON(http.StatusOK, product)
+    product, err := h.repo.FindByID(id)
+    if err != nil { h.resp.InternalError(c, "failed to get product"); return }
+    if product == nil { h.resp.NotFound(c, "product not found"); return }
+    h.resp.Success(c, toProductResponse(product))  // DTO, never raw model
 }
 ```
 
-### Routes Pattern
-```go
-func RegisterRoutes(router *gin.RouterGroup, handler *ProductHandler) {
-    products := router.Group("/products")
-    {
-        products.GET("", handler.ListProducts)
-        products.GET("/:id", handler.GetProduct)
-        products.POST("", handler.CreateProduct)
-        products.PUT("/:id", handler.UpdateProduct)
-        products.DELETE("/:id", handler.DeleteProduct)
-    }
-}
-```
-
-### Configuration Pattern
-```go
-type Config struct {
-    App        AppConfig        `yaml:"app"`
-    Database   DatabaseConfig   `yaml:"database"`
-    Redis      RedisConfig      `yaml:"redis"`
-    RateLimit  RateLimitConfig  `yaml:"rate_limit"`
-    Wompi      WompiConfig     `yaml:"wompi"`
-}
-
-// YAML tags with validation
-type WompiConfig struct {
-    Enabled      bool   `yaml:"enabled"`
-    Environment  string `yaml:"environment"` // "sandbox" or "production"
-    PublicKey    string `yaml:"public_key"`
-    PrivateKey   string `yaml:"private_key"`
-    EventKey     string `yaml:"event_key"`
-    IntegrityKey string `yaml:"integrity_key"`
-    BaseURL      string `yaml:"base_url"`
-}
-```
-
----
-
-## Linter Configuration
-
-The project uses **golangci-lint** with these linters enabled:
-- `errcheck` - Check unchecked errors
-- `gosimple` - Simplify code
-- `govet` - Suspicious constructs
-- `ineffassign` - Unused variable assignments
-- `staticcheck` - Static analysis
-- `unused` - Unused code
-- `gosec` - Security checker
-- `bodyclose` - HTTP response body closed
-- `nocxt` - HTTP requests without context
-- `gocritic` - Bugs and style issues
-
-Run linting:
-```bash
-golangci-lint run --timeout=5m
-```
-
----
-
-## Module Structure
-
-Each feature module follows this pattern:
-
+### Module Structure
 ```
 internal/modules/{module}/
-├── model.go         # GORM models
-├── dto.go           # Request/Response DTOs
-├── repository.go    # Data access layer
+├── model.go         # GORM models (uuid.UUID, gorm tags)
+├── dto.go           # Request/Response DTOs (binding tags)
+├── repository.go    # Data access (nil, nil for not found)
 ├── service.go       # Business logic
-├── handler.go       # HTTP handlers
+├── handler.go       # HTTP handlers (ResponseHandler, DTOs only)
 ├── routes.go        # Route definitions
-├── {module}_test.go # Tests (optional)
-└── ...
+└── *_test.go        # Table-driven tests
 ```
 
-### Adding a New Module
-1. `model.go` - GORM models with proper tags
-2. `dto.go` - Request/Response DTOs with binding validation
-3. `repository.go` - Data access with error handling
-4. `service.go` - Business logic, orchestration
-5. `handler.go` - HTTP handlers, Gin context
-6. `routes.go` - Route definitions
-7. Register in `main.go`
+## Critical Rules
 
----
+1. **NEVER return raw GORM models in HTTP responses** — always use DTOs. Bidirectional relations (Category↔Product) cause infinite JSON recursion.
+2. **ALWAYS use thread-safe Task methods** — `task.SetStatus()`, `task.SetError()`, `task.SetResult()`, `task.SetUpdatedAt()`. NEVER write `task.Status = ...` directly (data race).
+3. **`product_variants` has NO `deleted_at` column** — never query `WHERE deleted_at IS NULL` on this table.
+4. **Inventory source of truth is `product_variants`** — the `inventories` table is legacy. Sum `stock`/`reserved` from variants.
+5. **Never use empty strings for `time.Duration` in config.yaml** — YAML parser crashes. Remove the field; defaults are in code.
+6. **Type assertions must use comma-ok**: `val, ok := iface.(Type)` — never `iface.(Type)` directly (errcheck lint).
+7. **Use `http.NewRequestWithContext()`** — never `http.NewRequest()` (noctx lint).
+8. **Docker secrets via `env_file: - .env`** — never hardcode in docker-compose.yml.
 
-## Testing Guidelines
+## Security
 
-### Table-Driven Tests
-```go
-func TestProductService_CreateProduct(t *testing.T) {
-    tests := []struct {
-        name        string
-        input       CreateProductRequest
-        wantErr     bool
-        errContains string
-    }{
-        {
-            name: "success - create product",
-            input: CreateProductRequest{
-                Name:      "Test Product",
-                BasePrice: 100.00,
-            },
-            wantErr: false,
-        },
-        {
-            name: "fail - invalid price",
-            input: CreateProductRequest{
-                Name:      "Test Product",
-                BasePrice: -10.00,
-            },
-            wantErr:     true,
-            errContains: "price must be greater than 0",
-        },
-    }
-
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            // Test implementation
-        })
-    }
-}
-```
-
-### Handler Tests
-```go
-func TestProductHandler_GetProduct(t *testing.T) {
-    // Use gin.SetMode(gin.TestMode)
-    // Mock dependencies
-    // Test HTTP responses
-}
-```
-
----
-
-## Security Guidelines
-
-### Always Load the `go-gin-security` Skill
-Before implementing ANY new feature, API endpoint, or making security-related changes, load the `go-gin-security` skill from `~/.opencode/skills/go-gin-security/SKILL.md`. This skill covers:
-- OWASP Top 10:2025 mapped to Go/Gin
-- OWASP API Security Top 10:2025
-- Go/Gin specific CVEs and vulnerabilities
-- BOLA/IDOR prevention patterns
-- Authentication and authorization checklists
-- Input validation, rate limiting, and error handling rules
-
-### Never Expose Secrets
-- Never log sensitive data (passwords, API keys, tokens)
-- Use environment variables or secrets management
-- Validate all input with binding tags
-- JWT secret must be at least 32 characters — validated at startup
-
-### Authentication
-- All protected routes require valid JWT in cookie (`access_token`)
-- Use middleware for auth checks
-- Verify user ownership for sensitive operations (BOLA prevention)
+- Load `go-gin-security` skill before any security-related work
 - Derive user identity from JWT claims, NEVER from request body
-
-### Authorization
-- Every endpoint checks permissions (defense-in-depth: middleware + handler)
-- Users can only access their own resources
-- Admin endpoints protected with explicit role checks in handlers
-- No IDOR — validate user-controlled IDs against JWT claims
-
-### Database
-- Use parameterized queries (GORM does this automatically)
-- Never concatenate user input into SQL
-- Use transactions for multi-step operations
-
-### Input Validation
 - All DTOs have `binding` tags with `max` length limits
-- Request body size limited to 10MB
-- Content-Type validated on webhook endpoints
+- Generic error messages to clients; full errors logged server-side
+- JWT secret must be ≥32 characters (validated at startup)
 
-### Error Handling
-- Generic error messages to clients (no stack traces, no DB errors)
-- Full errors logged server-side
-- Sensitive data never returned in responses
+## Linter (golangci-lint v2.11+)
 
----
-
-## Available Skills
-
-### Project-Level (`.agents/skills/`)
-| Skill | Description |
-|-------|-------------|
-| golang-patterns | Idiomatic Go patterns |
-| golang-testing | Table-driven tests, subtests |
-| golang-concurrency-patterns | Goroutines, channels, sync |
-| golang-pro | Advanced Go, microservices, pprof |
-| docker-expert | Multi-stage builds, container security |
-| paypal-integration | PayPal payments |
-
-### Global Skills (`~/.opencode/skills/`)
-| Skill | Description |
-|-------|-------------|
-| sdd-* | SDD workflow (explore, propose, spec, design, tasks, apply, verify, archive) |
-| golang-gin-api | Gin REST API patterns |
-| **go-gin-security** | OWASP Top 10 + API Security for Go/Gin — MUST load before any security-related work |
-
----
+Enabled: `errcheck`, `staticcheck` (includes gosimple), `govet`, `ineffassign`, `unused`, `gosec`, `bodyclose`, `noctx`, `gocritic`.
 
 ## Database
 
-- Use GORM `AutoMigrate()` in `main.go`
-- Models in `internal/modules/*/model.go`
-- Follow migration naming: `20260101000000_create_users.go`
-
----
+- PostgreSQL 17, GORM AutoMigrate in `main.go`
+- UUID v7 for all primary keys (`uuidutil.GenerateV7()` in BeforeCreate)
+- Parameterized queries only (GORM handles this)
+- Use transactions for multi-step operations
 
 ## Docker
 
 ```bash
-# Development
-docker-compose up -d
-
-# Build production image
-docker build -t bey-api:latest .
-
-# Run container
-docker run -p 8080:8080 bey-api:latest
+docker compose up -d           # Start API + PostgreSQL + Redis
+docker compose watch           # Dev watch mode (auto-restart on .go changes)
+docker compose down -v         # Stop + delete volumes (⚠️ data loss)
 ```
-
----
-
-*Last updated: March 2026*
