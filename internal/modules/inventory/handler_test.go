@@ -18,7 +18,7 @@ func setupTestDBForInventoryHandler(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
-	if err := db.AutoMigrate(&Inventory{}); err != nil {
+	if err := db.AutoMigrate(&Inventory{}, &ProductVariant{}); err != nil {
 		t.Fatalf("Failed to migrate database: %v", err)
 	}
 	return db
@@ -30,7 +30,6 @@ func setupTestRouterWithInventory(t *testing.T) (*gin.Engine, *InventoryHandler)
 	handler := NewInventoryHandler(db)
 
 	router := gin.New()
-	// Simulate admin user context for tests
 	router.Use(func(c *gin.Context) {
 		c.Set("user_role", "admin")
 		c.Set("user_id", uuid.Must(uuid.NewV7()).String())
@@ -39,7 +38,7 @@ func setupTestRouterWithInventory(t *testing.T) (*gin.Engine, *InventoryHandler)
 	return router, handler
 }
 
-func TestGetInventory_NotFound(t *testing.T) {
+func TestGetInventory_NoVariants(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
 
 	testUUID := uuid.Must(uuid.NewV7())
@@ -49,8 +48,85 @@ func TestGetInventory_NotFound(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusNotFound {
-		t.Errorf("Expected status 404, got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+
+	data, ok := resp["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data field in response")
+	}
+
+	if int(data["total_stock"].(float64)) != 0 {
+		t.Errorf("Expected total_stock 0, got %v", data["total_stock"])
+	}
+}
+
+func TestGetInventory_WithVariants(t *testing.T) {
+	router, handler := setupTestRouterWithInventory(t)
+	db := handler.repo.db
+
+	testUUID := uuid.Must(uuid.NewV7())
+	variant1 := ProductVariant{
+		ID:        uuid.Must(uuid.NewV7()),
+		ProductID: testUUID,
+		SKU:       "SKU-001",
+		Price:     100.00,
+		Stock:     50,
+		Reserved:  10,
+	}
+	variant2 := ProductVariant{
+		ID:        uuid.Must(uuid.NewV7()),
+		ProductID: testUUID,
+		SKU:       "SKU-002",
+		Price:     150.00,
+		Stock:     30,
+		Reserved:  5,
+	}
+	db.Create(&variant1)
+	db.Create(&variant2)
+
+	router.GET("/api/v1/inventory/:product_id", handler.GetByProductID)
+
+	req, _ := http.NewRequest("GET", "/api/v1/inventory/"+testUUID.String(), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+
+	data, ok := resp["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data field in response")
+	}
+
+	if int(data["total_stock"].(float64)) != 80 {
+		t.Errorf("Expected total_stock 80, got %v", data["total_stock"])
+	}
+	if int(data["total_reserved"].(float64)) != 15 {
+		t.Errorf("Expected total_reserved 15, got %v", data["total_reserved"])
+	}
+	if int(data["total_available"].(float64)) != 65 {
+		t.Errorf("Expected total_available 65, got %v", data["total_available"])
+	}
+
+	variants, ok := data["variants"].([]interface{})
+	if !ok {
+		t.Fatal("Expected variants array in response")
+	}
+	if len(variants) != 2 {
+		t.Errorf("Expected 2 variants, got %d", len(variants))
 	}
 }
 
@@ -84,13 +160,60 @@ func TestUpdateInventory_InvalidBody(t *testing.T) {
 	}
 }
 
-func TestUpdateInventory_Success(t *testing.T) {
+func TestUpdateInventory_MissingVariantID(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
 
 	testUUID := uuid.Must(uuid.NewV7())
 	router.PUT("/api/v1/inventory/:product_id", handler.Update)
 
 	body := `{"quantity":100}`
+	req, _ := http.NewRequest("PUT", "/api/v1/inventory/"+testUUID.String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for missing variant_id, got %d. Body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUpdateInventory_VariantNotFound(t *testing.T) {
+	router, handler := setupTestRouterWithInventory(t)
+
+	testUUID := uuid.Must(uuid.NewV7())
+	variantUUID := uuid.Must(uuid.NewV7())
+	router.PUT("/api/v1/inventory/:product_id", handler.Update)
+
+	body := `{"quantity":100, "variant_id":"` + variantUUID.String() + `"}`
+	req, _ := http.NewRequest("PUT", "/api/v1/inventory/"+testUUID.String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400, got %d. Body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUpdateInventory_Success(t *testing.T) {
+	router, handler := setupTestRouterWithInventory(t)
+	db := handler.repo.db
+
+	testUUID := uuid.Must(uuid.NewV7())
+	variantUUID := uuid.Must(uuid.NewV7())
+	variant := ProductVariant{
+		ID:        variantUUID,
+		ProductID: testUUID,
+		SKU:       "SKU-001",
+		Price:     100.00,
+		Stock:     50,
+		Reserved:  0,
+	}
+	db.Create(&variant)
+
+	router.PUT("/api/v1/inventory/:product_id", handler.Update)
+
+	body := `{"quantity":200, "variant_id":"` + variantUUID.String() + `"}`
 	req, _ := http.NewRequest("PUT", "/api/v1/inventory/"+testUUID.String(), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -110,8 +233,8 @@ func TestUpdateInventory_Success(t *testing.T) {
 		t.Fatal("Expected data field in response")
 	}
 
-	if int(data["quantity"].(float64)) != 100 {
-		t.Errorf("Expected quantity 100, got %v", data["quantity"])
+	if int(data["total_stock"].(float64)) != 200 {
+		t.Errorf("Expected total_stock 200, got %v", data["total_stock"])
 	}
 }
 
@@ -148,13 +271,13 @@ func TestReserveInventory_InvalidBody(t *testing.T) {
 	}
 }
 
-func TestReserveInventory_InsufficientStock(t *testing.T) {
+func TestReserveInventory_NoStock(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
 
 	testUUID := uuid.Must(uuid.NewV7())
 	router.POST("/api/v1/inventory/:product_id/reserve", handler.Reserve)
 
-	body := `{"quantity":1000}`
+	body := `{"quantity":10}`
 	req, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/reserve", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -165,103 +288,150 @@ func TestReserveInventory_InsufficientStock(t *testing.T) {
 	}
 }
 
-func TestReserveInventory_Success(t *testing.T) {
+func TestReserveInventory_VariantSuccess(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
+	db := handler.repo.db
 
 	testUUID := uuid.Must(uuid.NewV7())
-	router.PUT("/api/v1/inventory/:product_id", handler.Update)
+	variantUUID := uuid.Must(uuid.NewV7())
+	variant := ProductVariant{
+		ID:        variantUUID,
+		ProductID: testUUID,
+		SKU:       "SKU-001",
+		Price:     100.00,
+		Stock:     100,
+		Reserved:  0,
+	}
+	db.Create(&variant)
+
 	router.POST("/api/v1/inventory/:product_id/reserve", handler.Reserve)
 
-	updateBody := `{"quantity":100}`
-	req1, _ := http.NewRequest("PUT", "/api/v1/inventory/"+testUUID.String(), bytes.NewBufferString(updateBody))
-	req1.Header.Set("Content-Type", "application/json")
-	w1 := httptest.NewRecorder()
-	router.ServeHTTP(w1, req1)
+	body := `{"quantity":10, "variant_id":"` + variantUUID.String() + `"}`
+	req, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/reserve", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
 
-	if w1.Code != http.StatusOK {
-		t.Fatalf("Failed to set up inventory, got %d", w1.Code)
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
-	reserveBody := `{"quantity":10}`
-	req2, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/reserve", bytes.NewBufferString(reserveBody))
-	req2.Header.Set("Content-Type", "application/json")
-	w2 := httptest.NewRecorder()
-	router.ServeHTTP(w2, req2)
+	var v ProductVariant
+	db.First(&v, "id = ?", variantUUID)
+	if v.Stock != 90 {
+		t.Errorf("Expected stock 90, got %d", v.Stock)
+	}
+	if v.Reserved != 10 {
+		t.Errorf("Expected reserved 10, got %d", v.Reserved)
+	}
+}
 
-	if w2.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d. Body: %s", w2.Code, w2.Body.String())
+func TestReserveInventory_ProductSuccess(t *testing.T) {
+	router, handler := setupTestRouterWithInventory(t)
+	db := handler.repo.db
+
+	testUUID := uuid.Must(uuid.NewV7())
+	variantUUID := uuid.Must(uuid.NewV7())
+	variant := ProductVariant{
+		ID:        variantUUID,
+		ProductID: testUUID,
+		SKU:       "SKU-001",
+		Price:     100.00,
+		Stock:     100,
+		Reserved:  0,
+	}
+	db.Create(&variant)
+
+	router.POST("/api/v1/inventory/:product_id/reserve", handler.Reserve)
+
+	body := `{"quantity":25}`
+	req, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/reserve", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	}
+
+	var v ProductVariant
+	db.First(&v, "id = ?", variantUUID)
+	if v.Stock != 75 {
+		t.Errorf("Expected stock 75, got %d", v.Stock)
+	}
+	if v.Reserved != 25 {
+		t.Errorf("Expected reserved 25, got %d", v.Reserved)
 	}
 }
 
 func TestReleaseInventory_Success(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
+	db := handler.repo.db
 
 	testUUID := uuid.Must(uuid.NewV7())
-	router.PUT("/api/v1/inventory/:product_id", handler.Update)
-	router.POST("/api/v1/inventory/:product_id/reserve", handler.Reserve)
+	variantUUID := uuid.Must(uuid.NewV7())
+	variant := ProductVariant{
+		ID:        variantUUID,
+		ProductID: testUUID,
+		SKU:       "SKU-001",
+		Price:     100.00,
+		Stock:     80,
+		Reserved:  20,
+	}
+	db.Create(&variant)
+
 	router.POST("/api/v1/inventory/:product_id/release", handler.Release)
 
-	updateBody := `{"quantity":100}`
-	req1, _ := http.NewRequest("PUT", "/api/v1/inventory/"+testUUID.String(), bytes.NewBufferString(updateBody))
-	req1.Header.Set("Content-Type", "application/json")
-	w1 := httptest.NewRecorder()
-	router.ServeHTTP(w1, req1)
+	body := `{"quantity":10, "variant_id":"` + variantUUID.String() + `"}`
+	req, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/release", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
 
-	if w1.Code != http.StatusOK {
-		t.Fatalf("Failed to set up inventory, got %d", w1.Code)
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
-	reserveBody := `{"quantity":20}`
-	req2, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/reserve", bytes.NewBufferString(reserveBody))
-	req2.Header.Set("Content-Type", "application/json")
-	w2 := httptest.NewRecorder()
-	router.ServeHTTP(w2, req2)
-
-	if w2.Code != http.StatusOK {
-		t.Fatalf("Failed to reserve inventory, got %d", w2.Code)
+	var v ProductVariant
+	db.First(&v, "id = ?", variantUUID)
+	if v.Stock != 90 {
+		t.Errorf("Expected stock 90, got %d", v.Stock)
 	}
-
-	releaseBody := `{"quantity":10}`
-	req3, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/release", bytes.NewBufferString(releaseBody))
-	req3.Header.Set("Content-Type", "application/json")
-	w3 := httptest.NewRecorder()
-	router.ServeHTTP(w3, req3)
-
-	if w3.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d. Body: %s", w3.Code, w3.Body.String())
+	if v.Reserved != 10 {
+		t.Errorf("Expected reserved 10, got %d", v.Reserved)
 	}
 }
 
 func TestReleaseInventory_NotEnoughReserved(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
+	db := handler.repo.db
 
 	testUUID := uuid.Must(uuid.NewV7())
-	router.PUT("/api/v1/inventory/:product_id", handler.Update)
-	router.POST("/api/v1/inventory/:product_id/reserve", handler.Reserve)
+	variantUUID := uuid.Must(uuid.NewV7())
+	variant := ProductVariant{
+		ID:        variantUUID,
+		ProductID: testUUID,
+		SKU:       "SKU-001",
+		Price:     100.00,
+		Stock:     100,
+		Reserved:  5,
+	}
+	db.Create(&variant)
+
 	router.POST("/api/v1/inventory/:product_id/release", handler.Release)
 
-	updateBody := `{"quantity":100}`
-	req1, _ := http.NewRequest("PUT", "/api/v1/inventory/"+testUUID.String(), bytes.NewBufferString(updateBody))
-	req1.Header.Set("Content-Type", "application/json")
-	w1 := httptest.NewRecorder()
-	router.ServeHTTP(w1, req1)
+	body := `{"quantity":50, "variant_id":"` + variantUUID.String() + `"}`
+	req, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/release", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
 
-	if w1.Code != http.StatusOK {
-		t.Fatalf("Failed to set up inventory, got %d", w1.Code)
-	}
-
-	releaseBody := `{"quantity":50}`
-	req2, _ := http.NewRequest("POST", "/api/v1/inventory/"+testUUID.String()+"/release", bytes.NewBufferString(releaseBody))
-	req2.Header.Set("Content-Type", "application/json")
-	w2 := httptest.NewRecorder()
-	router.ServeHTTP(w2, req2)
-
-	if w2.Code != http.StatusBadRequest {
-		t.Errorf("Expected status 400 for not enough reserved, got %d. Body: %s", w2.Code, w2.Body.String())
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for not enough reserved, got %d. Body: %s", w.Code, w.Body.String())
 	}
 }
 
-func TestReleaseInventory_NotFound(t *testing.T) {
+func TestReleaseInventory_NoReservedStock(t *testing.T) {
 	router, handler := setupTestRouterWithInventory(t)
 
 	testUUID := uuid.Must(uuid.NewV7())
@@ -273,7 +443,7 @@ func TestReleaseInventory_NotFound(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusNotFound {
-		t.Errorf("Expected status 404, got %d. Body: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400, got %d. Body: %s", w.Code, w.Body.String())
 	}
 }

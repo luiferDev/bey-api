@@ -1,6 +1,8 @@
 package inventory
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gofrs/uuid/v5"
 	"gorm.io/gorm"
@@ -27,24 +29,18 @@ func (h *InventoryHandler) GetByProductID(c *gin.Context) {
 		return
 	}
 
-	inventory, err := h.repo.FindByProductID(productID)
+	result, err := h.repo.GetProductInventory(productID)
 	if err != nil {
 		h.resp.InternalError(c, "failed to get inventory")
 		return
 	}
-	if inventory == nil {
-		h.resp.NotFound(c, "inventory not found")
-		return
-	}
 
-	resp := toInventoryResponse(inventory)
-
-	// Sum stock from all variants of this product
-	variantStock, variantReserved, err := h.repo.GetVariantStockSummary(productID)
-	if err == nil && (variantStock > 0 || variantReserved > 0) {
-		resp.VariantStock = variantStock
-		resp.VariantReserved = variantReserved
-		resp.VariantAvailable = variantStock - variantReserved
+	resp := InventoryResponse{
+		ProductID:      productID.String(),
+		TotalStock:     result.TotalStock,
+		TotalReserved:  result.TotalReserved,
+		TotalAvailable: result.TotalStock - result.TotalReserved,
+		Variants:       result.Variants,
 	}
 
 	h.resp.Success(c, resp)
@@ -63,40 +59,38 @@ func (h *InventoryHandler) Update(c *gin.Context) {
 		return
 	}
 
-	inventory, err := h.repo.FindByProductID(productID)
-	if err != nil {
-		h.resp.InternalError(c, "failed to get inventory")
-		return
-	}
-
-	if inventory == nil {
-		inventory = &Inventory{
-			ProductID: productID,
-			Quantity:  0,
-			Reserved:  0,
-		}
-		if err := h.repo.Create(inventory); err != nil {
-			h.resp.InternalError(c, "failed to create inventory")
-			return
-		}
-	}
-
 	var req UpdateInventoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.resp.ValidationError(c, err.Error())
 		return
 	}
 
-	if req.Quantity != nil {
-		inventory.Quantity = *req.Quantity
-	}
-
-	if err := h.repo.Update(inventory); err != nil {
-		h.resp.InternalError(c, "failed to update inventory")
+	if req.VariantID == nil {
+		h.resp.ValidationError(c, "variant_id is required")
 		return
 	}
 
-	h.resp.Success(c, toInventoryResponse(inventory))
+	err = h.repo.UpdateVariantStock(*req.VariantID, productID, req.Quantity)
+	if err != nil {
+		h.resp.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	result, err := h.repo.GetProductInventory(productID)
+	if err != nil {
+		h.resp.InternalError(c, "failed to get inventory")
+		return
+	}
+
+	resp := InventoryResponse{
+		ProductID:      productID.String(),
+		TotalStock:     result.TotalStock,
+		TotalReserved:  result.TotalReserved,
+		TotalAvailable: result.TotalStock - result.TotalReserved,
+		Variants:       result.Variants,
+	}
+
+	h.resp.Success(c, resp)
 }
 
 func (h *InventoryHandler) Reserve(c *gin.Context) {
@@ -112,39 +106,20 @@ func (h *InventoryHandler) Reserve(c *gin.Context) {
 		return
 	}
 
-	inventory, err := h.repo.FindByProductID(productID)
-	if err != nil {
-		h.resp.InternalError(c, "failed to get inventory")
-		return
-	}
-
-	if inventory == nil {
-		inventory = &Inventory{
-			ProductID: productID,
-			Quantity:  0,
-			Reserved:  0,
-		}
-		if err := h.repo.Create(inventory); err != nil {
-			h.resp.InternalError(c, "failed to create inventory")
-			return
-		}
-	}
-
-	var req struct {
-		Quantity int `json:"quantity" binding:"required,gt=0"`
-	}
+	var req ReserveReleaseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.resp.ValidationError(c, err.Error())
 		return
 	}
 
-	if inventory.Quantity < req.Quantity {
-		h.resp.Error(c, 400, "insufficient inventory")
-		return
+	if req.VariantID != nil {
+		err = h.repo.ReserveVariantStock(*req.VariantID, req.Quantity)
+	} else {
+		err = h.repo.ReserveProductStock(productID, req.Quantity)
 	}
 
-	if err := h.repo.Reserve(productID, req.Quantity); err != nil {
-		h.resp.InternalError(c, "failed to reserve inventory")
+	if err != nil {
+		h.resp.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -164,44 +139,22 @@ func (h *InventoryHandler) Release(c *gin.Context) {
 		return
 	}
 
-	inventory, err := h.repo.FindByProductID(productID)
-	if err != nil {
-		h.resp.InternalError(c, "failed to get inventory")
-		return
-	}
-	if inventory == nil {
-		h.resp.NotFound(c, "inventory not found")
-		return
-	}
-
-	var req struct {
-		Quantity int `json:"quantity" binding:"required,gt=0"`
-	}
+	var req ReserveReleaseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.resp.ValidationError(c, err.Error())
 		return
 	}
 
-	if inventory.Reserved < req.Quantity {
-		h.resp.Error(c, 400, "not enough reserved inventory")
-		return
+	if req.VariantID != nil {
+		err = h.repo.ReleaseVariantStock(*req.VariantID, req.Quantity)
+	} else {
+		err = h.repo.ReleaseProductStock(productID, req.Quantity)
 	}
 
-	if err := h.repo.Release(productID, req.Quantity); err != nil {
-		h.resp.InternalError(c, "failed to release inventory")
+	if err != nil {
+		h.resp.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	h.resp.Success(c, gin.H{"message": "inventory released"})
-}
-
-func toInventoryResponse(inventory *Inventory) InventoryResponse {
-	return InventoryResponse{
-		ID:        inventory.ID.String(),
-		ProductID: inventory.ProductID.String(),
-		Quantity:  inventory.Quantity,
-		Reserved:  inventory.Reserved,
-		Available: inventory.Quantity - inventory.Reserved,
-		UpdatedAt: inventory.UpdatedAt,
-	}
 }

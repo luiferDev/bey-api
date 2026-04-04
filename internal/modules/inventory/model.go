@@ -27,17 +27,27 @@ func (i *Inventory) BeforeCreate(tx *gorm.DB) error {
 }
 
 type UpdateInventoryRequest struct {
-	Quantity *int `json:"quantity"`
+	Quantity  int        `json:"quantity" binding:"required"`
+	VariantID *uuid.UUID `json:"variant_id"`
+}
+
+type ReserveReleaseRequest struct {
+	Quantity  int        `json:"quantity" binding:"required,gt=0"`
+	VariantID *uuid.UUID `json:"variant_id"`
+}
+
+type VariantStockInfo struct {
+	VariantID string `json:"variant_id"`
+	SKU       string `json:"sku"`
+	Stock     int    `json:"stock"`
+	Reserved  int    `json:"reserved"`
+	Available int    `json:"available"`
 }
 
 type InventoryResponse struct {
-	ID               string    `json:"id"`
-	ProductID        string    `json:"product_id"`
-	Quantity         int       `json:"quantity"`
-	Reserved         int       `json:"reserved"`
-	Available        int       `json:"available"`
-	VariantStock     int       `json:"variant_stock,omitempty"`
-	VariantReserved  int       `json:"variant_reserved,omitempty"`
-	VariantAvailable int       `json:"variant_available,omitempty"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ProductID      string             `json:"product_id"`
+	TotalStock     int                `json:"total_stock"`
+	TotalReserved  int                `json:"total_reserved"`
+	TotalAvailable int                `json:"total_available"`
+	Variants       []VariantStockInfo `json:"variants,omitempty"`
 }
