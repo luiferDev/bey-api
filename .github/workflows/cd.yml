@@ -87,14 +87,21 @@ jobs:
           path: trivy-image-results.sarif
           retention-days: 7
 
-      - name: Comment on PR
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Comment on associated PR
         uses: actions/github-script@v7
         with:
           script: |
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
+            const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## Docker Image Published\n\n**Image:** ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}\n\nView the image [here](https://github.com/${{ github.repository }}/pkgs/container/${{ env.IMAGE_NAME }})`
+              commit_sha: context.sha
             });
+
+            if (pulls.length > 0) {
+              await github.rest.issues.createComment({
+                issue_number: pulls[0].number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## Docker Image Published\n\n**Image:** ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}\n\nView the image [here](https://github.com/${{ github.repository }}/pkgs/container/${{ env.IMAGE_NAME }})`
+              });
+            }
